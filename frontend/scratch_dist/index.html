@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="google" value="notranslate" />
+        <link rel="shortcut icon" href="static/favicon.ico" />
+        <title>Scratch 4.0 GUI</title>
+    <script defer src="gui.js"></script></head>
+    <body>
+        <div
+            id="cloud-loading"
+            style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                z-index: 99999;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+                color: #fff;
+                font-family: &quot;Segoe UI&quot;, system-ui, sans-serif;
+            "
+        >
+            <div style="font-size: 3rem; margin-bottom: 20px">🍊</div>
+            <div
+                style="
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid rgba(255, 255, 255, 0.2);
+                    border-top-color: #4facfe;
+                    border-radius: 50%;
+                    animation: cloudSpin 0.8s linear infinite;
+                    margin-bottom: 16px;
+                "
+            ></div>
+            <p
+                id="cloud-loading-text"
+                style="color: #a0a0c0; font-size: 0.95rem; margin: 0"
+            >
+                正在加载 Scratch...
+            </p>
+            <style>
+                @keyframes cloudSpin {
+                    to {
+                        transform: rotate(360deg);
+                    }
+                }
+            </style>
+        </div>
+    </body>
+</html>

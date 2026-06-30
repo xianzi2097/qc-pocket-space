@@ -1,0 +1,1 @@
+import{_ as e,c as a,o,j as r}from"./chunks/framework.DE5X-pmd.js";const m=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"about.md","filePath":"about.md"}'),s={name:"about.md"};function n(c,t,p,d,l,u){return o(),a("div",null,[...t[0]||(t[0]=[r("p",null,"About",-1)])])}const _=e(s,[["render",n]]);export{m as __pageData,_ as default};
