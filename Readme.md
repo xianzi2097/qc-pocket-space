@@ -7,7 +7,7 @@
 当前开发环境：
 
 - 系统：Windows 11
-- 工程路径：`C:\Arin - cabin\QC-PocketSpace\website`
+- 工程路径：`C:\Arin - cabin\QC-PocketSpace\qc-pocket-space`
 - 后端：Python + FastAPI + SQLite
 - 前端：静态 HTML/CSS/JS
 - 网关：Caddy for Windows
@@ -15,7 +15,7 @@
 
 ## 目录结构
 ```text
-website/
+qc-pocket-space/
 ├─ backend/              FastAPI 后端
 │  ├─ main.py            后端入口
 │  ├─ requirements.txt   Python 依赖

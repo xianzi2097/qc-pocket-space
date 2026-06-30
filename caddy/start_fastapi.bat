@@ -8,7 +8,7 @@ title 青橙 FastAPI 后端
 cd /d "%~dp0"
 cd ..\backend
 
-:: 便携 Python 路径：website/launcher/python/python.exe
+:: 便携 Python 路径：qc-pocket-space/launcher/python/python.exe
 set "PORTABLE_PYTHON=%~dp0..\launcher\python\python.exe"
 
 if exist "%PORTABLE_PYTHON%" (
