@@ -37,9 +37,9 @@ exit
 :: ========================================================
 echo.
 echo =^> [1/3] Python 生成 Caddyfile（注入绝对路径）...
-python "%CADDY_DIR%generate_caddyfile.py" local
+"..\runtime\python\python.exe" "%CADDY_DIR%generate_caddyfile.py" local
 if errorlevel 1 (
-    echo [错误] Caddyfile 生成失败！请确认 Python 已安装并加入 PATH。
+    echo [错误] Caddyfile 生成失败！
     pause
     exit
 )
@@ -49,8 +49,8 @@ echo =^> [2/3] 启动 FastAPI 后端（新窗口，带热重载）...
 start "青橙 FastAPI" "%CADDY_DIR%start_fastapi.bat"
 
 echo =^> [3/3] 清理旧进程并启动 Caddy...
-taskkill /f /im caddy_windows_amd64_custom.exe >nul 2>&1
-caddy_windows_amd64_custom.exe run
+taskkill /f /im caddy.exe >nul 2>&1
+..\runtime\caddy\caddy.exe run
 pause
 exit
 
@@ -59,9 +59,9 @@ exit
 :: ========================================================
 echo.
 echo =^> [1/3] Python 生成 Caddyfile（注入绝对路径 + 线上域名）...
-python "%CADDY_DIR%generate_caddyfile.py" server
+"..\runtime\python\python.exe" "%CADDY_DIR%generate_caddyfile.py" server
 if errorlevel 1 (
-    echo [错误] Caddyfile 生成失败！请确认 Python 已安装并加入 PATH。
+    echo [错误] Caddyfile 生成失败！
     pause
     exit
 )
@@ -71,7 +71,7 @@ echo =^> [2/3] 启动 FastAPI 后端（新窗口，带热重载）...
 start "青橙 FastAPI" "%CADDY_DIR%start_fastapi.bat"
 
 echo =^> [3/3] 清理旧进程并启动 Caddy（Let's Encrypt HTTPS）...
-taskkill /f /im caddy_windows_amd64_custom.exe >nul 2>&1
-caddy_windows_amd64_custom.exe run
+taskkill /f /im caddy.exe >nul 2>&1
+..\runtime\caddy\caddy.exe run
 pause
 exit

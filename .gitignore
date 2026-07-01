@@ -29,8 +29,6 @@ dist/
 # =========================
 caddy/Caddyfile
 runtime/caddy/Caddyfile
-runtime/python/
-runtime/git/
 caddy/tmp/
 caddy/data/
 
