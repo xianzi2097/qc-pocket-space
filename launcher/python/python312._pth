@@ -1,5 +1,0 @@
-python312.zip
-.
-
-# Enable site.main() so pip-installed packages are found
-import site
