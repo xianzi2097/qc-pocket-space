@@ -457,18 +457,8 @@ def check_orphan_folders():
             print(f"  📁 {role_dir}/{name}  →  {path}")
         print("=" * 50)
 
-        try:
-            ans = input("是否删除这些孤儿文件夹？[y/N] ").strip().lower()
-            if ans == 'y':
-                for _, _, path in orphans:
-                    shutil.rmtree(path)
-                    print(f"  🗑️  已删除: {path}")
-                print("[+] 孤儿文件夹清理完成")
-            else:
-                print("[i] 跳过，保留孤儿文件夹")
-        except EOFError:
-            # 非交互模式（如后台启动），跳过
-            print("[i] 非交互模式，保留孤儿文件夹（可手动删除）")
+        # 后台模式：只打印警告，不阻塞等待输入
+        print("[i] 后台启动模式，保留孤儿文件夹（可手动删除）")
     finally:
         db.close()
 
