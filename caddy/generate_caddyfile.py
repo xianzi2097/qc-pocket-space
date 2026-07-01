@@ -55,7 +55,7 @@ def main():
     if mode == "local":
         content = content.replace("{{WWW_REDIRECT}}", "")
     else:
-        www_block = f"www.{site_domain} {{\n    redir http://{site_domain}{{uri}}\n}}"
+        www_block = f"www.{site_domain} {{\n    redir https://{site_domain}{{uri}}\n}}"
         content = content.replace("{{WWW_REDIRECT}}", www_block)
 
     # 写出最终的 Caddyfile（覆盖旧的）
