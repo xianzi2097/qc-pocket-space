@@ -32,8 +32,7 @@ Base = declarative_base()
 class UserModel(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)  # 纯英文，对应物理文件夹名
-    nickname = Column(String)                            # 中文显示名
+    username = Column(String, unique=True, index=True)  # 登录+显示名
     password = Column(String)
     role = Column(String)                                # "admin" / "teacher" / "student"
     avatar_path = Column(String, default="avatar_01.jpg") # 头像文件名
@@ -61,7 +60,7 @@ TRASH_DIR = os.path.abspath(os.path.join(BACKEND_DIR, "..", "..", "data", "trash
 # 工具函数
 # ==========================================
 def get_user_dir(user: UserModel) -> str:
-    return os.path.join(USERS_DIR, user.role + "s", user.username)
+    return os.path.join(USERS_DIR, user.role + "s", str(user.id))
 
 def get_user_dir_static(username: str, role: str) -> str:
     return os.path.join(USERS_DIR, role + "s", username)
@@ -80,7 +79,6 @@ def write_info_json(user: UserModel):
 
     info = {
         "username": user.username,
-        "nickname": user.nickname,
         "role": user.role,
         "avatar_path": user.avatar_path,
         "descriptors": descriptors,
@@ -100,11 +98,8 @@ def ensure_user_dirs(user: UserModel):
             os.makedirs(os.path.join(user_dir, sub), exist_ok=True)
             os.makedirs(os.path.join(user_dir, "messages", "收件箱"), exist_ok=True)
     elif user.role == "teacher":
-        # 初始化空班级列表
-        classes_path = os.path.join(user_dir, "classes.json")
-        if not os.path.exists(classes_path):
-            with open(classes_path, "w", encoding="utf-8") as f:
-                json.dump([], f, ensure_ascii=False)
+        # 不写空 classes.json，由 ensure_admin_and_test_accounts 或 API 创建
+        pass
     write_info_json(user)
 
 def move_to_trash(user: UserModel, db: Session) -> dict:
@@ -135,7 +130,7 @@ def move_to_trash(user: UserModel, db: Session) -> dict:
 
     # DB 快照（冗余备份，info.json 已足够）
     db_snapshot = {
-        "username": user.username, "nickname": user.nickname,
+        "username": user.username,
         "password": user.password, "role": user.role,
         "avatar_path": user.avatar_path, "qc_descriptors": user.qc_descriptors,
     }
@@ -173,7 +168,6 @@ def restore_from_trash(trash_id: int, db: Session) -> dict:
         with open(info_path, "r", encoding="utf-8") as f:
             info = json.load(f)
         username = info["username"]
-        nickname = info["nickname"]
         role = info["role"]
         avatar_path = info["avatar_path"]
         qc_descriptors = json.dumps(info.get("descriptors", {}), ensure_ascii=False)
@@ -184,7 +178,6 @@ def restore_from_trash(trash_id: int, db: Session) -> dict:
         # 降级：纯 DB 快照恢复
         db_snap = json.loads(trash.db_snapshot or "{}")
         username = db_snap["username"]
-        nickname = db_snap["nickname"]
         role = db_snap["role"]
         avatar_path = db_snap["avatar_path"]
         qc_descriptors = db_snap.get("qc_descriptors", "{}")
@@ -194,7 +187,7 @@ def restore_from_trash(trash_id: int, db: Session) -> dict:
         raise HTTPException(status_code=400, detail=f"用户 [{username}] 已存在，无法恢复")
 
     user = UserModel(
-        username=username, nickname=nickname, password=password,
+        username=username, password=password,
         role=role, avatar_path=avatar_path, qc_descriptors=qc_descriptors
     )
     db.add(user)
@@ -260,13 +253,13 @@ def _send_test_messages(student_username: str):
 # 启动：建表 + 确保管理员 + 注入测试账号
 # ==========================================
 
-def _ensure_user(db: Session, username: str, nickname: str, role: str,
+def _ensure_user(db: Session, username: str, role: str,
                  avatar: str = "default.jpg", descriptors: dict = None) -> UserModel:
     """创建用户（DB + 文件夹），如已存在则跳过"""
     user = db.query(UserModel).filter(UserModel.username == username).first()
     if not user:
         user = UserModel(
-            username=username, nickname=nickname, password="111111",
+            username=username, password="111111",
             role=role, avatar_path=avatar,
             qc_descriptors=json.dumps(descriptors or {}, ensure_ascii=False)
         )
@@ -276,8 +269,16 @@ def _ensure_user(db: Session, username: str, nickname: str, role: str,
     return user
 
 def _write_note_file(username: str, notebook: str, filename: str, content: str):
-    """写入一篇 .md 笔记"""
-    nb_dir = os.path.join(USERS_DIR, "students", username, "notes", notebook)
+    """写入一篇 .md 笔记（username → 查 id → 拼路径）"""
+    db = SessionLocal()
+    try:
+        user = db.query(UserModel).filter(UserModel.username == username).first()
+        if not user:
+            return
+        user_dir = get_user_dir(user)
+    finally:
+        db.close()
+    nb_dir = os.path.join(user_dir, "notes", notebook)
     os.makedirs(nb_dir, exist_ok=True)
     fp = os.path.join(nb_dir, filename)
     if not os.path.exists(fp):
@@ -408,31 +409,63 @@ def _create_teacher_classes(teacher_username: str, classes_data: list[dict]):
 
 def _send_teacher_welcome(teacher_username: str, student_usernames: list[str]):
     """老师给学生们发欢迎消息"""
-    for stu in student_usernames:
-        msg_dir = os.path.join(USERS_DIR, "students", stu, "messages", "收件箱")
-        os.makedirs(msg_dir, exist_ok=True)
-        msg_id = f"welcome_from_{teacher_username}"
-        fp = os.path.join(msg_dir, f"{msg_id}.json")
-        if os.path.exists(fp):
-            continue
-        msg = {
-            "id": msg_id,
-            "sender": teacher_username,
-            "recipient": stu,
-            "folder": "收件箱",
-            "subject": f"欢迎！我是{teacher_username}老师",
-            "body": f"你好！我是{teacher_username}老师。\n\n"
-                    f"很高兴和你一起学习编程！\n\n"
-                    f"## 课前准备\n"
-                    f"- 📝 准备好笔记本\n"
-                    f"- 💻 打开 Scratch/Python\n"
-                    f"- 🧠 带上好奇心\n\n"
-                    f"有问题随时发消息给我哦～",
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "is_read": False,
-        }
-        with open(fp, "w", encoding="utf-8") as f:
-            json.dump(msg, f, ensure_ascii=False, indent=2)
+    db = SessionLocal()
+    try:
+        for stu in student_usernames:
+            user = db.query(UserModel).filter(UserModel.username == stu).first()
+            if not user:
+                continue
+            user_dir = get_user_dir(user)
+            msg_dir = os.path.join(user_dir, "messages", "收件箱")
+            os.makedirs(msg_dir, exist_ok=True)
+            msg_id = f"welcome_from_{teacher_username}"
+            fp = os.path.join(msg_dir, f"{msg_id}.json")
+            if os.path.exists(fp):
+                continue
+            msg = {
+                "id": msg_id,
+                "sender": teacher_username,
+                "recipient": stu,
+                "folder": "收件箱",
+                "subject": f"欢迎！我是{teacher_username}老师",
+                "body": f"你好！我是{teacher_username}老师。\n\n"
+                        f"很高兴和你一起学习编程！\n\n"
+                        f"## 课前准备\n"
+                        f"- 📝 准备好笔记本\n"
+                        f"- 💻 打开 Scratch/Python\n"
+                        f"- 🧠 带上好奇心\n\n"
+                        f"有问题随时发消息给我哦～",
+                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "is_read": False,
+            }
+            with open(fp, "w", encoding="utf-8") as f:
+                json.dump(msg, f, ensure_ascii=False, indent=2)
+    finally:
+        db.close()
+
+def _make_student_username(teacher: str, class_name: str, student_name: str) -> str:
+    """
+    为班级学生生成唯一系统账号。
+    格式：{老师}{班级缩写}{学生名缩写}
+    有重名时自动追加数字后缀。
+    """
+    def slug(s: str) -> str:
+        s = re.sub(r'[\s/\\()（）]', '', s)
+        return s[:10]
+
+    base = f"{slug(teacher)}_{slug(class_name)}_{slug(student_name)}"
+    base = base.strip('_')
+
+    db = SessionLocal()
+    try:
+        candidate = base
+        suffix = 1
+        while db.query(UserModel).filter(UserModel.username == candidate).first():
+            suffix += 1
+            candidate = f"{base}{suffix}"
+        return candidate
+    finally:
+        db.close()
 
 def ensure_admin_and_test_accounts():
     db = SessionLocal()
@@ -442,94 +475,101 @@ def ensure_admin_and_test_accounts():
         os.makedirs(TRASH_DIR, exist_ok=True)
 
         # ── 管理员 ──
-        _ensure_user(db, "admin", "超级管理员", "admin", "default.jpg")
+        _ensure_user(db, "admin", "admin", "default.jpg")
 
-        # ── 测试老师 t1 / t2 / t3 ──
-        t1 = _ensure_user(db, "t1", "Arin 老师", "teacher", "avatar_01.jpg",
-                          {"title": "Scratch 主讲", "intro": "少儿编程教育者"})
-        t2 = _ensure_user(db, "t2", "李老师", "teacher", "avatar_02.jpg",
-                          {"title": "Python 讲师", "intro": "全栈开发工程师"})
-        t3 = _ensure_user(db, "t3", "王老师", "teacher", "avatar_03.jpg",
-                          {"title": "C++ 教练", "intro": "信息学奥赛教练"})
+        # ── 测试老师 ──
+        _ensure_user(db, "林老师", "teacher", "avatar_01.jpg",
+                     {"title": "Scratch 主讲"})
+        _ensure_user(db, "程老师", "teacher", "avatar_02.jpg",
+                     {"title": "Python 讲师"})
+        _ensure_user(db, "黄老师", "teacher", "avatar_03.jpg",
+                     {"title": "C++ 教练"})
 
-        # ── 测试学生 s1 / s2 / s3 ──
-        s1 = _ensure_user(db, "s1", "小极客", "student", "avatar_05.jpg",
-                          {"class": "三年级1班", "points": 128, "badges": 5, "projects": 12, "level": 3, "pet": "小火龙"})
-        s2 = _ensure_user(db, "s2", "代码侠", "student", "avatar_12.jpg",
-                          {"class": "三年级1班", "points": 256, "badges": 8, "projects": 20, "level": 5, "pet": "水箭龟"})
-        s3 = _ensure_user(db, "s3", "编程猫", "student", "avatar_08.jpg",
-                          {"class": "四年级2班", "points": 512, "badges": 12, "projects": 35, "level": 7, "pet": "皮卡丘"})
+        teacher_ids = {"林老师": None, "程老师": None, "黄老师": None}
+        for u in db.query(UserModel).filter(UserModel.role == "teacher").all():
+            if u.username in teacher_ids:
+                teacher_ids[u.username] = u.id
 
-        # ── 学生：创建测试笔记本 ──
-        for stu in ["s1", "s2", "s3"]:
-            _create_student_notebooks(stu)
+        # ── 50 个真实学生姓名 ──
+        student_names = [
+            "张子轩", "李雨桐", "王浩宇", "刘思琪", "陈明宇",
+            "杨紫涵", "赵子豪", "黄梓萱", "周俊杰", "吴欣怡",
+            "徐天佑", "孙语彤", "马浩然", "朱梓琳", "胡俊哲",
+            "郭雨萱", "林俊豪", "何思颖", "高浩然", "罗梓涵",
+            "梁俊熙", "宋雨桐", "唐子轩", "韩欣怡", "曹浩宇",
+            "许梓萱", "邓俊杰", "冯雨彤", "彭浩然", "蒋思琪",
+            "蔡俊豪", "潘梓琳", "袁浩宇", "翁雨萱", "方俊哲",
+            "沈欣怡", "任浩然", "姚梓涵", "卢俊熙", "崔雨桐",
+            "谭子轩", "汪欣怡", "范浩宇", "钟梓萱", "廖俊杰",
+            "熊雨彤", "金浩然", "欧阳思琪", "夏侯俊豪", "慕容梓琳",
+        ]
 
-        # ── 老师 t1：Scratch初级班 + Python进阶班（部分学生关联账号） ──
-        _create_teacher_classes("t1", [
-            {
-                "name": "Scratch初级班",
-                "students": [
-                    {"id": "s_1_scratch", "name": "小明", "account": ""},
-                    {"id": "s_2_scratch", "name": "小红", "account": ""},
-                    {"id": "s_3_scratch", "name": "小刚", "account": ""},
-                    {"id": "s_4_scratch", "name": "小丽", "account": ""},
-                    {"id": "s_5_scratch", "name": "豆豆", "account": ""},
-                ]
+        # ── 班级配置 ──
+        class_config = {
+            "林老师": {
+                "classes": ["Scratch启蒙班", "Scratch初级班", "Scratch中级班", "Python基础班", "Python进阶班"],
+                "student_count": 35,
             },
-            {
-                "name": "Python进阶班",
-                "students": [
-                    {"id": "s_1_python", "name": "大壮", "account": ""},
-                    {"id": "s_2_python", "name": "阿花", "account": ""},
-                    {"id": "s_3_python", "name": "小杰", "account": ""},
-                ]
+            "程老师": {
+                "classes": ["Python入门班", "算法提高班"],
+                "student_count": 8,
             },
-        ])
-        _send_teacher_welcome("t1", ["s1", "s2", "s3"])
+            "黄老师": {
+                "classes": ["C++基础班", "C++竞赛班", "机器人编程"],
+                "student_count": 7,
+            },
+        }
 
-        # ── 老师 t2：Python基础班 + C++入门班 ──
-        _create_teacher_classes("t2", [
-            {
-                "name": "Python基础班",
-                "students": [
-                    {"id": "t2_py_1", "name": "小美", "account": ""},
-                    {"id": "t2_py_2", "name": "浩浩", "account": ""},
-                    {"id": "t2_py_3", "name": "乐乐", "account": ""},
-                    {"id": "t2_py_4", "name": "婷婷", "account": ""},
-                ]
-            },
-            {
-                "name": "C++入门班",
-                "students": [
-                    {"id": "t2_cpp_1", "name": "小宇", "account": ""},
-                    {"id": "t2_cpp_2", "name": "静静", "account": ""},
-                    {"id": "t2_cpp_3", "name": "飞飞", "account": ""},
-                ]
-            },
-        ])
-        _send_teacher_welcome("t2", ["s1", "s2"])
+        name_idx = 0
+        all_students = {}
+        for teacher, cfg in class_config.items():
+            tid = teacher_ids[teacher]
+            t_dir = os.path.join(USERS_DIR, "teachers", str(tid))
+            classes_path = os.path.join(t_dir, "classes.json")
+            if os.path.exists(classes_path):
+                continue
 
-        # ── 老师 t3：机器人编程班 ──
-        _create_teacher_classes("t3", [
-            {
-                "name": "机器人编程",
-                "students": [
-                    {"id": "t3_rob_1", "name": "天天", "account": ""},
-                    {"id": "t3_rob_2", "name": "阳阳", "account": ""},
-                    {"id": "t3_rob_3", "name": "果果", "account": ""},
-                ]
-            },
-        ])
-        _send_teacher_welcome("t3", ["s3"])
+            classes_list = []
+            per_class = cfg["student_count"] // len(cfg["classes"])
+            extra = cfg["student_count"] % len(cfg["classes"])
+
+            for ci, cls_name in enumerate(cfg["classes"]):
+                count = per_class + (1 if ci < extra else 0)
+                students_list = []
+                for _ in range(count):
+                    stu_name = student_names[name_idx]
+                    name_idx += 1
+                    new_user = _ensure_user(
+                        db, stu_name, "student", "default.jpg",
+                        {"teacher": teacher}
+                    )
+                    students_list.append({
+                        "user_id": new_user.id,
+                        "name": stu_name,
+                    })
+                    all_students.setdefault(teacher, []).append(stu_name)
+                classes_list.append({
+                    "name": cls_name,
+                    "students": students_list,
+                    "schedule": [],
+                })
+
+            os.makedirs(t_dir, exist_ok=True)
+            with open(classes_path, "w", encoding="utf-8") as f:
+                json.dump(classes_list, f, ensure_ascii=False, indent=2)
+
+        # ── 发欢迎消息 ──
+        for teacher, stus in all_students.items():
+            _send_teacher_welcome(teacher, stus)
 
         print("[+] 测试账号就绪:")
         print("    管理员: admin / 111111")
-        print("    老师:   t1 / t2 / t3  (密码 111111)")
-        print("    学生:   s1 / s2 / s3  (密码 111111)")
-        print("    t1: Scratch初级班(5人) Python进阶班(3人)")
-        print("    t2: Python基础班(4人) C++入门班(3人)")
-        print("    t3: 机器人编程(3人)")
-        print("    每学生 3 笔记本: python scratch cpp")
+        print("    老师:   林老师 / 程老师 / 黄老师  (密码 111111)")
+        for teacher, cfg in class_config.items():
+            for cls_name in cfg["classes"]:
+                per = cfg["student_count"] // len(cfg["classes"])
+                print(f"    {teacher}: {cls_name}({per}人)")
+        print(f"    共 {name_idx} 名学生")
     finally:
         db.close()
 
@@ -537,10 +577,10 @@ def check_orphan_folders():
     """检查 users 文件夹中是否存在 DB 里没有的孤儿目录，提示用户处理"""
     db = SessionLocal()
     try:
-        # 收集 DB 中所有用户名
-        db_users = set()
-        for row in db.query(UserModel.username).all():
-            db_users.add(row[0])
+        # 收集 DB 中所有用户 id
+        db_ids = set()
+        for row in db.query(UserModel.id).all():
+            db_ids.add(str(row[0]))
 
         orphans = []
         for role_dir in ["admins", "teachers", "students"]:
@@ -550,7 +590,7 @@ def check_orphan_folders():
             for name in os.listdir(role_path):
                 p = os.path.join(role_path, name)
                 if os.path.isdir(p) and not name.startswith("."):
-                    if name not in db_users:
+                    if name not in db_ids:
                         orphans.append((role_dir, name, p))
 
         if not orphans:
@@ -602,7 +642,6 @@ def get_db():
 # ==========================================
 class RegisterForm(BaseModel):
     username: str
-    nickname: str
     password: str
     role: str
 
@@ -644,7 +683,6 @@ def register_user(form: RegisterForm, db: Session = Depends(get_db)):
 
     new_user = UserModel(
         username=form.username,
-        nickname=form.nickname,
         password=form.password,
         role=form.role,
         avatar_path=avatar_name,
@@ -677,7 +715,6 @@ def login_user(form: LoginForm, db: Session = Depends(get_db)):
             "user": {
                 "username": user.username,
                 "role": user.role,
-                "nickname": user.nickname,
                 "avatar_path": avatar_path,
                 "descriptors": descriptors
             }
@@ -763,7 +800,7 @@ def list_all_users(db: Session = Depends(get_db)):
     return {
         "status": "success",
         "users": [{
-            "id": u.id, "username": u.username, "nickname": u.nickname,
+            "id": u.id, "username": u.username,
             "role": u.role, "avatar_path": u.avatar_path
         } for u in users]
     }
@@ -863,7 +900,6 @@ def user_profile(username: str = "", db: Session = Depends(get_db)):
         "status": "success",
         "user": {
             "username": user.username,
-            "nickname": user.nickname,
             "role": user.role,
             "avatar_path": user.avatar_path,
             "descriptors": descriptors
@@ -1212,7 +1248,16 @@ def delete_note(notebook: str, filename: str, username: str = ""):
 # 老师班级管理 API
 # ==========================================
 def _get_classes_path(teacher_username: str) -> str:
-    return os.path.join(USERS_DIR, "teachers", teacher_username, "classes.json")
+    """根据老师用户名查找其 classes.json（用 id 做文件夹名）"""
+    db = SessionLocal()
+    try:
+        user = db.query(UserModel).filter(UserModel.username == teacher_username).first()
+        if user:
+            return os.path.join(USERS_DIR, "teachers", str(user.id), "classes.json")
+        # 降级：用 username（兼容旧数据或未创建的情况）
+        return os.path.join(USERS_DIR, "teachers", teacher_username, "classes.json")
+    finally:
+        db.close()
 
 def _load_classes(teacher_username: str) -> list:
     path = _get_classes_path(teacher_username)
@@ -1237,8 +1282,22 @@ class StudentForm(BaseModel):
     existing_id: str = ""  # 非空时表示沿用已有学生 ID
 
 @app.get("/api/classes")
-def list_classes(username: str = ""):
+def list_classes(username: str = "", db: Session = Depends(get_db)):
     classes = _load_classes(username)
+    # 为每个学生填充当前 nickname
+    for c in classes:
+        enriched = []
+        for s in c.get("students", []):
+            user_id = s.get("user_id")
+            if user_id:
+                user = db.query(UserModel).filter(UserModel.id == user_id).first()
+                enriched.append({
+                    "user_id": user_id,
+                    "username": user.username if user else "未知",
+                })
+            else:
+                enriched.append(s)
+        c["students"] = enriched
     return {"status": "success", "classes": classes}
 
 @app.post("/api/classes")
@@ -1418,45 +1477,100 @@ def permanent_delete_trash_item(folder_name: str, username: str = ""):
 
 @app.post("/api/classes/{class_name}/students")
 def add_student(class_name: str, form: StudentForm, username: str = ""):
-    classes = _load_classes(username)
-    for c in classes:
-        if c["name"] == class_name:
-            # 如果传了 existing_id，沿用已有 ID（跨班共享）
-            if form.existing_id:
-                student_id = form.existing_id
-            else:
-                student_id = f"s_{len(c['students']) + 1}_{int(datetime.now().timestamp())}"
-            c["students"].append({
-                "id": student_id, "name": form.name,
-                "account": form.account,
-                "remark": form.remark
-            })
-            _save_classes(username, classes)
-            return {"status": "success", "student_id": student_id, "is_new": not bool(form.existing_id)}
-    raise HTTPException(status_code=404, detail="班级不存在")
+    db_local = SessionLocal()
+    try:
+        classes = _load_classes(username)
+        for c in classes:
+            if c["name"] == class_name:
+                if form.existing_id:
+                    # 跨班共享已有学生
+                    user_id = int(form.existing_id)
+                    user = db_local.query(UserModel).filter(UserModel.id == user_id).first()
+                    if not user:
+                        raise HTTPException(status_code=404, detail="学生不存在")
+                else:
+                    # 新学生 → 自动创建系统账号
+                    new_username = _make_student_username(username, class_name, form.name)
+                    new_user = _ensure_user(
+                        db_local, new_username, "student", "default.jpg",
+                        {"teacher": username}
+                    )
+                    user_id = new_user.id
+
+                c["students"].append({
+                    "user_id": user_id,
+                    "name": form.name,
+                })
+                _save_classes(username, classes)
+                return {
+                    "status": "success",
+                    "user_id": user_id,
+                }
+        raise HTTPException(status_code=404, detail="班级不存在")
+    finally:
+        db_local.close()
 
 @app.get("/api/classes/find-student")
-def find_student(username: str = "", name: str = ""):
-    """查找同名学生在哪些班级，用于重名检测"""
-    classes = _load_classes(username)
+def find_student(name: str = ""):
+    """全校搜索同名学生在哪些老师的哪些班级"""
+    teachers_dir = os.path.join(USERS_DIR, "teachers")
+    if not os.path.exists(teachers_dir):
+        return {"status": "success", "matches": []}
+
     matches = []
-    for c in classes:
-        for s in c.get("students", []):
-            if s["name"] == name:
-                matches.append({
-                    "class_name": c["name"],
-                    "student_id": s["id"],
-                    "name": s["name"],
-                    "remark": s.get("remark", "")
-                })
+    for t_folder in os.listdir(teachers_dir):
+        t_path = os.path.join(teachers_dir, t_folder)
+        if not os.path.isdir(t_path):
+            continue
+        classes_path = os.path.join(t_path, "classes.json")
+        if not os.path.exists(classes_path):
+            continue
+        with open(classes_path, "r", encoding="utf-8") as f:
+            try:
+                classes = json.load(f)
+            except json.JSONDecodeError:
+                continue
+        for c in classes:
+            for s in c.get("students", []):
+                if s.get("name") == name and s.get("user_id"):
+                    matches.append({
+                        "teacher": t_folder,
+                        "class_name": c["name"],
+                        "user_id": s["user_id"],
+                    })
     return {"status": "success", "matches": matches}
+
+@app.get("/api/students/list")
+def list_all_students():
+    """扫 students/ 目录，返回全校学生列表"""
+    students_dir = os.path.join(USERS_DIR, "students")
+    if not os.path.exists(students_dir):
+        return {"status": "success", "students": []}
+
+    result = []
+    for folder in sorted(os.listdir(students_dir), key=lambda x: int(x) if x.isdigit() else 0):
+        info_path = os.path.join(students_dir, folder, "info.json")
+        if not os.path.exists(info_path):
+            continue
+        try:
+            with open(info_path, "r", encoding="utf-8") as f:
+                info = json.load(f)
+            result.append({
+                "user_id": int(folder),
+                "username": info.get("username", ""),
+                "avatar_path": info.get("avatar_path", "default.jpg"),
+            })
+        except (json.JSONDecodeError, ValueError):
+            continue
+    return {"status": "success", "students": result}
 
 @app.delete("/api/classes/{class_name}/students/{student_id}")
 def remove_student(class_name: str, student_id: str, username: str = ""):
     classes = _load_classes(username)
+    target_id = int(student_id)
     for c in classes:
         if c["name"] == class_name:
-            c["students"] = [s for s in c["students"] if s["id"] != student_id]
+            c["students"] = [s for s in c["students"] if s.get("user_id") != target_id]
             _save_classes(username, classes)
             return {"status": "success"}
     raise HTTPException(status_code=404, detail="班级不存在")
