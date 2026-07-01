@@ -63,28 +63,25 @@ def get_user_dir(user: UserModel) -> str:
     return os.path.join(USERS_DIR, user.role + "s", str(user.id))
 
 def _resolve_user_dir(username: str) -> str | None:
-    """
-    将用户信息写入文件夹内的 info.json，实现「文件夹即身份」。
-    即使数据库丢失，info.json 也能完整描述文件夹主人。
-    """
-    user_dir = get_user_dir(user)
-    os.makedirs(user_dir, exist_ok=True)
+    """通过 username 查找用户并返回 id 路径"""
+    db = SessionLocal()
     try:
-        descriptors = json.loads(user.qc_descriptors or "{}")
-    except json.JSONDecodeError:
-        descriptors = {}
+        user = db.query(UserModel).filter(UserModel.username == username).first()
+        if not user:
+            return None
+        return get_user_dir(user)
+    finally:
+        db.close()
 
-    info = {
-        "username": user.username,
-        "role": user.role,
-        "avatar_path": user.avatar_path,
-        "descriptors": descriptors,
-        "created": getattr(user, "_created_at", ""),
-        "subfolders": ["sb3_projects", "notes"] if user.role == "student" else [],
-    }
-    info_path = os.path.join(user_dir, "info.json")
-    with open(info_path, "w", encoding="utf-8") as f:
-        json.dump(info, f, ensure_ascii=False, indent=2)
+def _resolve_user_by_username(username: str) -> UserModel | None:
+    """通过 username 查找用户对象"""
+    db = SessionLocal()
+    try:
+        return db.query(UserModel).filter(UserModel.username == username).first()
+    finally:
+        db.close()
+
+def write_info_json(user: UserModel):
 
 def ensure_user_dirs(user: UserModel):
     """为新用户创建标准目录 + info.json"""
