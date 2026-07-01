@@ -63,28 +63,6 @@ def get_user_dir(user: UserModel) -> str:
     return os.path.join(USERS_DIR, user.role + "s", str(user.id))
 
 def _resolve_user_dir(username: str) -> str | None:
-    """通过 username 查找用户并返回 id 路径"""
-    db = SessionLocal()
-    try:
-        user = db.query(UserModel).filter(UserModel.username == username).first()
-        if not user:
-            return None
-        return get_user_dir(user)
-    finally:
-        db.close()
-
-def _resolve_user_by_username(username: str) -> UserModel | None:
-    """通过 username 查找用户对象"""
-    db = SessionLocal()
-    try:
-        return db.query(UserModel).filter(UserModel.username == username).first()
-    finally:
-        db.close()
-
-def get_user_dir_static(username: str, role: str) -> str:
-    return os.path.join(USERS_DIR, role + "s", username)
-
-def write_info_json(user: UserModel):
     """
     将用户信息写入文件夹内的 info.json，实现「文件夹即身份」。
     即使数据库丢失，info.json 也能完整描述文件夹主人。
@@ -706,7 +684,7 @@ def list_trash(username: str = "", db: Session = Depends(get_db)):
     }
 
 @app.post("/api/trash/restore/{trash_id}")
-def restore_trash_item(trash_id: int, username: str = "", db: Session = Depends(get_db)):
+def restore_user_from_trash(trash_id: int, username: str = "", db: Session = Depends(get_db)):
     """从垃圾桶恢复用户"""
     require_admin(username, db)
     return restore_from_trash(trash_id, db)
@@ -1302,8 +1280,8 @@ def list_trash_items(username: str = ""):
     return {"status": "success", "items": items}
 
 @app.post("/api/trash/items/{folder_name}/restore")
-def restore_trash_item(folder_name: str, username: str = ""):
-    """恢复回收站项目"""
+def restore_class_from_trash(folder_name: str, username: str = ""):
+    """恢复回收站中的班级/课程"""
     folder_path = os.path.join(TRASH_DIR, folder_name)
     meta_path = os.path.join(folder_path, ".trash.json")
     if not os.path.exists(meta_path):
@@ -1670,15 +1648,15 @@ def delete_material(course_name: str, lesson_name: str, teacher: str = ""):
     shutil.rmtree(lesson_path)
     return {"status": "success", "message": f"课件 [{lesson_name}] 已删除"}
 
-@app.delete("/api/courses/{course_name:path}")
-def delete_course(course_name: str, teacher: str = ""):
-    """删除课程"""
+@app.delete("/api/courses/{course_name:path}/permanent")
+def permanent_delete_course(course_name: str, teacher: str = ""):
+    """永久删除课程（不经过回收站）"""
     base = _get_teacher_course_dir(teacher)
     course_path = _safe_path(base, course_name)
     if not os.path.exists(course_path):
         raise HTTPException(status_code=404, detail="课程不存在")
     shutil.rmtree(course_path)
-    return {"status": "success", "message": f"课程 [{course_name}] 已删除"}
+    return {"status": "success", "message": f"课程 [{course_name}] 已永久删除"}
 
 # ==========================================
 # 保存课件 sb3（Scratch 编辑器保存到课程）
