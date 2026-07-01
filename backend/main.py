@@ -82,6 +82,24 @@ def _resolve_user_by_username(username: str) -> UserModel | None:
         db.close()
 
 def write_info_json(user: UserModel):
+    """将用户信息写入文件夹内的 info.json"""
+    user_dir = get_user_dir(user)
+    os.makedirs(user_dir, exist_ok=True)
+    try:
+        descriptors = json.loads(user.qc_descriptors or "{}")
+    except json.JSONDecodeError:
+        descriptors = {}
+    info = {
+        "username": user.username,
+        "role": user.role,
+        "avatar_path": user.avatar_path,
+        "descriptors": descriptors,
+        "created": getattr(user, "_created_at", ""),
+        "subfolders": ["sb3_projects", "notes"] if user.role == "student" else [],
+    }
+    info_path = os.path.join(user_dir, "info.json")
+    with open(info_path, "w", encoding="utf-8") as f:
+        json.dump(info, f, ensure_ascii=False, indent=2)
 
 def ensure_user_dirs(user: UserModel):
     """为新用户创建标准目录 + info.json"""
