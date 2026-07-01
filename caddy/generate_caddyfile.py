@@ -2,8 +2,8 @@
 青橙 Studio - Caddyfile 生成器
 自动检测项目路径，注入绝对路径到 Caddyfile。
 零依赖，可直接用系统 Python 运行。
-用法: python generate_caddyfile.py local    (本地测试)
-      python generate_caddyfile.py server   (线上生产)
+用法: python generate_caddyfile.py local [域名] [端口]    (本地测试)
+      python generate_caddyfile.py server [域名] [端口]   (线上生产)
 """
 import os
 import sys
