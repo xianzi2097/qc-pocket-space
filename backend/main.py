@@ -20,7 +20,16 @@ DB_PATH = os.path.abspath(os.path.join(BACKEND_DIR, "..", "..", "data", "qingche
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # 数据目录：website 外部的 data/，git 碰不到
-USERS_DIR = os.path.abspath(os.path.join(BACKEND_DIR, "..", "..", "data", "users"))
+# 确保 data/ 及子目录存在（否则 SQLite 连不上）
+_DATA_ROOT = os.path.abspath(os.path.join(BACKEND_DIR, "..", "..", "data"))
+USERS_DIR = os.path.join(_DATA_ROOT, "users")
+for _d in [_DATA_ROOT, USERS_DIR,
+           os.path.join(USERS_DIR, "admins"),
+           os.path.join(USERS_DIR, "teachers"),
+           os.path.join(USERS_DIR, "students"),
+           os.path.join(_DATA_ROOT, "trash"),
+           os.path.join(_DATA_ROOT, "courses")]:
+    os.makedirs(_d, exist_ok=True)
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False, "timeout": 10})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
