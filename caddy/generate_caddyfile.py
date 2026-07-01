@@ -27,6 +27,14 @@ def main():
     else:
         site_domain = "localhost"
     fastapi_port = sys.argv[3] if len(sys.argv) > 3 else "8000"
+    caddy_port = sys.argv[4] if len(sys.argv) > 4 else ""
+
+    # Caddy 地址：本地模式用 `:端口`（纯HTTP），域名模式用 `域名:端口`
+    if mode == "local":
+        port = caddy_port if caddy_port else "80"
+        site_domain = f":{port}"
+    elif caddy_port:
+        site_domain = f"{site_domain}:{caddy_port}"
 
     # 读模板
     template_path = os.path.join(script_dir, "Caddyfile.template")
@@ -42,6 +50,13 @@ def main():
     content = content.replace("{{DATA_PATH}}", data_path)
     content = content.replace("{{SITE_DOMAIN}}", site_domain)
     content = content.replace("{{FASTAPI_PORT}}", fastapi_port)
+
+    # www 跳转：域名模式用 https，本地模式直接去掉
+    if mode == "local":
+        content = content.replace("{{WWW_REDIRECT}}", "")
+    else:
+        www_block = f"www.{site_domain} {{\n    redir https://{site_domain}{{uri}}\n}}"
+        content = content.replace("{{WWW_REDIRECT}}", www_block)
 
     # 写出最终的 Caddyfile（覆盖旧的）
     caddyfile_path = os.path.join(script_dir, "Caddyfile")
