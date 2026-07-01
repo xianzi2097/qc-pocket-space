@@ -5,6 +5,17 @@ description: "服务器部署运维。Keywords: 部署, 服务器, codenova.cn, 
 
 # 青橙 Studio 服务器部署
 
+> 🚨 老师通过 qx-launcher 启动服务，不要叫他跑 Start_Caddy.bat！
+
+## ⚠️ 两个 Python，严格区分！
+| | Python 位置 | 装了什么 | 用途 | 进 git |
+|---|---|---|---|---|
+| ① 启动器 | 系统 Python（开发机独有） | PySide6 | 跑 qx-launcher GUI | ❌ |
+| ② 后端 | `runtime/python/python.exe` | fastapi/uvicorn/pydantic/sqlalchemy | 跑 backend/main.py | ✅ |
+- 后端自带 Python 是因为：用户电脑可能没装 Python，U 盘插上必须能跑
+- **绝对不要**给 runtime/python/ 装 PySide6！后端不需要 GUI 库
+- **绝对不要**给系统 Python 装 fastapi！启动器不需要后端依赖
+
 ## 服务器信息
 - **主机**: 117.72.13.189 / codenova.cn
 - **用户**: administrator / 密码 P@ssw0rd123!
@@ -18,7 +29,39 @@ description: "服务器部署运维。Keywords: 部署, 服务器, codenova.cn, 
 | `data/` | `C:\QC-Packet\data\` | 用户数据，不参与 Git，两边独立 |
 | `labs_dev/qx-launcher/` | `C:\QC-Packet\qc-launcher\` | Launcher 源码 |
 
-> 本地 `website` 和 `qx-launcher` 测试完推 Gitee → 服务器 `git pull`
+> 本地 `qc-pocket-space` 和 `qx-launcher` 测试完推 Gitee → 服务器 `git pull`
+
+## 🗂️ 完整项目架构（核心理解！）
+```
+QC-PocketSpace/                          ← 工作区根
+├── qc-pocket-space/                     ← 【部署包】自包含，git clone 即用
+│   ├── backend/main.py                  ← FastAPI 后端（用 runtime/python/）
+│   ├── frontend/                        ← 前端 build 产物
+│   │   ├── dashboard/                   ← React 看板（qx-dashboard-ts build →）
+│   │   ├── scratch_dist/                ← Scratch 编辑器（Scratch-dev build →）
+│   │   └── vitepress_dist/              ← 文档站（Vitepress-dev build →）
+│   ├── caddy/                           ← Caddy 启动脚本 + 配置模板
+│   │   ├── Start_Caddy.bat              ← 备用手动启动
+│   │   └── start_fastapi.bat            ← 硬编码指向 runtime/python/
+│   └── runtime/                         ← 自带运行时！
+│       ├── python/                      ← Python 3.12 + fastapi/uvicorn/pydantic/sqlalchemy
+│       └── caddy/caddy.exe              ← Caddy Web 服务器
+│
+├── data/                                ← 用户数据（不进 git，每台独立）
+│
+└── labs_dev/                            ← 开发源码（各自独立 git 仓库）
+    ├── qx-dashboard-ts/  → Arin-Cabin/qc-frontend       (React 看板)
+    ├── qx-launcher/      → Arin-Cabin/qc-launcher        (GUI 启动器)
+    ├── Scratch-dev/      → Arin-Cabin/scratch-Teaching   (Scratch 二开)
+    └── Vitepress-dev/    → Arin-Cabin/qc-vitepress       (课程文档)
+```
+
+**工作流：** 改 dev 源码 → build → 产物到 `frontend/` → git push qc-pocket-space → 服务器 pull → 老师用 launcher 启动
+
+**两个 Python 铁律：**
+- ① 启动器 Python（系统/virtualenv）：**只有 PySide6**，不装后端库
+- ② 后端 Python（`runtime/python/`）：**只有 fastapi/uvicorn 等**，不装 GUI 库
+- 后端自带 Python 的原因：用户电脑/U 盘可能没装 Python，必须自包含
 
 ## ⚠️ 原则
 - **绝不删 `.git`**、**绝不 `--force`**，涉及仓库操作先问用户

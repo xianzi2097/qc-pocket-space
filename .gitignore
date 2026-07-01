@@ -14,7 +14,8 @@ backend/env/
 **/__pycache__/
 *.pyc
 *.pyo
-*.pyd
+!runtime/python/**/*.pyd
+!runtime/python/*.pyd
 
 # =========================
 # Python 打包生成
