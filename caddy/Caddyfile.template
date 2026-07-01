@@ -18,7 +18,7 @@ www.{{SITE_DOMAIN}} {
     encode gzip zstd
 	
     # 0.后端大脑：把所有 /api/ 开头的流量，拦截下来交给 FastAPI
-    reverse_proxy /api/* localhost:8000
+    reverse_proxy /api/* localhost:{{FASTAPI_PORT}}
     
     # 1. 默认根目录：公开主页（4 卡片布局，低年级入口）
     root * "{{SITE_PATH}}/dashboard"

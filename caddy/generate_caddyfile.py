@@ -26,6 +26,7 @@ def main():
         site_domain = "codenova.cn"
     else:
         site_domain = "localhost"
+    fastapi_port = sys.argv[3] if len(sys.argv) > 3 else "8000"
 
     # 读模板
     template_path = os.path.join(script_dir, "Caddyfile.template")
@@ -40,6 +41,7 @@ def main():
     content = content.replace("{{SITE_PATH}}", site_path)
     content = content.replace("{{DATA_PATH}}", data_path)
     content = content.replace("{{SITE_DOMAIN}}", site_domain)
+    content = content.replace("{{FASTAPI_PORT}}", fastapi_port)
 
     # 写出最终的 Caddyfile（覆盖旧的）
     caddyfile_path = os.path.join(script_dir, "Caddyfile")
