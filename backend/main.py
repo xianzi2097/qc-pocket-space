@@ -62,6 +62,25 @@ TRASH_DIR = os.path.abspath(os.path.join(BACKEND_DIR, "..", "..", "data", "trash
 def get_user_dir(user: UserModel) -> str:
     return os.path.join(USERS_DIR, user.role + "s", str(user.id))
 
+def _resolve_user_dir(username: str) -> str | None:
+    """通过 username 查找用户并返回 id 路径"""
+    db = SessionLocal()
+    try:
+        user = db.query(UserModel).filter(UserModel.username == username).first()
+        if not user:
+            return None
+        return get_user_dir(user)
+    finally:
+        db.close()
+
+def _resolve_user_by_username(username: str) -> UserModel | None:
+    """通过 username 查找用户对象"""
+    db = SessionLocal()
+    try:
+        return db.query(UserModel).filter(UserModel.username == username).first()
+    finally:
+        db.close()
+
 def get_user_dir_static(username: str, role: str) -> str:
     return os.path.join(USERS_DIR, role + "s", username)
 
@@ -191,8 +210,9 @@ def restore_from_trash(trash_id: int, db: Session) -> dict:
         role=role, avatar_path=avatar_path, qc_descriptors=qc_descriptors
     )
     db.add(user)
+    db.commit()  # 先 commit 获取 id
 
-    target_dir = get_user_dir_static(username, role)
+    target_dir = get_user_dir(user)
     if os.path.exists(trash_path):
         os.makedirs(os.path.dirname(target_dir), exist_ok=True)
         shutil.move(trash_path, target_dir)
@@ -208,8 +228,11 @@ def restore_from_trash(trash_id: int, db: Session) -> dict:
 MESSAGES_DIR_NAME = "messages"  # 学生个人空间里的消息文件夹名
 
 def _get_msgs_dir(username: str) -> str:
-    """学生消息根目录：data/users/students/{username}/messages/"""
-    return os.path.join(USERS_DIR, "students", username, MESSAGES_DIR_NAME)
+    """学生消息根目录：data/users/students/{id}/messages/"""
+    user_dir = _resolve_user_dir(username)
+    if not user_dir:
+        raise HTTPException(status_code=404, detail=f"用户 {username} 不存在")
+    return os.path.join(user_dir, MESSAGES_DIR_NAME)
 
 def _write_msg(username: str, folder: str, msg_id: str, sender: str, subject: str, body: str):
     """写一条消息到文件"""
@@ -226,28 +249,6 @@ def _write_msg(username: str, folder: str, msg_id: str, sender: str, subject: st
     fp = os.path.join(folder_dir, f"{msg_id}.json")
     with open(fp, "w", encoding="utf-8") as f:
         json.dump(msg, f, ensure_ascii=False, indent=2)
-
-def _send_test_messages(student_username: str):
-    """给学生发测试消息（文件系统）"""
-    folder = "收件箱"
-    os.makedirs(os.path.join(_get_msgs_dir(student_username), folder), exist_ok=True)
-    _write_msg(student_username, folder, "welcome_1", "t",
-        "欢迎来到青橙 Studio 🍊",
-        "你好！欢迎加入青橙 Studio。\n\n"
-        "这里是你和老师之间的消息中心，老师会在这里发送：\n"
-        "- 📝 **课堂笔记**\n"
-        "- 💡 **代码示例**\n"
-        "- 🎯 **课后任务**\n\n"
-        "祝你学习愉快！")
-    _write_msg(student_username, folder, "scratch_tip", "t",
-        "Scratch 小技巧：克隆的使用",
-        "今天我们来学习**克隆**。\n\n"
-        "```scratch\n"
-        "当绿旗被点击\n"
-        "重复执行 10 次\n"
-        "  克隆 自己\n"
-        "```\n\n"
-        "克隆体可以有自己的变量，试试看！")
 
 # ==========================================
 # 启动：建表 + 确保管理员 + 注入测试账号
@@ -267,145 +268,6 @@ def _ensure_user(db: Session, username: str, role: str,
         db.commit()
         ensure_user_dirs(user)
     return user
-
-def _write_note_file(username: str, notebook: str, filename: str, content: str):
-    """写入一篇 .md 笔记（username → 查 id → 拼路径）"""
-    db = SessionLocal()
-    try:
-        user = db.query(UserModel).filter(UserModel.username == username).first()
-        if not user:
-            return
-        user_dir = get_user_dir(user)
-    finally:
-        db.close()
-    nb_dir = os.path.join(user_dir, "notes", notebook)
-    os.makedirs(nb_dir, exist_ok=True)
-    fp = os.path.join(nb_dir, filename)
-    if not os.path.exists(fp):
-        with open(fp, "w", encoding="utf-8") as f:
-            f.write(content)
-
-def _create_student_notebooks(username: str):
-    """为一个学生创建 3 个笔记本及其测试笔记"""
-    notebooks = {
-        "python": [
-            ("01.变量与类型.md",
-             "# 变量与类型\n\n"
-             "Python 中的变量就像一个**标签**，贴在数据上。\n\n"
-             "```python\n"
-             "name = \"小明\"      # 字符串 str\n"
-             "age = 10            # 整数 int\n"
-             "score = 95.5        # 浮点数 float\n"
-             "is_cool = True      # 布尔 bool\n"
-             "```\n\n"
-             "## 试试看\n"
-             "用 `type()` 函数可以查看变量的类型：\n"
-             "```python\n"
-             "print(type(name))   # <class 'str'>\n"
-             "print(type(age))    # <class 'int'>\n"
-             "```\n"),
-            ("02.条件判断.md",
-             "# 条件判断 if/else\n\n"
-             "让程序根据不同情况做不同的事。\n\n"
-             "```python\n"
-             "score = 85\n"
-             "if score >= 90:\n"
-             "    print(\"优秀！\")\n"
-             "elif score >= 60:\n"
-             "    print(\"及格\")\n"
-             "else:\n"
-             "    print(\"加油！\")\n"
-             "```\n\n"
-             "## 练习\n"
-             "写一个判断奇偶数的程序：\n"
-             "```python\n"
-             "n = int(input(\"输入一个数: \"))\n"
-             "if n % 2 == 0:\n"
-             "    print(\"偶数\")\n"
-             "else:\n"
-             "    print(\"奇数\")\n"
-             "```\n"),
-        ],
-        "scratch": [
-            ("01.小猫散步.md",
-             "# 小猫散步\n\n"
-             "让 Scratch 小猫动起来！\n\n"
-             "## 积木\n"
-             "- 🟢 **当绿旗被点击** — 开始\n"
-             "- 🔵 **移动 10 步** — 让角色移动\n"
-             "- 🟣 **碰到边缘就反弹** — 不跑出屏幕\n\n"
-             "```scratch\n"
-             "当 🟢 被点击\n"
-             "重复执行\n"
-             "  移动 (10) 步\n"
-             "  碰到边缘就反弹\n"
-             "```\n\n"
-             "## 挑战\n"
-             "1. 改变步数看看小猫跑多快\n"
-             "2. 加上「下一个造型」让小猫走路\n"),
-            ("02.克隆魔法.md",
-             "# 克隆魔法\n\n"
-             "克隆 = 复制角色，做弹幕、下雨等效果的神器。\n\n"
-             "```scratch\n"
-             "当 🟢 被点击\n"
-             "重复执行 (10) 次\n"
-             "  克隆 [自己]\n"
-             "  等待 (0.5) 秒\n"
-             "```\n\n"
-             "## 克隆体启动时\n"
-             "```scratch\n"
-             "当作为克隆体启动时\n"
-             "  移到 [随机位置]\n"
-             "  重复执行 (50) 次\n"
-             "    将 y 增加 (-2)\n"
-             "  删除此克隆体\n"
-             "```\n"),
-        ],
-        "cpp": [
-            ("01.你好世界.md",
-             "# 第一个 C++ 程序\n\n"
-             "```cpp\n"
-             "#include <iostream>\n"
-             "using namespace std;\n\n"
-             "int main() {\n"
-             "    cout << \"Hello, World!\" << endl;\n"
-             "    return 0;\n"
-             "}\n"
-             "```\n\n"
-             "## 拆解\n"
-             "- `#include <iostream>` — 引入输入输出库\n"
-             "- `int main()` — 程序入口\n"
-             "- `cout <<` — 输出到屏幕\n"
-             "- `return 0` — 告诉系统程序正常结束\n"),
-            ("02.循环.md",
-             "# for 循环\n\n"
-             "重复做一件事，不用写 N 遍代码。\n\n"
-             "```cpp\n"
-             "for (int i = 1; i <= 10; i++) {\n"
-             "    cout << i << \" \";\n"
-             "}\n"
-             "// 输出: 1 2 3 4 5 6 7 8 9 10\n"
-             "```\n\n"
-             "## 三个部分\n"
-             "1. `int i = 1` — 起点\n"
-             "2. `i <= 10` — 条件（满足就继续）\n"
-             "3. `i++` — 每次加 1\n"),
-        ],
-    }
-
-    for nb_name, notes in notebooks.items():
-        for filename, content in notes:
-            _write_note_file(username, nb_name, filename, content)
-
-def _create_teacher_classes(teacher_username: str, classes_data: list[dict]):
-    """为老师创建班级和班级学生（支持关联账号）"""
-    existing = _load_classes(teacher_username)
-    if existing:  # 已有班级数据不覆盖
-        return
-
-    _save_classes(teacher_username, classes_data)
-    for c in classes_data:
-        os.makedirs(os.path.join(USERS_DIR, "teachers", teacher_username, "attendance", c["name"]), exist_ok=True)
 
 def _send_teacher_welcome(teacher_username: str, student_usernames: list[str]):
     """老师给学生们发欢迎消息"""
@@ -674,10 +536,6 @@ def register_user(form: RegisterForm, db: Session = Depends(get_db)):
     if db.query(UserModel).filter(UserModel.username == form.username).first():
         raise HTTPException(status_code=400, detail="该账号已存在！")
 
-    # 创建物理文件夹
-    user_dir = get_user_dir_static(form.username, form.role)
-    os.makedirs(user_dir, exist_ok=True)
-
     # 随机默认头像
     avatar_name = f"avatar_{str(random.randint(1, 78)).zfill(2)}.jpg"
 
@@ -713,6 +571,7 @@ def login_user(form: LoginForm, db: Session = Depends(get_db)):
             "status": "success",
             "message": "登录成功！",
             "user": {
+                "id": user.id,
                 "username": user.username,
                 "role": user.role,
                 "avatar_path": avatar_path,
@@ -899,6 +758,7 @@ def user_profile(username: str = "", db: Session = Depends(get_db)):
     return {
         "status": "success",
         "user": {
+            "id": user.id,
             "username": user.username,
             "role": user.role,
             "avatar_path": user.avatar_path,
@@ -980,22 +840,29 @@ def sent_messages(username: str = "", db: Session = Depends(get_db)):
     if not os.path.exists(students_dir):
         return {"status": "success", "messages": []}
     results = []
-    for student_name in os.listdir(students_dir):
-        msgs_base = _get_msgs_dir(student_name)
+    for folder_id in os.listdir(students_dir):
+        if not folder_id.isdigit():
+            continue
+        # 用 id 查 username
+        uid = int(folder_id)
+        user = db.query(UserModel).filter(UserModel.id == uid).first()
+        if not user:
+            continue
+        msgs_base = _get_msgs_dir(user.username)
         if not os.path.exists(msgs_base):
             continue
         for folder_name in os.listdir(msgs_base):
-            fp = os.path.join(msgs_base, folder_name)
-            if not os.path.isdir(fp):
+            fp_path = os.path.join(msgs_base, folder_name)
+            if not os.path.isdir(fp_path):
                 continue
-            for fname in os.listdir(fp):
+            for fname in os.listdir(fp_path):
                 if not fname.endswith(".json"):
                     continue
                 try:
-                    with open(os.path.join(fp, fname), "r", encoding="utf-8") as f:
+                    with open(os.path.join(fp_path, fname), "r", encoding="utf-8") as f:
                         data = json.load(f)
                         if data.get("sender") == username and data.get("subject"):
-                            data["recipient"] = student_name
+                            data["recipient"] = user.username
                             data["folder"] = folder_name
                             results.append(data)
                 except (json.JSONDecodeError, OSError):
@@ -1120,12 +987,19 @@ def _safe_path(base: str, *parts: str) -> str:
         raise HTTPException(status_code=403, detail="路径不安全")
     return fp
 
+def _get_notes_base(username: str) -> str:
+    """通过 username 获取学生笔记根目录"""
+    user_dir = _resolve_user_dir(username)
+    if not user_dir:
+        raise HTTPException(status_code=404, detail=f"用户 {username} 不存在")
+    return os.path.join(user_dir, "notes")
+
 # ─── 笔记本（文件夹）───
 
 @app.get("/api/notebooks")
 def list_notebooks(username: str = ""):
     """列出学生的所有笔记本"""
-    base = os.path.join(USERS_DIR, "students", username, "notes")
+    base = _get_notes_base(username)
     if not os.path.exists(base):
         return {"status": "success", "notebooks": []}
     items = []
@@ -1142,7 +1016,7 @@ def create_notebook(form: NotebookForm, username: str = ""):
     name = form.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="笔记本名称不能为空")
-    base = os.path.join(USERS_DIR, "students", username, "notes")
+    base = _get_notes_base(username)
     nb_path = _safe_path(base, name)
     if os.path.exists(nb_path):
         raise HTTPException(status_code=400, detail="笔记本已存在")
@@ -1152,7 +1026,7 @@ def create_notebook(form: NotebookForm, username: str = ""):
 @app.delete("/api/notebooks/{name:path}")
 def delete_notebook(name: str, username: str = ""):
     """删除笔记本及其所有笔记"""
-    base = os.path.join(USERS_DIR, "students", username, "notes")
+    base = _get_notes_base(username)
     nb_path = _safe_path(base, name)
     if not os.path.exists(nb_path):
         raise HTTPException(status_code=404, detail="笔记本不存在")
@@ -1164,7 +1038,7 @@ def rename_notebook(name: str, username: str = "", new_name: str = ""):
     """重命名笔记本"""
     if not new_name or new_name == name:
         raise HTTPException(status_code=400, detail="新名称无效")
-    base = os.path.join(USERS_DIR, "students", username, "notes")
+    base = _get_notes_base(username)
     old_path = _safe_path(base, name)
     new_path = _safe_path(base, new_name)
     if not os.path.exists(old_path):
@@ -1179,7 +1053,7 @@ def rename_notebook(name: str, username: str = "", new_name: str = ""):
 @app.get("/api/notes")
 def list_notes(username: str = "", notebook: str = ""):
     """列出笔记本内的所有笔记"""
-    base = os.path.join(USERS_DIR, "students", username, "notes", notebook)
+    base = os.path.join(_get_notes_base(username), notebook)
     if not os.path.exists(base):
         return {"status": "success", "notes": []}
     files = sorted(
@@ -1196,7 +1070,7 @@ def list_notes(username: str = "", notebook: str = ""):
 @app.get("/api/notes/{notebook}/{filename:path}")
 def read_note(notebook: str, filename: str, username: str = ""):
     """读取单篇笔记"""
-    base = os.path.join(USERS_DIR, "students", username, "notes")
+    base = _get_notes_base(username)
     fp = _safe_path(base, notebook, filename)
     if not os.path.exists(fp):
         raise HTTPException(status_code=404, detail="笔记不存在")
@@ -1210,7 +1084,7 @@ def save_note(form: NoteSaveForm, username: str = "", notebook: str = ""):
         raise HTTPException(status_code=400, detail="请指定笔记本")
     if not form.filename.endswith(".md"):
         form.filename += ".md"
-    base = os.path.join(USERS_DIR, "students", username, "notes", notebook)
+    base = os.path.join(_get_notes_base(username), notebook)
     os.makedirs(base, exist_ok=True)
     fp = _safe_path(base, form.filename)
     with open(fp, "w", encoding="utf-8") as f:
@@ -1224,7 +1098,7 @@ def rename_note(notebook: str, filename: str, username: str = "", new_name: str 
         raise HTTPException(status_code=400, detail="新名称无效")
     if not new_name.endswith(".md"):
         new_name += ".md"
-    base = os.path.join(USERS_DIR, "students", username, "notes")
+    base = _get_notes_base(username)
     old_fp = _safe_path(base, notebook, filename)
     new_fp = _safe_path(base, notebook, new_name)
     if not os.path.exists(old_fp):
@@ -1237,7 +1111,7 @@ def rename_note(notebook: str, filename: str, username: str = "", new_name: str 
 @app.delete("/api/notes/{notebook}/{filename:path}")
 def delete_note(notebook: str, filename: str, username: str = ""):
     """删除一篇笔记"""
-    base = os.path.join(USERS_DIR, "students", username, "notes")
+    base = _get_notes_base(username)
     fp = _safe_path(base, notebook, filename)
     if not os.path.exists(fp):
         raise HTTPException(status_code=404, detail="笔记不存在")
@@ -1517,27 +1391,35 @@ def find_student(name: str = ""):
     if not os.path.exists(teachers_dir):
         return {"status": "success", "matches": []}
 
-    matches = []
-    for t_folder in os.listdir(teachers_dir):
-        t_path = os.path.join(teachers_dir, t_folder)
-        if not os.path.isdir(t_path):
-            continue
-        classes_path = os.path.join(t_path, "classes.json")
-        if not os.path.exists(classes_path):
-            continue
-        with open(classes_path, "r", encoding="utf-8") as f:
-            try:
-                classes = json.load(f)
-            except json.JSONDecodeError:
+    db_local = SessionLocal()
+    try:
+        matches = []
+        for t_folder in os.listdir(teachers_dir):
+            t_path = os.path.join(teachers_dir, t_folder)
+            if not os.path.isdir(t_path):
                 continue
-        for c in classes:
-            for s in c.get("students", []):
-                if s.get("name") == name and s.get("user_id"):
-                    matches.append({
-                        "teacher": t_folder,
-                        "class_name": c["name"],
-                        "user_id": s["user_id"],
-                    })
+            classes_path = os.path.join(t_path, "classes.json")
+            if not os.path.exists(classes_path):
+                continue
+            with open(classes_path, "r", encoding="utf-8") as f:
+                try:
+                    classes = json.load(f)
+                except json.JSONDecodeError:
+                    continue
+            # 解析老师 id → username
+            tid = int(t_folder)
+            teacher_user = db_local.query(UserModel).filter(UserModel.id == tid).first()
+            teacher_name = teacher_user.username if teacher_user else t_folder
+            for c in classes:
+                for s in c.get("students", []):
+                    if s.get("name") == name and s.get("user_id"):
+                        matches.append({
+                            "teacher": teacher_name,
+                            "class_name": c["name"],
+                            "user_id": s["user_id"],
+                        })
+    finally:
+        db_local.close()
     return {"status": "success", "matches": matches}
 
 @app.get("/api/students/list")
@@ -1594,8 +1476,11 @@ class SessionForm(BaseModel):
     students: list[SessionStudentRecord]
 
 def _get_session_path(username: str, class_name: str, month: str) -> str:
-    """获取某月课堂记录文件路径"""
-    return os.path.join(USERS_DIR, "teachers", username, "sessions", class_name, f"{month}.json")
+    """获取某月课堂记录文件路径（用老师 id 做文件夹名）"""
+    user_dir = _resolve_user_dir(username)
+    if not user_dir:
+        return os.path.join(USERS_DIR, "teachers", username, "sessions", class_name, f"{month}.json")
+    return os.path.join(user_dir, "sessions", class_name, f"{month}.json")
 
 def _load_sessions(username: str, class_name: str, month: str) -> list:
     """加载某月课堂记录，文件不存在则返回空数组"""
