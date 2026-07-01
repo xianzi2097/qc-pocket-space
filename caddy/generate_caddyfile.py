@@ -18,10 +18,11 @@ def main():
     site_path = os.path.join(project_root, "frontend").replace("\\", "/")
     data_path = os.path.join(os.path.dirname(project_root), "data").replace("\\", "/")
 
-    # 模式：local 或 server
+    # 模式：local 或 server，后面可跟自定义域名
     mode = sys.argv[1] if len(sys.argv) > 1 else "local"
-
-    if mode == "server":
+    if len(sys.argv) > 2:
+        site_domain = sys.argv[2]
+    elif mode == "server":
         site_domain = "codenova.cn"
     else:
         site_domain = "localhost"

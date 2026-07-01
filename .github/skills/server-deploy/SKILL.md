@@ -7,14 +7,14 @@ description: "服务器部署运维。Keywords: 部署, 服务器, codenova.cn, 
 
 > 🚨 老师通过 qx-launcher 启动服务，不要叫他跑 Start_Caddy.bat！
 
-## ⚠️ 两个 Python，严格区分！
+## ⚠️ 两个 Python + 一个 venv，严格区分！
 | | Python 位置 | 装了什么 | 用途 | 进 git |
 |---|---|---|---|---|
-| ① 启动器 | 系统 Python（开发机独有） | PySide6 | 跑 qx-launcher GUI | ❌ |
+| ① 启动器 venv | `labs_dev/qx-launcher/.venv/Scripts/python.exe` | PySide6, psutil | 跑 qx-launcher GUI | ❌ |
 | ② 后端 | `runtime/python/python.exe` | fastapi/uvicorn/pydantic/sqlalchemy | 跑 backend/main.py | ✅ |
+- 启动 launcher 用 `.venv\Scripts\python.exe main.py`，**不要先 Activate 再 python**（Windows Store 劫持）
 - 后端自带 Python 是因为：用户电脑可能没装 Python，U 盘插上必须能跑
 - **绝对不要**给 runtime/python/ 装 PySide6！后端不需要 GUI 库
-- **绝对不要**给系统 Python 装 fastapi！启动器不需要后端依赖
 
 ## 服务器信息
 - **主机**: 117.72.13.189 / codenova.cn
