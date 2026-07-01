@@ -13,7 +13,6 @@
 # 此文件由 generate_caddyfile.py 自动生成，请勿手动编辑！
 # 路径和域名通过 Python 脚本注入绝对路径。
 {{SITE_DOMAIN}} {
-    tls internal
     encode gzip zstd
 	
     # 0.后端大脑：把所有 /api/ 开头的流量，拦截下来交给 FastAPI
