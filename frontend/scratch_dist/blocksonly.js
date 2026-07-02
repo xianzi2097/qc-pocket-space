@@ -127500,39 +127500,54 @@ class MenuBar extends react__WEBPACK_IMPORTED_MODULE_5__.Component {
     overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:sans-serif;";
     const box = document.createElement("div");
     box.style.cssText = "background:#fff;border-radius:12px;padding:24px;width:380px;box-shadow:0 8px 32px rgba(0,0,0,0.3);color:#333;";
-    box.innerHTML = "\n            <h3 style=\"margin:0 0 16px;font-size:16px;font-weight:700;\">\u4FDD\u5B58\u5230\u8BFE\u7A0B</h3>\n            <div style=\"margin-bottom:12px;\">\n                <label style=\"display:block;font-size:12px;color:#666;margin-bottom:4px;\">\u9009\u62E9\u8001\u5E08</label>\n                <select id=\"sct-teacher\" style=\"width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;background:#fff;\">\n                    <option value=\"t1\">Arin \u8001\u5E08</option>\n                    <option value=\"t2\">\u674E\u8001\u5E08</option>\n                    <option value=\"t3\">\u738B\u8001\u5E08</option>\n                </select>\n            </div>\n            <div style=\"margin-bottom:12px;\">\n                <label style=\"display:block;font-size:12px;color:#666;margin-bottom:4px;\">\u9009\u62E9\u8BFE\u7A0B</label>\n                <select id=\"sct-course\" style=\"width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;background:#fff;\">\n                    <option value=\"\">\u52A0\u8F7D\u4E2D...</option>\n                </select>\n            </div>\n            <div style=\"margin-bottom:20px;\">\n                <label style=\"display:block;font-size:12px;color:#666;margin-bottom:4px;\">\u8BFE\u4EF6\u540D\u79F0</label>\n                <input id=\"sct-lesson\" value=\"01.\u7B2C\u4E00\u8BFE\" style=\"width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;\">\n            </div>\n            <div style=\"display:flex;gap:8px;justify-content:flex-end;\">\n                <button id=\"sct-cancel\" style=\"padding:8px 16px;border:1px solid #ddd;border-radius:6px;background:#f5f5f5;cursor:pointer;font-size:13px;\">\u53D6\u6D88</button>\n                <button id=\"sct-confirm\" style=\"padding:8px 16px;border:none;border-radius:6px;background:#4c97ff;color:#fff;cursor:pointer;font-size:13px;font-weight:600;\">\u4FDD\u5B58</button>\n            </div>\n        ";
+    box.innerHTML = "\n            <h3 style=\"margin:0 0 16px;font-size:16px;font-weight:700;\">\u4FDD\u5B58\u5230\u8BFE\u7A0B</h3>\n            <div style=\"margin-bottom:12px;\">\n                <label style=\"display:block;font-size:12px;color:#666;margin-bottom:4px;\">\u9009\u62E9\u8BFE\u7A0B</label>\n                <select id=\"sct-course\" style=\"width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;background:#fff;\">\n                    <option value=\"\">\u52A0\u8F7D\u4E2D...</option>\n                </select>\n            </div>\n            <div style=\"margin-bottom:20px;\">\n                <label style=\"display:block;font-size:12px;color:#666;margin-bottom:4px;\">\u8BFE\u4EF6\u540D\u79F0</label>\n                <input id=\"sct-lesson\" value=\"01.\u7B2C\u4E00\u8BFE\" style=\"width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box;\">\n            </div>\n            <div style=\"display:flex;gap:8px;justify-content:flex-end;\">\n                <button id=\"sct-cancel\" style=\"padding:8px 16px;border:1px solid #ddd;border-radius:6px;background:#f5f5f5;cursor:pointer;font-size:13px;\">\u53D6\u6D88</button>\n                <button id=\"sct-confirm\" style=\"padding:8px 16px;border:none;border-radius:6px;background:#4c97ff;color:#fff;cursor:pointer;font-size:13px;font-weight:600;\">\u4FDD\u5B58</button>\n            </div>\n        ";
     overlay.appendChild(box);
     document.body.appendChild(overlay);
 
-    // 加载课程列表
-    const loadCourses = teacher => {
+    // 动态扫描所有老师的课程
+    const loadAllCourses = () => {
       const sel = document.getElementById("sct-course");
       sel.innerHTML = '<option value="">加载中...</option>';
-      fetch("/api/courses?teacher=".concat(teacher, "&t=").concat(Date.now())).then(r => r.json()).then(data => {
-        if (data.status === "success" && data.courses.length > 0) {
-          sel.innerHTML = data.courses.map(c => "<option value=\"".concat(c.name, "\">").concat(c.name, " (").concat(c.material_count, "\u8BFE\u4EF6)</option>")).join("");
-        } else {
-          sel.innerHTML = '<option value="">暂无课程，请先创建</option>';
+      fetch("/api/users?t=".concat(Date.now())).then(r => r.json()).then(data => {
+        const teachers = data.users.filter(u => u.role === "teacher");
+        if (teachers.length === 0) {
+          sel.innerHTML = '<option value="">暂无老师，请先创建</option>';
+          return;
         }
+        // 并发获取所有老师的课程
+        return Promise.all(teachers.map(t => fetch("/api/courses?teacher=".concat(t.username, "&t=").concat(Date.now())).then(r => r.json()))).then(results => {
+          let allOptions = [];
+          results.forEach((courseData, i) => {
+            if (courseData.status === "success" && courseData.courses) {
+              courseData.courses.forEach(c => {
+                allOptions.push({
+                  name: c.name,
+                  material_count: c.material_count,
+                  teacher: teachers[i].username
+                });
+              });
+            }
+          });
+          if (allOptions.length === 0) {
+            sel.innerHTML = '<option value="">暂无课程，请先创建</option>';
+            return;
+          }
+          sel.innerHTML = allOptions.map(c => "<option value=\"".concat(c.name, "\" data-teacher=\"").concat(c.teacher, "\">").concat(c.name, "\uFF08").concat(c.teacher, "\uFF09</option>")).join("");
+        });
       }).catch(() => {
         sel.innerHTML = '<option value="">加载失败</option>';
       });
     };
-
-    // 切换老师时重新加载课程
-    document.getElementById("sct-teacher").onchange = e => {
-      loadCourses(e.target.value);
-    };
-
-    // 默认加载 t1 的课程
-    loadCourses("t1");
+    loadAllCourses();
     document.getElementById("sct-cancel").onclick = () => overlay.remove();
     document.getElementById("sct-confirm").onclick = () => {
-      const teacher = document.getElementById("sct-teacher").value;
-      const courseName = document.getElementById("sct-course").value;
+      var _sel$options$sel$sele;
+      const sel = document.getElementById("sct-course");
+      const courseName = sel.value;
+      const teacher = ((_sel$options$sel$sele = sel.options[sel.selectedIndex]) === null || _sel$options$sel$sele === void 0 || (_sel$options$sel$sele = _sel$options$sel$sele.dataset) === null || _sel$options$sel$sele === void 0 ? void 0 : _sel$options$sel$sele.teacher) || "";
       const lessonName = document.getElementById("sct-lesson").value.trim();
-      if (!teacher || !courseName || !lessonName) {
-        alert("请完整填写所有字段");
+      if (!courseName || !lessonName) {
+        alert("请选择课程并填写课件名称");
         return;
       }
       overlay.remove();
