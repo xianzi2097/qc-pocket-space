@@ -37,6 +37,16 @@ def main():
         site_domain = f"{site_domain}:{caddy_port}"
     # 443 时不追加端口，Caddy 自动启用 HTTPS + Let's Encrypt
 
+    # 合并域名列表（www + 主域名共用同一块，一张证书）
+    if mode == "server":
+        suffix = site_domain.split(":", 1)[1] if ":" in site_domain else ""
+        www_domain = f"www.{site_domain.split(':')[0]}"
+        if suffix:
+            www_domain = f"{www_domain}:{suffix}"
+        site_domain_list = f"{site_domain}, {www_domain}"
+    else:
+        site_domain_list = site_domain
+
     # 读模板
     template_path = os.path.join(script_dir, "Caddyfile.template")
     if not os.path.exists(template_path):
@@ -50,14 +60,9 @@ def main():
     content = content.replace("{{SITE_PATH}}", site_path)
     content = content.replace("{{DATA_PATH}}", data_path)
     content = content.replace("{{SITE_DOMAIN}}", site_domain)
+    content = content.replace("{{SITE_DOMAIN_LIST}}", site_domain_list)
     content = content.replace("{{FASTAPI_PORT}}", fastapi_port)
-
-    # www 跳转：域名模式用 https，本地模式直接去掉
-    if mode == "local":
-        content = content.replace("{{WWW_REDIRECT}}", "")
-    else:
-        www_block = f"www.{site_domain} {{\n    redir https://{site_domain}{{uri}}\n}}"
-        content = content.replace("{{WWW_REDIRECT}}", www_block)
+    content = content.replace("{{WWW_REDIRECT}}", "")
 
     # 写出最终的 Caddyfile（覆盖旧的）
     caddyfile_path = os.path.join(script_dir, "Caddyfile")

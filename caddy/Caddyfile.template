@@ -4,15 +4,15 @@
     order webdav before file_server
 }
 
-# ===============================================
-# 专门处理带 www 的访问，自动跳转到不带 www 的主域名
-# ===============================================
-{{WWW_REDIRECT}}
-
 # ================= 你的网站配置 =================
 # 此文件由 generate_caddyfile.py 自动生成，请勿手动编辑！
 # 路径和域名通过 Python 脚本注入绝对路径。
-{{SITE_DOMAIN}} {
+{{SITE_DOMAIN_LIST}} {
+    # www → 主域名 301 跳转
+    @www {
+        host www.{{SITE_DOMAIN}}
+    }
+    redir @www https://{{SITE_DOMAIN}}{uri}
     encode gzip zstd
 	
     # 0.后端大脑：把所有 /api/ 开头的流量，拦截下来交给 FastAPI
