@@ -1150,7 +1150,7 @@ class StudentForm(BaseModel):
 @app.get("/api/classes")
 def list_classes(username: str = "", db: Session = Depends(get_db)):
     classes = _load_classes(username)
-    # 为每个学生填充当前 nickname
+    # 为每个学生填充当前 username
     for c in classes:
         enriched = []
         for s in c.get("students", []):

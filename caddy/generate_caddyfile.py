@@ -33,8 +33,9 @@ def main():
     if mode == "local":
         port = caddy_port if caddy_port else "80"
         site_domain = f":{port}"
-    elif caddy_port:
+    elif caddy_port and caddy_port != "443":
         site_domain = f"{site_domain}:{caddy_port}"
+    # 443 时不追加端口，Caddy 自动启用 HTTPS + Let's Encrypt
 
     # 读模板
     template_path = os.path.join(script_dir, "Caddyfile.template")
