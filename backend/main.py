@@ -338,6 +338,10 @@ def ensure_admin_and_test_accounts():
             os.makedirs(os.path.join(USERS_DIR, folder), exist_ok=True)
         os.makedirs(TRASH_DIR, exist_ok=True)
 
+        # 如果管理员已存在 → 不是第一次启动，跳过全部测试数据
+        if db.query(UserModel).filter(UserModel.username == "admin").first():
+            return
+
         # ── 管理员 ──
         _ensure_user(db, "admin", "admin", "default.jpg")
 
