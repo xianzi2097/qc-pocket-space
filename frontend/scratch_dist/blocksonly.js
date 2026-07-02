@@ -133968,8 +133968,8 @@ class Blocks extends react__WEBPACK_IMPORTED_MODULE_4__.Component {
       const minTop = Math.min(...stackWithHeight.map(r => r.top));
       const maxBottom = Math.max(...stackWithHeight.map(r => r.bottom));
       const gutterWidth = Math.round(32 * scaleFactor);
-      const gutterLeft = minLeft - gutterWidth - 4 * scaleFactor;
-      const scriptTop = minTop - 2 * scaleFactor;
+      const gutterLeft = minLeft + window.scrollX - gutterWidth - 4 * scaleFactor;
+      const scriptTop = minTop + window.scrollY - 2 * scaleFactor;
       const scriptHeight = maxBottom - minTop + 4 * scaleFactor;
 
       // Store script info for export
@@ -134235,6 +134235,9 @@ class Blocks extends react__WEBPACK_IMPORTED_MODULE_4__.Component {
     // (addChangeListener doesn't fire for translate/zoom events)
     if (this._lineNumbersActive) {
       this._debouncedGenerateLineNumbers();
+    }
+    if (this._whitelistActive) {
+      this._debouncedGenerateWhitelist();
     }
   }
   onScriptGlowOn(data) {
