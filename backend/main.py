@@ -375,43 +375,43 @@ def ensure_admin_and_test_accounts():
         _ensure_user(db, "admin", "admin", "default.jpg")
 
         # ── 测试老师 ──
-        _ensure_user(db, "林老师", "teacher", "avatar_01.jpg",
+        _ensure_user(db, "林老师(t)", "teacher", "avatar_01.jpg",
                      {"title": "Scratch 主讲"})
-        _ensure_user(db, "程老师", "teacher", "avatar_02.jpg",
+        _ensure_user(db, "程老师(t)", "teacher", "avatar_02.jpg",
                      {"title": "Python 讲师"})
-        _ensure_user(db, "黄老师", "teacher", "avatar_03.jpg",
+        _ensure_user(db, "黄老师(t)", "teacher", "avatar_03.jpg",
                      {"title": "C++ 教练"})
 
-        teacher_ids = {"林老师": None, "程老师": None, "黄老师": None}
+        teacher_ids = {"林老师(t)": None, "程老师(t)": None, "黄老师(t)": None}
         for u in db.query(UserModel).filter(UserModel.role == "teacher").all():
             if u.username in teacher_ids:
                 teacher_ids[u.username] = u.id
 
         # ── 50 个真实学生姓名 ──
         student_names = [
-            "张子轩", "李雨桐", "王浩宇", "刘思琪", "陈明宇",
-            "杨紫涵", "赵子豪", "黄梓萱", "周俊杰", "吴欣怡",
-            "徐天佑", "孙语彤", "马浩然", "朱梓琳", "胡俊哲",
-            "郭雨萱", "林俊豪", "何思颖", "高浩然", "罗梓涵",
-            "梁俊熙", "宋雨桐", "唐子轩", "韩欣怡", "曹浩宇",
-            "许梓萱", "邓俊杰", "冯雨彤", "彭浩然", "蒋思琪",
-            "蔡俊豪", "潘梓琳", "袁浩宇", "翁雨萱", "方俊哲",
-            "沈欣怡", "任浩然", "姚梓涵", "卢俊熙", "崔雨桐",
-            "谭子轩", "汪欣怡", "范浩宇", "钟梓萱", "廖俊杰",
-            "熊雨彤", "金浩然", "欧阳思琪", "夏侯俊豪", "慕容梓琳",
+            "张子轩(t)", "李雨桐(t)", "王浩宇(t)", "刘思琪(t)", "陈明宇(t)",
+            "杨紫涵(t)", "赵子豪(t)", "黄梓萱(t)", "周俊杰(t)", "吴欣怡(t)",
+            "徐天佑(t)", "孙语彤(t)", "马浩然(t)", "朱梓琳(t)", "胡俊哲(t)",
+            "郭雨萱(t)", "林俊豪(t)", "何思颖(t)", "高浩然(t)", "罗梓涵(t)",
+            "梁俊熙(t)", "宋雨桐(t)", "唐子轩(t)", "韩欣怡(t)", "曹浩宇(t)",
+            "许梓萱(t)", "邓俊杰(t)", "冯雨彤(t)", "彭浩然(t)", "蒋思琪(t)",
+            "蔡俊豪(t)", "潘梓琳(t)", "袁浩宇(t)", "翁雨萱(t)", "方俊哲(t)",
+            "沈欣怡(t)", "任浩然(t)", "姚梓涵(t)", "卢俊熙(t)", "崔雨桐(t)",
+            "谭子轩(t)", "汪欣怡(t)", "范浩宇(t)", "钟梓萱(t)", "廖俊杰(t)",
+            "熊雨彤(t)", "金浩然(t)", "欧阳思琪(t)", "夏侯俊豪(t)", "慕容梓琳(t)",
         ]
 
         # ── 班级配置 ──
         class_config = {
-            "林老师": {
+            "林老师(t)": {
                 "classes": ["Scratch启蒙班", "Scratch初级班", "Scratch中级班", "Python基础班", "Python进阶班"],
                 "student_count": 35,
             },
-            "程老师": {
+            "程老师(t)": {
                 "classes": ["Python入门班", "算法提高班"],
                 "student_count": 8,
             },
-            "黄老师": {
+            "黄老师(t)": {
                 "classes": ["C++基础班", "C++竞赛班", "机器人编程"],
                 "student_count": 7,
             },
@@ -461,7 +461,7 @@ def ensure_admin_and_test_accounts():
 
         print("[+] 测试账号就绪:")
         print("    管理员: admin / 111111")
-        print("    老师:   林老师 / 程老师 / 黄老师  (密码 111111)")
+        print("    老师:   林老师(t) / 程老师(t) / 黄老师(t)  (密码 111111)")
         for teacher, cfg in class_config.items():
             for cls_name in cfg["classes"]:
                 per = cfg["student_count"] // len(cfg["classes"])
