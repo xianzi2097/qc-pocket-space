@@ -2,6 +2,7 @@ import os
 import re
 import json
 import random
+import secrets
 import shutil
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -11,6 +12,34 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, Text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
+
+# ==========================================
+# Token 认证（简易版，服务器重启后所有 token 失效）
+# ==========================================
+ACTIVE_TOKENS: dict[str, dict] = {}
+
+def generate_token(username: str, role: str) -> str:
+    """生成随机 token 并存入内存"""
+    token = secrets.token_hex(32)
+    ACTIVE_TOKENS[token] = {
+        "username": username,
+        "role": role,
+        "created_at": datetime.now().isoformat()
+    }
+    return token
+
+def verify_token(authorization: str | None) -> dict:
+    """验证 Authorization header，返回用户信息"""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="未登录")
+    parts = authorization.split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
+    token = parts[1]
+    user_info = ACTIVE_TOKENS.get(token)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
+    return user_info
 
 # ==========================================
 # 路径配置
@@ -483,6 +512,25 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# ── Token 认证中间件 ──
+# 拦截所有 /api/* 请求，验证 Authorization header
+# 登录/注册接口和 OPTIONS 预检请求不需要认证
+SKIP_AUTH_PATHS = {"/api/login", "/api/register"}
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if request.method == "OPTIONS" or request.url.path in SKIP_AUTH_PATHS:
+        return await call_next(request)
+
+    auth = request.headers.get("authorization")
+    try:
+        user_info = verify_token(auth)
+        request.state.user = user_info
+    except HTTPException:
+        return JSONResponse(status_code=401, content={"detail": "请先登录"})
+
+    return await call_next(request)
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     print(f"!!! 报错详情: {exc.errors()}")
@@ -563,9 +611,12 @@ def login_user(form: LoginForm, db: Session = Depends(get_db)):
             descriptors = json.loads(user.qc_descriptors or "{}")
         except json.JSONDecodeError:
             descriptors = {}
+        # 生成 token
+        token = generate_token(user.username, user.role)
         return {
             "status": "success",
             "message": "登录成功！",
+            "token": token,
             "user": {
                 "id": user.id,
                 "username": user.username,
