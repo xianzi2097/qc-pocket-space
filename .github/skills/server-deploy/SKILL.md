@@ -69,16 +69,27 @@ QC-PocketSpace/                          ← 工作区根
 - 部署时 **SSH 只管拉代码，重启由用户本地运行 bat**
 
 ## 部署流程
-### 标准方式：SSH 拉代码 + 用户本地重启
+### 标准方式：SSH 拉代码 → 用户通过 launcher 重启
 ```bash
-# 1. 拉取 website 代码
+# 1. 拉取 website 代码（后端 + 前端 build 产物）
 ssh administrator@117.72.13.189 "cd C:\QC-Packet\qc-pocket-space && git pull"
 
 # 2. 拉取 qx-launcher 代码
 ssh administrator@117.72.13.189 "cd C:\QC-Packet\qc-launcher && git pull"
 
-# 3. 通知用户手动跑 Start_Caddy.bat 选 2
+# 3. 通知用户：打开 qx-launcher → 先点 🟥 停止服务 → 再点 🟢 启动服务
+#    ⚠️ 不要叫用户跑 Start_Caddy.bat！launcher 才是标准启动方式
 ```
+
+> 如果改了后端 `backend/main.py`（如添加新 API、修改认证逻辑），必须重启 FastAPI 才能生效。
+> 前端 build 产物（`frontend/dashboard/`）由 Caddy 直接托管，一般不需重启，但改了 Caddy 配置（`caddy/Caddyfile`）也需重启。
+
+### Token 认证部署注意事项（2026-07-06 新增）
+- 前端 token 认证通过**全局 fetch 劫持**实现（`src/lib/useAuth.ts`），所有 `/api/*` 请求自动携带 `Authorization: Bearer <token>`
+- 后端 token 存内存字典 `ACTIVE_TOKENS`，**服务器重启后所有 token 失效**，用户需重新登录
+- 后端中间件拦截所有 `/api/*` 请求（除 `/api/login` 和 `/api/register`），无有效 token 返回 401
+- 前端收到 401 会自动清除 localStorage 并刷新页面回到登录页
+- **部署涉及 auth 改动时，后端必须重启才能生效**
 
 ### 强制同步（仅用户要求时）
 ```bash
