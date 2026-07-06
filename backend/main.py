@@ -1554,6 +1554,62 @@ def list_sessions(class_name: str, username: str = "", month: str = ""):
     all_sessions.sort(key=lambda x: x["date"], reverse=True)
     return {"status": "success", "sessions": all_sessions}
 
+# ==========================================
+# 全局学生课堂记录（跨老师、跨班级扫描）
+# 注意：必须在 {class_name}/{date} 路由之前定义，避免被贪婪匹配
+# ==========================================
+@app.get("/api/sessions/student/{student_name}")
+def list_student_sessions(student_name: str):
+    """全局扫描所有老师的课堂记录，找出某学生的全部出勤记录"""
+    teachers_dir = os.path.join(USERS_DIR, "teachers")
+    if not os.path.exists(teachers_dir):
+        return {"status": "success", "sessions": []}
+
+    db_local = SessionLocal()
+    try:
+        results = []
+        for t_folder in os.listdir(teachers_dir):
+            if not t_folder.isdigit():
+                continue
+            tid = int(t_folder)
+            teacher_user = db_local.query(UserModel).filter(UserModel.id == tid).first()
+            if not teacher_user:
+                continue
+            teacher_name = teacher_user.username
+            sessions_root = os.path.join(teachers_dir, t_folder, "sessions")
+            if not os.path.exists(sessions_root):
+                continue
+            for class_name in sorted(os.listdir(sessions_root)):
+                class_dir = os.path.join(sessions_root, class_name)
+                if not os.path.isdir(class_dir):
+                    continue
+                for fname in sorted(os.listdir(class_dir), reverse=True):
+                    if not fname.endswith(".json"):
+                        continue
+                    fp = os.path.join(class_dir, fname)
+                    try:
+                        with open(fp, "r", encoding="utf-8") as f:
+                            month_sessions = json.load(f)
+                    except (json.JSONDecodeError, OSError):
+                        continue
+                    for s in month_sessions:
+                        for stu in s.get("students", []):
+                            if stu.get("name") == student_name:
+                                results.append({
+                                    "date": s["date"],
+                                    "teacher": teacher_name,
+                                    "class": class_name,
+                                    "status": stu.get("status", "present"),
+                                    "content": stu.get("content", ""),
+                                    "remark": stu.get("remark", ""),
+                                    "next_plan": stu.get("next_plan", ""),
+                                })
+                                break
+        results.sort(key=lambda x: x["date"], reverse=True)
+        return {"status": "success", "sessions": results}
+    finally:
+        db_local.close()
+
 @app.get("/api/sessions/{class_name}/{date}")
 def get_session(class_name: str, date: str, username: str = ""):
     """获取某天的课堂记录"""
