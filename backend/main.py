@@ -1223,6 +1223,7 @@ def list_classes(username: str = "", db: Session = Depends(get_db)):
                 enriched.append({
                     "user_id": user_id,
                     "username": user.username if user else "未知",
+                    "name": s.get("name", user.username if user else "未知"),
                 })
             else:
                 enriched.append(s)
