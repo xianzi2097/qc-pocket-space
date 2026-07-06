@@ -515,7 +515,7 @@ app = FastAPI(lifespan=lifespan)
 # ── Token 认证中间件 ──
 # 拦截所有 /api/* 请求，验证 Authorization header
 # 登录/注册接口和 OPTIONS 预检请求不需要认证
-SKIP_AUTH_PATHS = {"/api/login", "/api/register"}
+SKIP_AUTH_PATHS = {"/api/login", "/api/register", "/api/users"}
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
@@ -695,6 +695,14 @@ def update_descriptors(form: DescriptorsUpdateForm, db: Session = Depends(get_db
     user.qc_descriptors = form.qc_descriptors
     db.commit()
     return {"status": "success", "message": "描述符更新成功！"}
+
+# ==========================================
+# 暗号接口（启动器遍历 IP 核验用）
+# ==========================================
+@app.get("/api/ping/addr")
+async def ping_addr():
+    """只要能请求到这个接口，说明这个 IP 是后端真正在监听的物理通道"""
+    return {"status": "ok", "secret": "QC-PocketPlace-Addr"}
 
 # ==========================================
 # 用户管理接口
