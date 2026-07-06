@@ -132,7 +132,6 @@ def write_info_json(user: UserModel):
         "role": user.role,
         "avatar_path": user.avatar_path,
         "descriptors": descriptors,
-        "created": getattr(user, "_created_at", ""),
         "subfolders": ["sb3_projects", "notes"] if user.role == "student" else [],
     }
     info_path = os.path.join(user_dir, "info.json")
@@ -697,14 +696,6 @@ def update_descriptors(form: DescriptorsUpdateForm, db: Session = Depends(get_db
     return {"status": "success", "message": "描述符更新成功！"}
 
 # ==========================================
-# 暗号接口（启动器遍历 IP 核验用）
-# ==========================================
-@app.get("/api/ping/addr")
-async def ping_addr():
-    """只要能请求到这个接口，说明这个 IP 是后端真正在监听的物理通道"""
-    return {"status": "ok", "secret": "QC-PocketPlace-Addr"}
-
-# ==========================================
 # 用户管理接口
 # ==========================================
 @app.get("/api/users")
@@ -887,43 +878,6 @@ def inbox(username: str = "", folder: str = ""):
         except (json.JSONDecodeError, OSError):
             pass
     return {"status": "success", "messages": msgs}
-
-@app.get("/api/messages/sent")
-def sent_messages(username: str = "", db: Session = Depends(get_db)):
-    """发件箱：扫描所有学生文件夹，找出某人发的消息"""
-    students_dir = os.path.join(USERS_DIR, "students")
-    if not os.path.exists(students_dir):
-        return {"status": "success", "messages": []}
-    results = []
-    for folder_id in os.listdir(students_dir):
-        if not folder_id.isdigit():
-            continue
-        # 用 id 查 username
-        uid = int(folder_id)
-        user = db.query(UserModel).filter(UserModel.id == uid).first()
-        if not user:
-            continue
-        msgs_base = _get_msgs_dir(user.username)
-        if not os.path.exists(msgs_base):
-            continue
-        for folder_name in os.listdir(msgs_base):
-            fp_path = os.path.join(msgs_base, folder_name)
-            if not os.path.isdir(fp_path):
-                continue
-            for fname in os.listdir(fp_path):
-                if not fname.endswith(".json"):
-                    continue
-                try:
-                    with open(os.path.join(fp_path, fname), "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        if data.get("sender") == username and data.get("subject"):
-                            data["recipient"] = user.username
-                            data["folder"] = folder_name
-                            results.append(data)
-                except (json.JSONDecodeError, OSError):
-                    pass
-    results.sort(key=lambda x: x.get("id", ""), reverse=True)
-    return {"status": "success", "messages": results}
 
 @app.post("/api/messages/{msg_id}/read")
 def mark_read(msg_id: str, username: str = "", folder: str = ""):
@@ -1578,10 +1532,13 @@ def save_session(class_name: str, form: SessionForm, username: str = ""):
 @app.get("/api/sessions/{class_name}")
 def list_sessions(class_name: str, username: str = "", month: str = ""):
     """列出某班级某月的课堂记录，不传 month 则返回所有月份合并"""
-    sessions_dir = os.path.join(USERS_DIR, "teachers", username, "sessions", class_name)
     if month:
         return {"status": "success", "sessions": _load_sessions(username, class_name, month)}
     # 不传 month → 遍历所有月份文件
+    user_dir = _resolve_user_dir(username)
+    if not user_dir:
+        return {"status": "success", "sessions": []}
+    sessions_dir = os.path.join(user_dir, "sessions", class_name)
     if not os.path.exists(sessions_dir):
         return {"status": "success", "sessions": []}
     all_sessions = []
