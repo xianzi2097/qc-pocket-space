@@ -1000,7 +1000,7 @@ def move_message(request: Request, msg_id: str, folder: str = ""):
     src_fp = _find_msg_file(caller["username"], None, msg_id)
     if not src_fp:
         raise HTTPException(status_code=404, detail="消息不存在")
-    dst_dir = os.path.join(_get_msgs_dir(username), folder)
+    dst_dir = os.path.join(_get_msgs_dir(caller["username"]), folder)
     os.makedirs(dst_dir, exist_ok=True)
     dst_fp = os.path.join(dst_dir, f"{msg_id}.json")
     os.rename(src_fp, dst_fp)
@@ -1252,7 +1252,7 @@ def create_class(request: Request, form: ClassForm):
     if any(c["name"] == form.name for c in classes):
         raise HTTPException(status_code=400, detail="班级已存在")
     classes.append({"name": form.name, "schedule": form.schedule, "students": []})
-    _save_classes(username, classes)
+    _save_classes(caller["username"], classes)
     return {"status": "success", "message": f"班级 [{form.name}] 已创建"}
 
 @app.put("/api/classes/{class_name}")
@@ -1263,7 +1263,7 @@ def update_class(request: Request, class_name: str, form: ClassForm):
         if c["name"] == class_name:
             c["name"] = form.name
             c["schedule"] = form.schedule
-            _save_classes(username, classes)
+            _save_classes(caller["username"], classes)
             return {"status": "success"}
     raise HTTPException(status_code=404, detail="班级不存在")
 
@@ -1336,13 +1336,12 @@ def delete_class(request: Request, class_name: str):
     if not deleted:
         raise HTTPException(status_code=404, detail="班级不存在")
     # 先保存班级数据到临时文件并移入回收站，成功后再从 classes.json 移除
-    tmp = os.path.join(TRASH_DIR, f"__tmp_{username}_{class_name}.json")
+    tmp = os.path.join(TRASH_DIR, f"__tmp_{caller['username']}_{class_name}.json")
     os.makedirs(TRASH_DIR, exist_ok=True)
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump({"class_data": deleted}, f, ensure_ascii=False, indent=2)
-    owner_path = os.path.join("users", "teachers", username, "trash")
     try:
-        _move_to_trash(tmp, "class", username, class_name)
+        _move_to_trash(tmp, "class", caller["username"], class_name)
     except Exception:
         # 垃圾箱失败则清理临时文件，保留班级
         if os.path.exists(tmp):
@@ -1353,7 +1352,7 @@ def delete_class(request: Request, class_name: str):
         raise HTTPException(status_code=500, detail="移动到回收站失败，班级未删除")
     # 垃圾箱成功后安全移除
     classes = [c for c in classes if c["name"] != class_name]
-    _save_classes(username, classes)
+    _save_classes(caller["username"], classes)
     return {"status": "success", "message": f"班级 [{class_name}] 已移到回收站"}
 
 @app.delete("/api/courses/{course_name:path}")
@@ -1365,7 +1364,7 @@ def delete_course(request: Request, course_name: str):
     if not os.path.exists(course_path):
         raise HTTPException(status_code=404, detail="课程不存在")
     rel_path = os.path.join("courses", f"{caller['username']}_course", course_name)
-    _move_to_trash(course_path, "course", teacher, rel_path)
+    _move_to_trash(course_path, "course", caller["username"], rel_path)
     return {"status": "success", "message": f"课程 [{course_name}] 已移到回收站"}
 
 # ── 统一回收站 API ──
@@ -1444,10 +1443,10 @@ def add_student(request: Request, class_name: str, form: StudentForm, db: Sessio
                         raise HTTPException(status_code=404, detail="学生不存在")
                 else:
                     # 新学生 → 自动创建系统账号
-                    new_username = _make_student_username(username, class_name, form.name)
+                    new_username = _make_student_username(caller["username"], class_name, form.name)
                     new_user = _ensure_user(
                         db_local, new_username, "student", "default.jpg",
-                        {"teacher": username}
+                        {"teacher": caller["username"]}
                     )
                     user_id = new_user.id
 
@@ -1455,7 +1454,7 @@ def add_student(request: Request, class_name: str, form: StudentForm, db: Sessio
                     "user_id": user_id,
                     "name": form.name,
                 })
-                _save_classes(username, classes)
+                _save_classes(caller["username"], classes)
                 return {
                     "status": "success",
                     "user_id": user_id,
@@ -1536,7 +1535,7 @@ def remove_student(request: Request, class_name: str, student_id: str):
     for c in classes:
         if c["name"] == class_name:
             c["students"] = [s for s in c["students"] if s.get("user_id") != target_id]
-            _save_classes(username, classes)
+            _save_classes(caller["username"], classes)
             return {"status": "success"}
     raise HTTPException(status_code=404, detail="班级不存在")
 
@@ -1706,7 +1705,7 @@ def delete_session(request: Request, class_name: str, date: str):
     filtered = [s for s in sessions if s["date"] != date]
     if len(filtered) == len(sessions):
         raise HTTPException(status_code=404, detail=f"{date} 没有课堂记录")
-    _save_sessions(username, class_name, month, filtered)
+    _save_sessions(caller["username"], class_name, month, filtered)
     return {"status": "success", "message": f"{date} 课堂记录已删除"}
 
 # ==========================================
@@ -1866,5 +1865,5 @@ async def save_sb3(
     return {
         "status": "success",
         "message": f"{filename} 已保存",
-        "path": f"/share/{teacher}_course/{course_name}/{lesson_name}/"
+        "path": f"/share/{caller['username']}_course/{course_name}/{lesson_name}/"
     }
