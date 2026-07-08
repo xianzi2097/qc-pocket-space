@@ -554,6 +554,11 @@ class LoginForm(BaseModel):
     username: str
     password: str
 
+class ChangePasswordForm(BaseModel):
+    username: str
+    old_password: str
+    new_password: str
+
 class AvatarUpdateForm(BaseModel):
     username: str
     avatar_path: str  # 预设头像: "avatar_01.jpg" 或自定义: "custom"
@@ -676,6 +681,20 @@ async def upload_avatar(username: str, file: UploadFile = File(...), db: Session
     db.commit()
 
     return {"status": "success", "message": "头像上传成功！"}
+
+@app.post("/api/user/change-password")
+def change_password(form: ChangePasswordForm, db: Session = Depends(get_db)):
+    """修改密码"""
+    user = db.query(UserModel).filter(UserModel.username == form.username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if user.password != form.old_password:
+        raise HTTPException(status_code=400, detail="原密码错误")
+    if not form.new_password.strip():
+        raise HTTPException(status_code=400, detail="新密码不能为空")
+    user.password = form.new_password
+    db.commit()
+    return {"status": "success", "message": "密码修改成功！"}
 
 # ==========================================
 # qc_descriptors 接口（万能口袋）
