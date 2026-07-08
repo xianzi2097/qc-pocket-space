@@ -514,7 +514,7 @@ app = FastAPI(lifespan=lifespan)
 # ── Token 认证中间件 ──
 # 拦截所有 /api/* 请求，验证 Authorization header
 # 登录/注册接口和 OPTIONS 预检请求不需要认证
-SKIP_AUTH_PATHS = {"/api/login", "/api/register", "/api/users"}
+SKIP_AUTH_PATHS = {"/api/login", "/api/users"}
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
@@ -543,6 +543,20 @@ def get_db():
         db.close()
 
 # ==========================================
+# Auth 辅助函数（所有接口统一使用）
+# ==========================================
+def get_current_user(request: Request) -> dict:
+    """从 token 获取当前用户信息（中间件已验证）"""
+    return request.state.user
+
+def require_role(request: Request, allowed_roles: list) -> dict:
+    """检查当前用户是否在允许的角色列表中，否则 403"""
+    user = request.state.user
+    if user["role"] not in allowed_roles:
+        raise HTTPException(status_code=403, detail="你没有权限执行此操作")
+    return user
+
+# ==========================================
 # Pydantic 表单
 # ==========================================
 class RegisterForm(BaseModel):
@@ -564,11 +578,9 @@ class AvatarUpdateForm(BaseModel):
     avatar_path: str  # 预设头像: "avatar_01.jpg" 或自定义: "custom"
 
 class DescriptorsUpdateForm(BaseModel):
-    username: str
     qc_descriptors: str  # JSON 字符串
 
 class SendMessageForm(BaseModel):
-    sender: str         # 发件人
     recipient: str      # 收件人
     folder: str = "收件箱"  # 消息文件夹
     subject: str        # 主题
@@ -578,8 +590,13 @@ class SendMessageForm(BaseModel):
 # 注册接口
 # ==========================================
 @app.post("/api/register")
-def register_user(form: RegisterForm, db: Session = Depends(get_db)):
-    if form.role not in ("teacher", "student"):
+def register_user(request: Request, form: RegisterForm, db: Session = Depends(get_db)):
+    caller = get_current_user(request)
+    if form.role == "teacher":
+        require_role(request, ["admin"])            # 注册老师 → 只有 admin
+    elif form.role == "student":
+        require_role(request, ["admin", "teacher"])  # 注册学生 → admin 或老师
+    else:
         raise HTTPException(status_code=400, detail="角色只能是 teacher 或 student")
     if db.query(UserModel).filter(UserModel.username == form.username).first():
         raise HTTPException(status_code=400, detail="该账号已存在！")
@@ -635,8 +652,9 @@ def login_user(form: LoginForm, db: Session = Depends(get_db)):
 # 头像接口
 # ==========================================
 @app.post("/api/update-avatar")
-def update_avatar(form: AvatarUpdateForm, db: Session = Depends(get_db)):
-    user = db.query(UserModel).filter(UserModel.username == form.username).first()
+def update_avatar(request: Request, form: AvatarUpdateForm, db: Session = Depends(get_db)):
+    caller = get_current_user(request)
+    user = db.query(UserModel).filter(UserModel.username == caller["username"]).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -658,9 +676,10 @@ def update_avatar(form: AvatarUpdateForm, db: Session = Depends(get_db)):
     }
 
 @app.post("/api/upload-avatar")
-async def upload_avatar(username: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_avatar(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
     """学生上传自定义头像，存到 students/{username}/avatar.jpg"""
-    user = db.query(UserModel).filter(UserModel.username == username).first()
+    caller = get_current_user(request)
+    user = db.query(UserModel).filter(UserModel.username == caller["username"]).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     if user.role != "student":
@@ -683,9 +702,10 @@ async def upload_avatar(username: str, file: UploadFile = File(...), db: Session
     return {"status": "success", "message": "头像上传成功！"}
 
 @app.post("/api/user/change-password")
-def change_password(form: ChangePasswordForm, db: Session = Depends(get_db)):
+def change_password(request: Request, form: ChangePasswordForm, db: Session = Depends(get_db)):
     """修改密码"""
-    user = db.query(UserModel).filter(UserModel.username == form.username).first()
+    caller = get_current_user(request)
+    user = db.query(UserModel).filter(UserModel.username == caller["username"]).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     if user.password != form.old_password:
@@ -700,9 +720,10 @@ def change_password(form: ChangePasswordForm, db: Session = Depends(get_db)):
 # qc_descriptors 接口（万能口袋）
 # ==========================================
 @app.post("/api/update-descriptors")
-def update_descriptors(form: DescriptorsUpdateForm, db: Session = Depends(get_db)):
+def update_descriptors(request: Request, form: DescriptorsUpdateForm, db: Session = Depends(get_db)):
     """更新用户的 qc_descriptors JSON。前端负责整个 JSON 的读写。"""
-    user = db.query(UserModel).filter(UserModel.username == form.username).first()
+    caller = get_current_user(request)
+    user = db.query(UserModel).filter(UserModel.username == caller["username"]).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     # 验证是合法 JSON
@@ -733,8 +754,9 @@ def list_all_users(db: Session = Depends(get_db)):
 # 软删除用户（移入垃圾桶）
 # ==========================================
 @app.delete("/api/users/{username}")
-def delete_user(username: str, db: Session = Depends(get_db)):
+def delete_user(request: Request, username: str, db: Session = Depends(get_db)):
     """软删除：移至垃圾桶，admin 可恢复或彻底删除"""
+    require_role(request, ["admin"])
     user = db.query(UserModel).filter(UserModel.username == username).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -758,9 +780,9 @@ def require_admin(username: str, db: Session) -> UserModel:
     return caller
 
 @app.get("/api/trash")
-def list_trash(username: str = "", db: Session = Depends(get_db)):
+def list_trash(request: Request, db: Session = Depends(get_db)):
     """列出垃圾桶中所有记录"""
-    require_admin(username, db)
+    require_role(request, ["admin"])
     items = db.query(TrashModel).order_by(TrashModel.id.desc()).all()
     return {
         "status": "success",
@@ -771,15 +793,15 @@ def list_trash(username: str = "", db: Session = Depends(get_db)):
     }
 
 @app.post("/api/trash/restore/{trash_id}")
-def restore_user_from_trash(trash_id: int, username: str = "", db: Session = Depends(get_db)):
+def restore_user_from_trash(request: Request, trash_id: int, db: Session = Depends(get_db)):
     """从垃圾桶恢复用户"""
-    require_admin(username, db)
+    require_role(request, ["admin"])
     return restore_from_trash(trash_id, db)
 
 @app.delete("/api/trash/{trash_id}")
-def permanent_delete(trash_id: int, username: str = "", db: Session = Depends(get_db)):
+def permanent_delete(request: Request, trash_id: int, db: Session = Depends(get_db)):
     """彻底删除垃圾桶中的一条记录（删物理文件夹）"""
-    require_admin(username, db)
+    require_role(request, ["admin"])
     trash = db.query(TrashModel).filter(TrashModel.id == trash_id).first()
     if not trash:
         raise HTTPException(status_code=404, detail="垃圾桶中未找到该记录")
@@ -794,9 +816,9 @@ def permanent_delete(trash_id: int, username: str = "", db: Session = Depends(ge
     return {"status": "success", "message": f"已彻底删除 [{trash.username}]"}
 
 @app.delete("/api/trash")
-def empty_trash(username: str = "", db: Session = Depends(get_db)):
+def empty_trash(request: Request, db: Session = Depends(get_db)):
     """清空整个垃圾桶"""
-    require_admin(username, db)
+    require_role(request, ["admin"])
     items = db.query(TrashModel).all()
     for t in items:
         tp = os.path.join(TRASH_DIR, t.trash_folder)
@@ -811,9 +833,10 @@ def empty_trash(username: str = "", db: Session = Depends(get_db)):
 # 用户资料接口（含 qc_descriptors）
 # ==========================================
 @app.get("/api/user/profile")
-def user_profile(username: str = "", db: Session = Depends(get_db)):
+def user_profile(request: Request, db: Session = Depends(get_db)):
     """返回用户完整信息，包括 qc_descriptors 解析后的对象"""
-    user = db.query(UserModel).filter(UserModel.username == username).first()
+    caller = get_current_user(request)
+    user = db.query(UserModel).filter(UserModel.username == caller["username"]).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     try:
@@ -837,8 +860,9 @@ def user_profile(username: str = "", db: Session = Depends(get_db)):
 # ==========================================
 
 @app.post("/api/messages/send")
-def send_message(form: SendMessageForm, db: Session = Depends(get_db)):
+def send_message(request: Request, form: SendMessageForm, db: Session = Depends(get_db)):
     """发送站内信（老师→学生），存为 JSON 文件"""
+    caller = require_role(request, ["admin", "teacher"])
     # 检查收件人是否存在
     recipient = db.query(UserModel).filter(
         UserModel.username == form.recipient, UserModel.role == "student"
@@ -846,14 +870,15 @@ def send_message(form: SendMessageForm, db: Session = Depends(get_db)):
     if not recipient:
         raise HTTPException(status_code=404, detail=f"学生 [{form.recipient}] 不存在，请检查账号名")
     folder = form.folder or "收件箱"
-    msg_id = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{form.sender}"
-    _write_msg(form.recipient, folder, msg_id, form.sender, form.subject, form.body)
+    msg_id = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{caller['username']}"
+    _write_msg(form.recipient, folder, msg_id, caller["username"], form.subject, form.body)
     return {"status": "success", "message": "消息发送成功！", "id": msg_id}
 
 @app.get("/api/messages/folders")
-def list_folders(username: str = ""):
+def list_folders(request: Request):
     """列出消息文件夹及未读数"""
-    base = _get_msgs_dir(username)
+    caller = get_current_user(request)
+    base = _get_msgs_dir(caller["username"])
     if not os.path.exists(base):
         return {"status": "success", "folders": [{"name": "收件箱", "count": 0, "unread": 0}], "total_unread": 0}
     folders = []
@@ -879,9 +904,10 @@ def list_folders(username: str = ""):
     return {"status": "success", "folders": folders, "total_unread": total_unread}
 
 @app.get("/api/messages/inbox")
-def inbox(username: str = "", folder: str = ""):
+def inbox(request: Request, folder: str = ""):
     """收件箱：列出某文件夹下的所有消息"""
-    dir_path = os.path.join(_get_msgs_dir(username), folder)
+    caller = get_current_user(request)
+    dir_path = os.path.join(_get_msgs_dir(caller["username"]), folder)
     if not os.path.exists(dir_path):
         return {"status": "success", "messages": []}
     msgs = []
@@ -899,9 +925,10 @@ def inbox(username: str = "", folder: str = ""):
     return {"status": "success", "messages": msgs}
 
 @app.post("/api/messages/{msg_id}/read")
-def mark_read(msg_id: str, username: str = "", folder: str = ""):
+def mark_read(request: Request, msg_id: str, folder: str = ""):
     """标记消息为已读"""
-    fp = _find_msg_file(username, folder, msg_id)
+    caller = get_current_user(request)
+    fp = _find_msg_file(caller["username"], folder, msg_id)
     if not fp:
         raise HTTPException(status_code=404, detail="消息不存在")
     with open(fp, "r", encoding="utf-8") as f:
@@ -912,34 +939,37 @@ def mark_read(msg_id: str, username: str = "", folder: str = ""):
     return {"status": "success"}
 
 @app.post("/api/messages/folders")
-def create_folder(username: str = "", folder: str = ""):
+def create_folder(request: Request, folder: str = ""):
     """创建新文件夹"""
+    caller = get_current_user(request)
     if not folder or folder == "收件箱":
         raise HTTPException(status_code=400, detail="文件夹名无效")
-    dir_path = os.path.join(_get_msgs_dir(username), folder)
+    dir_path = os.path.join(_get_msgs_dir(caller["username"]), folder)
     if os.path.exists(dir_path):
         raise HTTPException(status_code=400, detail="文件夹已存在")
     os.makedirs(dir_path, exist_ok=True)
     return {"status": "success", "message": f"文件夹 [{folder}] 创建成功！"}
 
 @app.delete("/api/messages/folders/{folder_name:path}")
-def delete_folder(folder_name: str, username: str = ""):
+def delete_folder(request: Request, folder_name: str):
     """删除文件夹"""
+    caller = get_current_user(request)
     if folder_name == "收件箱":
         raise HTTPException(status_code=400, detail="不能删除收件箱")
-    path = _safe_path(_get_msgs_dir(username), folder_name)
+    path = _safe_path(_get_msgs_dir(caller["username"]), folder_name)
     if os.path.exists(path):
         shutil.rmtree(path)
     return {"status": "success", "message": f"文件夹 [{folder_name}] 已删除"}
 
 @app.put("/api/messages/folders/{folder_name:path}")
-def rename_folder(folder_name: str, username: str = "", new_name: str = ""):
+def rename_folder(request: Request, folder_name: str, new_name: str = ""):
     """重命名文件夹"""
+    caller = get_current_user(request)
     if folder_name == "收件箱":
         raise HTTPException(status_code=400, detail="不能重命名收件箱")
     if not new_name or new_name == folder_name:
         raise HTTPException(status_code=400, detail="新名称无效")
-    base = _get_msgs_dir(username)
+    base = _get_msgs_dir(caller["username"])
     old_path = _safe_path(base, folder_name)
     new_path = _safe_path(base, new_name)
     if not os.path.exists(old_path):
@@ -950,11 +980,12 @@ def rename_folder(folder_name: str, username: str = "", new_name: str = ""):
     return {"status": "success", "message": f"文件夹 [{folder_name}] → [{new_name}]"}
 
 @app.delete("/api/messages/{msg_id}")
-def delete_message(msg_id: str, username: str = "", folder: str = ""):
+def delete_message(request: Request, msg_id: str, folder: str = ""):
     """删除单条消息"""
+    caller = get_current_user(request)
     if not folder:
         raise HTTPException(status_code=400, detail="请指定文件夹")
-    base = _get_msgs_dir(username)
+    base = _get_msgs_dir(caller["username"])
     fp = _safe_path(base, folder, f"{msg_id}.json")
     if not os.path.exists(fp):
         raise HTTPException(status_code=404, detail="消息不存在")
@@ -962,10 +993,11 @@ def delete_message(msg_id: str, username: str = "", folder: str = ""):
     return {"status": "success", "message": "消息已删除"}
 
 @app.post("/api/messages/{msg_id}/move")
-def move_message(msg_id: str, folder: str = "", username: str = ""):
+def move_message(request: Request, msg_id: str, folder: str = ""):
     """移动消息到指定文件夹"""
+    caller = get_current_user(request)
     # 在所有文件夹中查找消息
-    src_fp = _find_msg_file(username, None, msg_id)
+    src_fp = _find_msg_file(caller["username"], None, msg_id)
     if not src_fp:
         raise HTTPException(status_code=404, detail="消息不存在")
     dst_dir = os.path.join(_get_msgs_dir(username), folder)
@@ -975,9 +1007,9 @@ def move_message(msg_id: str, folder: str = "", username: str = ""):
     return {"status": "success", "message": f"已移至 [{folder}]"}
 
 @app.get("/api/messages/unread-count")
-def unread_count(username: str = ""):
+def unread_count(request: Request):
     """未读消息总数"""
-    result = list_folders(username)
+    result = list_folders(request)
     return {"status": "success", "count": result.get("total_unread", 0)}
 
 def _find_msg_file(username: str, folder: str | None, msg_id: str) -> str | None:
@@ -1025,9 +1057,10 @@ def _get_notes_base(username: str) -> str:
 # ─── 笔记本（文件夹）───
 
 @app.get("/api/notebooks")
-def list_notebooks(username: str = ""):
+def list_notebooks(request: Request):
     """列出学生的所有笔记本"""
-    base = _get_notes_base(username)
+    caller = get_current_user(request)
+    base = _get_notes_base(caller["username"])
     if not os.path.exists(base):
         return {"status": "success", "notebooks": []}
     items = []
@@ -1039,12 +1072,13 @@ def list_notebooks(username: str = ""):
     return {"status": "success", "notebooks": items}
 
 @app.post("/api/notebooks")
-def create_notebook(form: NotebookForm, username: str = ""):
+def create_notebook(request: Request, form: NotebookForm):
     """创建笔记本（文件夹）"""
+    caller = get_current_user(request)
     name = form.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="笔记本名称不能为空")
-    base = _get_notes_base(username)
+    base = _get_notes_base(caller["username"])
     nb_path = _safe_path(base, name)
     if os.path.exists(nb_path):
         raise HTTPException(status_code=400, detail="笔记本已存在")
@@ -1052,9 +1086,10 @@ def create_notebook(form: NotebookForm, username: str = ""):
     return {"status": "success", "message": f"笔记本 [{name}] 创建成功！", "name": name}
 
 @app.delete("/api/notebooks/{name:path}")
-def delete_notebook(name: str, username: str = ""):
+def delete_notebook(request: Request, name: str):
     """删除笔记本及其所有笔记"""
-    base = _get_notes_base(username)
+    caller = get_current_user(request)
+    base = _get_notes_base(caller["username"])
     nb_path = _safe_path(base, name)
     if not os.path.exists(nb_path):
         raise HTTPException(status_code=404, detail="笔记本不存在")
@@ -1062,11 +1097,12 @@ def delete_notebook(name: str, username: str = ""):
     return {"status": "success", "message": f"笔记本 [{name}] 已删除"}
 
 @app.put("/api/notebooks/{name:path}")
-def rename_notebook(name: str, username: str = "", new_name: str = ""):
+def rename_notebook(request: Request, name: str, new_name: str = ""):
     """重命名笔记本"""
+    caller = get_current_user(request)
     if not new_name or new_name == name:
         raise HTTPException(status_code=400, detail="新名称无效")
-    base = _get_notes_base(username)
+    base = _get_notes_base(caller["username"])
     old_path = _safe_path(base, name)
     new_path = _safe_path(base, new_name)
     if not os.path.exists(old_path):
@@ -1079,9 +1115,10 @@ def rename_notebook(name: str, username: str = "", new_name: str = ""):
 # ─── 笔记（.md 文件）───
 
 @app.get("/api/notes")
-def list_notes(username: str = "", notebook: str = ""):
+def list_notes(request: Request, notebook: str = ""):
     """列出笔记本内的所有笔记"""
-    base = os.path.join(_get_notes_base(username), notebook)
+    caller = get_current_user(request)
+    base = os.path.join(_get_notes_base(caller["username"]), notebook)
     if not os.path.exists(base):
         return {"status": "success", "notes": []}
     files = sorted(
@@ -1096,9 +1133,10 @@ def list_notes(username: str = "", notebook: str = ""):
     return {"status": "success", "notes": notes}
 
 @app.get("/api/notes/{notebook}/{filename:path}")
-def read_note(notebook: str, filename: str, username: str = ""):
+def read_note(request: Request, notebook: str, filename: str):
     """读取单篇笔记"""
-    base = _get_notes_base(username)
+    caller = get_current_user(request)
+    base = _get_notes_base(caller["username"])
     fp = _safe_path(base, notebook, filename)
     if not os.path.exists(fp):
         raise HTTPException(status_code=404, detail="笔记不存在")
@@ -1106,13 +1144,14 @@ def read_note(notebook: str, filename: str, username: str = ""):
         return {"status": "success", "filename": filename, "notebook": notebook, "content": f.read()}
 
 @app.post("/api/notes")
-def save_note(form: NoteSaveForm, username: str = "", notebook: str = ""):
+def save_note(request: Request, form: NoteSaveForm, notebook: str = ""):
     """创建或更新笔记"""
+    caller = get_current_user(request)
     if not notebook:
         raise HTTPException(status_code=400, detail="请指定笔记本")
     if not form.filename.endswith(".md"):
         form.filename += ".md"
-    base = os.path.join(_get_notes_base(username), notebook)
+    base = os.path.join(_get_notes_base(caller["username"]), notebook)
     os.makedirs(base, exist_ok=True)
     fp = _safe_path(base, form.filename)
     with open(fp, "w", encoding="utf-8") as f:
@@ -1120,13 +1159,14 @@ def save_note(form: NoteSaveForm, username: str = "", notebook: str = ""):
     return {"status": "success", "message": f"笔记 [{form.filename}] 保存成功！"}
 
 @app.put("/api/notes/{notebook}/{filename:path}")
-def rename_note(notebook: str, filename: str, username: str = "", new_name: str = ""):
+def rename_note(request: Request, notebook: str, filename: str, new_name: str = ""):
     """重命名笔记"""
+    caller = get_current_user(request)
     if not new_name or new_name == filename:
         raise HTTPException(status_code=400, detail="新名称无效")
     if not new_name.endswith(".md"):
         new_name += ".md"
-    base = _get_notes_base(username)
+    base = _get_notes_base(caller["username"])
     old_fp = _safe_path(base, notebook, filename)
     new_fp = _safe_path(base, notebook, new_name)
     if not os.path.exists(old_fp):
@@ -1137,9 +1177,10 @@ def rename_note(notebook: str, filename: str, username: str = "", new_name: str 
     return {"status": "success", "message": f"笔记 [{filename}] → [{new_name}]"}
 
 @app.delete("/api/notes/{notebook}/{filename:path}")
-def delete_note(notebook: str, filename: str, username: str = ""):
+def delete_note(request: Request, notebook: str, filename: str):
     """删除一篇笔记"""
-    base = _get_notes_base(username)
+    caller = get_current_user(request)
+    base = _get_notes_base(caller["username"])
     fp = _safe_path(base, notebook, filename)
     if not os.path.exists(fp):
         raise HTTPException(status_code=404, detail="笔记不存在")
@@ -1184,8 +1225,9 @@ class StudentForm(BaseModel):
     existing_id: str = ""  # 非空时表示沿用已有学生 ID
 
 @app.get("/api/classes")
-def list_classes(username: str = "", db: Session = Depends(get_db)):
-    classes = _load_classes(username)
+def list_classes(request: Request, db: Session = Depends(get_db)):
+    caller = get_current_user(request)
+    classes = _load_classes(caller["username"])
     # 为每个学生填充当前 username
     for c in classes:
         enriched = []
@@ -1204,8 +1246,9 @@ def list_classes(username: str = "", db: Session = Depends(get_db)):
     return {"status": "success", "classes": classes}
 
 @app.post("/api/classes")
-def create_class(form: ClassForm, username: str = ""):
-    classes = _load_classes(username)
+def create_class(request: Request, form: ClassForm):
+    caller = require_role(request, ["admin", "teacher"])
+    classes = _load_classes(caller["username"])
     if any(c["name"] == form.name for c in classes):
         raise HTTPException(status_code=400, detail="班级已存在")
     classes.append({"name": form.name, "schedule": form.schedule, "students": []})
@@ -1213,8 +1256,9 @@ def create_class(form: ClassForm, username: str = ""):
     return {"status": "success", "message": f"班级 [{form.name}] 已创建"}
 
 @app.put("/api/classes/{class_name}")
-def update_class(class_name: str, form: ClassForm, username: str = ""):
-    classes = _load_classes(username)
+def update_class(request: Request, class_name: str, form: ClassForm):
+    caller = require_role(request, ["admin", "teacher"])
+    classes = _load_classes(caller["username"])
     for c in classes:
         if c["name"] == class_name:
             c["name"] = form.name
@@ -1281,8 +1325,9 @@ def _list_trash_items(owner: str = "") -> list:
     return items
 
 @app.delete("/api/classes/{class_name}")
-def delete_class(class_name: str, username: str = ""):
-    classes = _load_classes(username)
+def delete_class(request: Request, class_name: str):
+    caller = require_role(request, ["admin", "teacher"])
+    classes = _load_classes(caller["username"])
     deleted = None
     for c in classes:
         if c["name"] == class_name:
@@ -1312,27 +1357,31 @@ def delete_class(class_name: str, username: str = ""):
     return {"status": "success", "message": f"班级 [{class_name}] 已移到回收站"}
 
 @app.delete("/api/courses/{course_name:path}")
-def delete_course(course_name: str, teacher: str = ""):
+def delete_course(request: Request, course_name: str):
     """删除课程（移到回收站）"""
-    base = _get_teacher_course_dir(teacher)
+    caller = require_role(request, ["admin", "teacher"])
+    base = _get_teacher_course_dir(caller["username"])
     course_path = _safe_path(base, course_name)
     if not os.path.exists(course_path):
         raise HTTPException(status_code=404, detail="课程不存在")
-    rel_path = os.path.join("courses", f"{teacher}_course", course_name)
+    rel_path = os.path.join("courses", f"{caller['username']}_course", course_name)
     _move_to_trash(course_path, "course", teacher, rel_path)
     return {"status": "success", "message": f"课程 [{course_name}] 已移到回收站"}
 
 # ── 统一回收站 API ──
 
 @app.get("/api/trash/items")
-def list_trash_items(username: str = ""):
+def list_trash_items(request: Request):
     """列出回收站所有项目（可选按 owner 过滤）"""
-    items = _list_trash_items(owner=username)
+    caller = get_current_user(request)
+    owner = caller["username"] if caller["role"] != "admin" else ""
+    items = _list_trash_items(owner=owner)
     return {"status": "success", "items": items}
 
 @app.post("/api/trash/items/{folder_name}/restore")
-def restore_class_from_trash(folder_name: str, username: str = ""):
+def restore_class_from_trash(request: Request, folder_name: str):
     """恢复回收站中的班级/课程"""
+    caller = require_role(request, ["admin", "teacher"])
     folder_path = os.path.join(TRASH_DIR, folder_name)
     meta_path = os.path.join(folder_path, ".trash.json")
     if not os.path.exists(meta_path):
@@ -1350,9 +1399,9 @@ def restore_class_from_trash(folder_name: str, username: str = ""):
         restored = data.get("class_data")
         if not restored:
             raise HTTPException(status_code=404, detail="回收站数据损坏")
-        classes = _load_classes(username)
+        classes = _load_classes(caller["username"])
         classes.append(restored)
-        _save_classes(username, classes)
+        _save_classes(caller["username"], classes)
     # 恢复课程
     elif meta["type"] == "course":
         base = _get_teacher_course_dir(meta["owner"])
@@ -1370,8 +1419,9 @@ def restore_class_from_trash(folder_name: str, username: str = ""):
     return {"status": "success", "message": "已恢复"}
 
 @app.delete("/api/trash/items/{folder_name}")
-def permanent_delete_trash_item(folder_name: str, username: str = ""):
+def permanent_delete_trash_item(request: Request, folder_name: str):
     """永久删除回收站项目"""
+    require_role(request, ["admin"])
     folder_path = os.path.join(TRASH_DIR, folder_name)
     if not os.path.exists(folder_path):
         raise HTTPException(status_code=404, detail="回收站中未找到该项目")
@@ -1379,10 +1429,11 @@ def permanent_delete_trash_item(folder_name: str, username: str = ""):
     return {"status": "success", "message": "已永久删除"}
 
 @app.post("/api/classes/{class_name}/students")
-def add_student(class_name: str, form: StudentForm, username: str = ""):
+def add_student(request: Request, class_name: str, form: StudentForm, db: Session = Depends(get_db)):
+    caller = require_role(request, ["admin", "teacher"])
     db_local = SessionLocal()
     try:
-        classes = _load_classes(username)
+        classes = _load_classes(caller["username"])
         for c in classes:
             if c["name"] == class_name:
                 if form.existing_id:
@@ -1414,8 +1465,9 @@ def add_student(class_name: str, form: StudentForm, username: str = ""):
         db_local.close()
 
 @app.get("/api/classes/find-student")
-def find_student(name: str = ""):
+def find_student(request: Request, name: str = ""):
     """全校搜索同名学生在哪些老师的哪些班级"""
+    require_role(request, ["admin", "teacher"])
     teachers_dir = os.path.join(USERS_DIR, "teachers")
     if not os.path.exists(teachers_dir):
         return {"status": "success", "matches": []}
@@ -1452,8 +1504,9 @@ def find_student(name: str = ""):
     return {"status": "success", "matches": matches}
 
 @app.get("/api/students/list")
-def list_all_students():
+def list_all_students(request: Request):
     """扫 students/ 目录，返回全校学生列表"""
+    require_role(request, ["admin", "teacher"])
     students_dir = os.path.join(USERS_DIR, "students")
     if not os.path.exists(students_dir):
         return {"status": "success", "students": []}
@@ -1476,8 +1529,9 @@ def list_all_students():
     return {"status": "success", "students": result}
 
 @app.delete("/api/classes/{class_name}/students/{student_id}")
-def remove_student(class_name: str, student_id: str, username: str = ""):
-    classes = _load_classes(username)
+def remove_student(request: Request, class_name: str, student_id: str):
+    caller = require_role(request, ["admin", "teacher"])
+    classes = _load_classes(caller["username"])
     target_id = int(student_id)
     for c in classes:
         if c["name"] == class_name:
@@ -1527,10 +1581,11 @@ def _save_sessions(username: str, class_name: str, month: str, sessions: list):
         json.dump(sessions, f, ensure_ascii=False, indent=2)
 
 @app.post("/api/sessions/{class_name}")
-def save_session(class_name: str, form: SessionForm, username: str = ""):
+def save_session(request: Request, class_name: str, form: SessionForm):
     """创建或更新课堂记录（按日期 upsert）"""
+    caller = require_role(request, ["admin", "teacher"])
     month = form.date[:7]  # "2026-06"
-    sessions = _load_sessions(username, class_name, month)
+    sessions = _load_sessions(caller["username"], class_name, month)
     # 转 dict 方便序列化
     new_record = {
         "date": form.date,
@@ -1545,16 +1600,17 @@ def save_session(class_name: str, form: SessionForm, username: str = ""):
         sessions.append(new_record)
     # 按日期倒序排列
     sessions.sort(key=lambda x: x["date"], reverse=True)
-    _save_sessions(username, class_name, month, sessions)
+    _save_sessions(caller["username"], class_name, month, sessions)
     return {"status": "success", "message": f"{form.date} 课堂记录已保存"}
 
 @app.get("/api/sessions/{class_name}")
-def list_sessions(class_name: str, username: str = "", month: str = ""):
+def list_sessions(request: Request, class_name: str, month: str = ""):
     """列出某班级某月的课堂记录，不传 month 则返回所有月份合并"""
+    caller = get_current_user(request)
     if month:
-        return {"status": "success", "sessions": _load_sessions(username, class_name, month)}
+        return {"status": "success", "sessions": _load_sessions(caller["username"], class_name, month)}
     # 不传 month → 遍历所有月份文件
-    user_dir = _resolve_user_dir(username)
+    user_dir = _resolve_user_dir(caller["username"])
     if not user_dir:
         return {"status": "success", "sessions": []}
     sessions_dir = os.path.join(user_dir, "sessions", class_name)
@@ -1578,8 +1634,9 @@ def list_sessions(class_name: str, username: str = "", month: str = ""):
 # 注意：必须在 {class_name}/{date} 路由之前定义，避免被贪婪匹配
 # ==========================================
 @app.get("/api/sessions/student/{student_name}")
-def list_student_sessions(student_name: str):
+def list_student_sessions(request: Request, student_name: str):
     """全局扫描所有老师的课堂记录，找出某学生的全部出勤记录"""
+    require_role(request, ["admin", "teacher"])
     teachers_dir = os.path.join(USERS_DIR, "teachers")
     if not os.path.exists(teachers_dir):
         return {"status": "success", "sessions": []}
@@ -1630,20 +1687,22 @@ def list_student_sessions(student_name: str):
         db_local.close()
 
 @app.get("/api/sessions/{class_name}/{date}")
-def get_session(class_name: str, date: str, username: str = ""):
+def get_session(request: Request, class_name: str, date: str):
     """获取某天的课堂记录"""
+    caller = get_current_user(request)
     month = date[:7]
-    sessions = _load_sessions(username, class_name, month)
+    sessions = _load_sessions(caller["username"], class_name, month)
     for s in sessions:
         if s["date"] == date:
             return {"status": "success", "session": s}
     raise HTTPException(status_code=404, detail=f"{date} 没有课堂记录")
 
 @app.delete("/api/sessions/{class_name}/{date}")
-def delete_session(class_name: str, date: str, username: str = ""):
+def delete_session(request: Request, class_name: str, date: str):
     """删除某天的课堂记录"""
+    caller = require_role(request, ["admin", "teacher"])
     month = date[:7]
-    sessions = _load_sessions(username, class_name, month)
+    sessions = _load_sessions(caller["username"], class_name, month)
     filtered = [s for s in sessions if s["date"] != date]
     if len(filtered) == len(sessions):
         raise HTTPException(status_code=404, detail=f"{date} 没有课堂记录")
@@ -1699,9 +1758,10 @@ def list_courses(teacher: str = ""):
     return {"status": "success", "courses": courses}
 
 @app.post("/api/courses")
-def create_course(form: CourseCreateForm):
+def create_course(request: Request, form: CourseCreateForm):
     """创建课程（建文件夹 + course.json）"""
-    course_dir = _get_teacher_course_dir(form.teacher)
+    caller = require_role(request, ["admin", "teacher"])
+    course_dir = _get_teacher_course_dir(caller["username"])
     os.makedirs(course_dir, exist_ok=True)
     course_path = os.path.join(course_dir, form.name)
     if os.path.exists(course_path):
@@ -1746,9 +1806,10 @@ def list_materials(course_name: str, teacher: str = ""):
     return {"status": "success", "materials": items}
 
 @app.delete("/api/courses/{course_name}/materials/{lesson_name}")
-def delete_material(course_name: str, lesson_name: str, teacher: str = ""):
+def delete_material(request: Request, course_name: str, lesson_name: str):
     """删除课件（物理删除文件夹）"""
-    base = _get_teacher_course_dir(teacher)
+    caller = require_role(request, ["admin", "teacher"])
+    base = _get_teacher_course_dir(caller["username"])
     course_path = _safe_path(base, course_name)
     if not os.path.exists(course_path):
         raise HTTPException(status_code=404, detail="课程不存在")
@@ -1759,9 +1820,10 @@ def delete_material(course_name: str, lesson_name: str, teacher: str = ""):
     return {"status": "success", "message": f"课件 [{lesson_name}] 已删除"}
 
 @app.delete("/api/courses/{course_name:path}/permanent")
-def permanent_delete_course(course_name: str, teacher: str = ""):
+def permanent_delete_course(request: Request, course_name: str):
     """永久删除课程（不经过回收站）"""
-    base = _get_teacher_course_dir(teacher)
+    caller = require_role(request, ["admin", "teacher"])
+    base = _get_teacher_course_dir(caller["username"])
     course_path = _safe_path(base, course_name)
     if not os.path.exists(course_path):
         raise HTTPException(status_code=404, detail="课程不存在")
@@ -1773,16 +1835,17 @@ def permanent_delete_course(course_name: str, teacher: str = ""):
 # ==========================================
 @app.post("/api/courses/{course_name}/materials/{lesson_name}/save-sb3")
 async def save_sb3(
+    request: Request,
     course_name: str,
     lesson_name: str,
-    teacher: str = "",
     file_type: str = "main",
     file: UploadFile = File(...),
 ):
     """保存单个 sb3 文件到课件文件夹
     - file_type: "main" → main.sb3, "student" → student.sb3
     """
-    base = _get_teacher_course_dir(teacher)
+    caller = require_role(request, ["admin", "teacher"])
+    base = _get_teacher_course_dir(caller["username"])
     course_path = _safe_path(base, course_name)
     if not os.path.exists(course_path):
         raise HTTPException(status_code=404, detail="课程不存在")
