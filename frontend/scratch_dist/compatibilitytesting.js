@@ -127504,6 +127504,15 @@ class MenuBar extends react__WEBPACK_IMPORTED_MODULE_5__.Component {
     overlay.appendChild(box);
     document.body.appendChild(overlay);
 
+    // 获取 auth token（与看板共用 localStorage）
+    const authToken = () => localStorage.getItem("auth_token");
+    const authHeaders = () => {
+      const token = authToken();
+      return token ? {
+        Authorization: "Bearer ".concat(token)
+      } : {};
+    };
+
     // 动态扫描所有老师的课程
     const loadAllCourses = () => {
       const sel = document.getElementById("sct-course");
@@ -127515,7 +127524,9 @@ class MenuBar extends react__WEBPACK_IMPORTED_MODULE_5__.Component {
           return;
         }
         // 并发获取所有老师的课程
-        return Promise.all(teachers.map(t => fetch("/api/courses?teacher=".concat(t.username, "&t=").concat(Date.now())).then(r => r.json()))).then(results => {
+        return Promise.all(teachers.map(t => fetch("/api/courses?teacher=".concat(t.username, "&t=").concat(Date.now()), {
+          headers: authHeaders()
+        }).then(r => r.json()))).then(results => {
           let allOptions = [];
           results.forEach((courseData, i) => {
             if (courseData.status === "success" && courseData.courses) {
@@ -127887,7 +127898,14 @@ class MenuBar extends react__WEBPACK_IMPORTED_MODULE_5__.Component {
       className: classnames__WEBPACK_IMPORTED_MODULE_0___default()({
         [_menu_bar_css__WEBPACK_IMPORTED_MODULE_33__["default"].inactive]: !this.state.showBlockWhitelist
       })
-    }, "✓"), " 积木白名单"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5__.createElement(_containers_save_to_course_jsx__WEBPACK_IMPORTED_MODULE_22__["default"], null, _ref5 => {
+    }, "✓"), " 积木白名单"), (() => {
+      try {
+        const u = JSON.parse(localStorage.getItem("user") || "{}");
+        return u.role === "teacher" || u.role === "admin";
+      } catch (_unused) {
+        return false;
+      }
+    })() && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5__.createElement(_containers_save_to_course_jsx__WEBPACK_IMPORTED_MODULE_22__["default"], null, _ref5 => {
       let {
         saveToCourse
       } = _ref5;
@@ -138680,9 +138698,17 @@ class SaveToCourse extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
     return _asyncToGenerator(function* () {
       const formData = new FormData();
       formData.append("file", blob, fileType === "main" ? "main.sb3" : "student.sb3");
+      const token = localStorage.getItem("auth_token");
+      const headers = {};
+
+      // 如果已登录，带上 auth token（后端需要认证）
+      if (token) {
+        headers["Authorization"] = "Bearer ".concat(token);
+      }
       const url = "/api/courses/".concat(encodeURIComponent(courseName), "/materials/").concat(encodeURIComponent(lessonName), "/save-sb3?teacher=").concat(encodeURIComponent(teacher), "&file_type=").concat(fileType);
       const res = yield fetch(url, {
         method: "POST",
+        headers,
         body: formData
       });
       if (!res.ok) {
