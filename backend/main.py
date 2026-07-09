@@ -1789,18 +1789,50 @@ def list_materials(course_name: str, teacher: str = ""):
     course_path = _safe_path(base, course_name)
     if not os.path.exists(course_path):
         raise HTTPException(status_code=404, detail="课程不存在")
+
+    # 读取课程类型
+    course_type = "scratch"
+    meta_path = os.path.join(course_path, "course.json")
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                course_type = json.load(f).get("type", "scratch")
+        except json.JSONDecodeError:
+            pass
+
     items = []
     for name in sorted(os.listdir(course_path)):
         fp = os.path.join(course_path, name)
-        if os.path.isdir(fp) and not name.startswith("."):
-            # 检查是否有 sb3 文件
+        if not os.path.isdir(fp) or name.startswith("."):
+            continue
+
+        url = f"/share/{teacher}_course/{course_name}/{name}/"
+
+        if course_type == "scratch":
+            # Scratch 课程：返回 sb3 信息（保持原有逻辑）
             sb3_files = [f for f in os.listdir(fp) if f.endswith(".sb3")]
             items.append({
                 "name": name,
                 "has_main": "main.sb3" in sb3_files,
                 "has_student": "student.sb3" in sb3_files,
                 "sb3_count": len(sb3_files),
-                "url": f"/share/{teacher}_course/{course_name}/{name}/"
+                "url": url,
+            })
+        else:
+            # Python/C++ 课程：返回文件列表
+            files = []
+            for fname in sorted(os.listdir(fp)):
+                fpath = os.path.join(fp, fname)
+                if os.path.isfile(fpath) and not fname.startswith("."):
+                    files.append({
+                        "name": fname,
+                        "size": os.path.getsize(fpath),
+                    })
+            items.append({
+                "name": name,
+                "files": files,
+                "file_count": len(files),
+                "url": url,
             })
     return {"status": "success", "materials": items}
 
@@ -1817,6 +1849,48 @@ def delete_material(request: Request, course_name: str, lesson_name: str):
         raise HTTPException(status_code=404, detail="课件不存在")
     shutil.rmtree(lesson_path)
     return {"status": "success", "message": f"课件 [{lesson_name}] 已删除"}
+
+@app.delete("/api/courses/{course_name}/materials/{lesson_name}/{filename}")
+def delete_file(request: Request, course_name: str, lesson_name: str, filename: str):
+    """删除课件文件夹中的单个文件"""
+    caller = require_role(request, ["admin", "teacher"])
+    base = _get_teacher_course_dir(caller["username"])
+    course_path = _safe_path(base, course_name)
+    if not os.path.exists(course_path):
+        raise HTTPException(status_code=404, detail="课程不存在")
+    lesson_path = _safe_path(course_path, lesson_name)
+    if not os.path.exists(lesson_path):
+        raise HTTPException(status_code=404, detail="课件不存在")
+    file_path = _safe_path(lesson_path, filename)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="文件不存在")
+    os.remove(file_path)
+    return {"status": "success", "message": f"文件 [{filename}] 已删除"}
+
+@app.post("/api/courses/{course_name}/materials/{lesson_name}/upload")
+async def upload_file(
+    request: Request,
+    course_name: str,
+    lesson_name: str,
+    file: UploadFile = File(...),
+):
+    """上传任意文件到课件文件夹（Python/C++ 课程用）"""
+    caller = require_role(request, ["admin", "teacher"])
+    base = _get_teacher_course_dir(caller["username"])
+    course_path = _safe_path(base, course_name)
+    if not os.path.exists(course_path):
+        raise HTTPException(status_code=404, detail="课程不存在")
+    lesson_path = os.path.join(course_path, lesson_name)
+    os.makedirs(lesson_path, exist_ok=True)
+    dest = os.path.join(lesson_path, file.filename)
+    content = await file.read()
+    with open(dest, "wb") as f:
+        f.write(content)
+    return {
+        "status": "success",
+        "message": f"文件 [{file.filename}] 已上传",
+        "path": f"/share/{caller['username']}_course/{course_name}/{lesson_name}/"
+    }
 
 @app.delete("/api/courses/{course_name:path}/permanent")
 def permanent_delete_course(request: Request, course_name: str):
