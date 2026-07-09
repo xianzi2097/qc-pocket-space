@@ -147,7 +147,7 @@ def ensure_user_dirs(user: UserModel):
             os.makedirs(os.path.join(user_dir, sub), exist_ok=True)
             os.makedirs(os.path.join(user_dir, "messages", "收件箱"), exist_ok=True)
     elif user.role == "teacher":
-        # 不写空 classes.json，由 ensure_admin_and_test_accounts 或 API 创建
+        # classes.json 由 API 创建班级时写入
         pass
     write_info_json(user)
 
@@ -281,191 +281,22 @@ def _write_msg(username: str, folder: str, msg_id: str, sender: str, subject: st
         json.dump(msg, f, ensure_ascii=False, indent=2)
 
 # ==========================================
-# 启动：建表 + 确保管理员 + 注入测试账号
+# 启动：建表 + 确保管理员
 # ==========================================
 
-def _ensure_user(db: Session, username: str, role: str,
-                 avatar: str = "default.jpg", descriptors: dict = None) -> UserModel:
-    """创建用户（DB + 文件夹），如已存在则跳过"""
-    user = db.query(UserModel).filter(UserModel.username == username).first()
-    if not user:
+def _ensure_admin():
+    """后端唯一内置账号：admin/111111"""
+    db = SessionLocal()
+    try:
+        if db.query(UserModel).filter(UserModel.username == "admin").first():
+            return
         user = UserModel(
-            username=username, password="111111",
-            role=role, avatar_path=avatar,
-            qc_descriptors=json.dumps(descriptors or {}, ensure_ascii=False)
+            username="admin", password="111111",
+            role="admin", avatar_path="default.jpg",
+            qc_descriptors="{}"
         )
         db.add(user)
         db.commit()
-        ensure_user_dirs(user)
-    return user
-
-def _send_teacher_welcome(teacher_username: str, student_usernames: list[str]):
-    """老师给学生们发欢迎消息"""
-    db = SessionLocal()
-    try:
-        for stu in student_usernames:
-            user = db.query(UserModel).filter(UserModel.username == stu).first()
-            if not user:
-                continue
-            user_dir = get_user_dir(user)
-            msg_dir = os.path.join(user_dir, "messages", "收件箱")
-            os.makedirs(msg_dir, exist_ok=True)
-            msg_id = f"welcome_from_{teacher_username}"
-            fp = os.path.join(msg_dir, f"{msg_id}.json")
-            if os.path.exists(fp):
-                continue
-            msg = {
-                "id": msg_id,
-                "sender": teacher_username,
-                "recipient": stu,
-                "folder": "收件箱",
-                "subject": f"欢迎！我是{teacher_username}老师",
-                "body": f"你好！我是{teacher_username}老师。\n\n"
-                        f"很高兴和你一起学习编程！\n\n"
-                        f"## 课前准备\n"
-                        f"- 📝 准备好笔记本\n"
-                        f"- 💻 打开 Scratch/Python\n"
-                        f"- 🧠 带上好奇心\n\n"
-                        f"有问题随时发消息给我哦～",
-                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "is_read": False,
-            }
-            with open(fp, "w", encoding="utf-8") as f:
-                json.dump(msg, f, ensure_ascii=False, indent=2)
-    finally:
-        db.close()
-
-def _make_student_username(teacher: str, class_name: str, student_name: str) -> str:
-    """
-    为班级学生生成唯一系统账号。
-    格式：{老师}{班级缩写}{学生名缩写}
-    有重名时自动追加数字后缀。
-    """
-    def slug(s: str) -> str:
-        s = re.sub(r'[\s/\\()（）]', '', s)
-        return s[:10]
-
-    base = f"{slug(teacher)}_{slug(class_name)}_{slug(student_name)}"
-    base = base.strip('_')
-
-    db = SessionLocal()
-    try:
-        candidate = base
-        suffix = 1
-        while db.query(UserModel).filter(UserModel.username == candidate).first():
-            suffix += 1
-            candidate = f"{base}{suffix}"
-        return candidate
-    finally:
-        db.close()
-
-def ensure_admin_and_test_accounts():
-    db = SessionLocal()
-    try:
-        for folder in ["admins", "teachers", "students"]:
-            os.makedirs(os.path.join(USERS_DIR, folder), exist_ok=True)
-        os.makedirs(TRASH_DIR, exist_ok=True)
-
-        # 如果管理员已存在 → 不是第一次启动，跳过全部测试数据
-        if db.query(UserModel).filter(UserModel.username == "admin").first():
-            return
-
-        # ── 管理员 ──
-        _ensure_user(db, "admin", "admin", "default.jpg")
-
-        # ── 测试老师 ──
-        _ensure_user(db, "林老师(t)", "teacher", "avatar_01.jpg",
-                     {"title": "Scratch 主讲"})
-        _ensure_user(db, "程老师(t)", "teacher", "avatar_02.jpg",
-                     {"title": "Python 讲师"})
-        _ensure_user(db, "黄老师(t)", "teacher", "avatar_03.jpg",
-                     {"title": "C++ 教练"})
-
-        teacher_ids = {"林老师(t)": None, "程老师(t)": None, "黄老师(t)": None}
-        for u in db.query(UserModel).filter(UserModel.role == "teacher").all():
-            if u.username in teacher_ids:
-                teacher_ids[u.username] = u.id
-
-        # ── 50 个真实学生姓名 ──
-        student_names = [
-            "张子轩(t)", "李雨桐(t)", "王浩宇(t)", "刘思琪(t)", "陈明宇(t)",
-            "杨紫涵(t)", "赵子豪(t)", "黄梓萱(t)", "周俊杰(t)", "吴欣怡(t)",
-            "徐天佑(t)", "孙语彤(t)", "马浩然(t)", "朱梓琳(t)", "胡俊哲(t)",
-            "郭雨萱(t)", "林俊豪(t)", "何思颖(t)", "高浩然(t)", "罗梓涵(t)",
-            "梁俊熙(t)", "宋雨桐(t)", "唐子轩(t)", "韩欣怡(t)", "曹浩宇(t)",
-            "许梓萱(t)", "邓俊杰(t)", "冯雨彤(t)", "彭浩然(t)", "蒋思琪(t)",
-            "蔡俊豪(t)", "潘梓琳(t)", "袁浩宇(t)", "翁雨萱(t)", "方俊哲(t)",
-            "沈欣怡(t)", "任浩然(t)", "姚梓涵(t)", "卢俊熙(t)", "崔雨桐(t)",
-            "谭子轩(t)", "汪欣怡(t)", "范浩宇(t)", "钟梓萱(t)", "廖俊杰(t)",
-            "熊雨彤(t)", "金浩然(t)", "欧阳思琪(t)", "夏侯俊豪(t)", "慕容梓琳(t)",
-        ]
-
-        # ── 班级配置 ──
-        class_config = {
-            "林老师(t)": {
-                "classes": ["Scratch启蒙班", "Scratch初级班", "Scratch中级班", "Python基础班", "Python进阶班"],
-                "student_count": 35,
-            },
-            "程老师(t)": {
-                "classes": ["Python入门班", "算法提高班"],
-                "student_count": 8,
-            },
-            "黄老师(t)": {
-                "classes": ["C++基础班", "C++竞赛班", "机器人编程"],
-                "student_count": 7,
-            },
-        }
-
-        name_idx = 0
-        all_students = {}
-        for teacher, cfg in class_config.items():
-            tid = teacher_ids[teacher]
-            t_dir = os.path.join(USERS_DIR, "teachers", str(tid))
-            classes_path = os.path.join(t_dir, "classes.json")
-            if os.path.exists(classes_path):
-                continue
-
-            classes_list = []
-            per_class = cfg["student_count"] // len(cfg["classes"])
-            extra = cfg["student_count"] % len(cfg["classes"])
-
-            for ci, cls_name in enumerate(cfg["classes"]):
-                count = per_class + (1 if ci < extra else 0)
-                students_list = []
-                for _ in range(count):
-                    stu_name = student_names[name_idx]
-                    name_idx += 1
-                    new_user = _ensure_user(
-                        db, stu_name, "student", "default.jpg",
-                        {"teacher": teacher}
-                    )
-                    students_list.append({
-                        "user_id": new_user.id,
-                        "name": stu_name,
-                    })
-                    all_students.setdefault(teacher, []).append(stu_name)
-                classes_list.append({
-                    "name": cls_name,
-                    "students": students_list,
-                    "schedule": [],
-                })
-
-            os.makedirs(t_dir, exist_ok=True)
-            with open(classes_path, "w", encoding="utf-8") as f:
-                json.dump(classes_list, f, ensure_ascii=False, indent=2)
-
-        # ── 发欢迎消息 ──
-        for teacher, stus in all_students.items():
-            _send_teacher_welcome(teacher, stus)
-
-        print("[+] 测试账号就绪:")
-        print("    管理员: admin / 111111")
-        print("    老师:   林老师(t) / 程老师(t) / 黄老师(t)  (密码 111111)")
-        for teacher, cfg in class_config.items():
-            for cls_name in cfg["classes"]:
-                per = cfg["student_count"] // len(cfg["classes"])
-                print(f"    {teacher}: {cls_name}({per}人)")
-        print(f"    共 {name_idx} 名学生")
     finally:
         db.close()
 
@@ -505,7 +336,7 @@ def check_orphan_folders():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    ensure_admin_and_test_accounts()
+    _ensure_admin()
     check_orphan_folders()
     yield
 
