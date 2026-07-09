@@ -127722,7 +127722,7 @@ class MenuBar extends react__WEBPACK_IMPORTED_MODULE_5__.Component {
       title: this.state.isBrowserFullscreen ? "退出全屏" : "进入全屏"
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5__.createElement("img", {
       src: this.state.isBrowserFullscreen ? _icon_unfullscreen_svg__WEBPACK_IMPORTED_MODULE_43__ : _icon_fullscreen_svg__WEBPACK_IMPORTED_MODULE_42__
-    })), this.props.isTotallyNormal && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5__.createElement("div", {
+    }), "\u7F29\u653E"), this.props.isTotallyNormal && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5__.createElement("div", {
       className: classnames__WEBPACK_IMPORTED_MODULE_0___default()(_menu_bar_css__WEBPACK_IMPORTED_MODULE_33__["default"].menuBarItem, _menu_bar_css__WEBPACK_IMPORTED_MODULE_33__["default"].hoverable, {
         [_menu_bar_css__WEBPACK_IMPORTED_MODULE_33__["default"].active]: this.props.modeMenuOpen
       }),
@@ -136276,12 +136276,6 @@ class GUI extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
         this.openPreviewPanel(fileUrl);
       });
       fullscreenDiv.parentNode.insertBefore(btn, fullscreenDiv);
-
-      // 给全屏按钮也加上文字"缩放"
-      const fsImg = fullscreenDiv.querySelector("img");
-      if (fsImg && !fullscreenDiv.textContent.includes("缩放")) {
-        fullscreenDiv.innerHTML = fsImg.outerHTML + " 缩放";
-      }
     };
     tryMount();
   }
