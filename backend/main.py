@@ -343,21 +343,25 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # ── Token 认证中间件 ──
-# 拦截所有 /api/* 请求，验证 Authorization header
-# 登录/注册接口和 OPTIONS 预检请求不需要认证
-SKIP_AUTH_PATHS = {"/api/login", "/api/users"}
-
+# 不再全拦，改为放行模式：
+# - 有 token → 验证并设置 user（可能过期，过期就当游客）
+# - 没 token → user = None，游客身份放行
+# 权限由具体接口的 require_role() 自己决定
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    if request.method == "OPTIONS" or request.url.path in SKIP_AUTH_PATHS:
+    if request.method == "OPTIONS":
         return await call_next(request)
 
     auth = request.headers.get("authorization")
-    try:
-        user_info = verify_token(auth)
-        request.state.user = user_info
-    except HTTPException:
-        return JSONResponse(status_code=401, content={"detail": "请先登录"})
+    if auth:
+        try:
+            user_info = verify_token(auth)
+            request.state.user = user_info
+        except HTTPException:
+            # token 过期/无效 → 当游客处理
+            request.state.user = None
+    else:
+        request.state.user = None
 
     return await call_next(request)
 
@@ -383,7 +387,7 @@ def get_current_user(request: Request) -> dict:
 def require_role(request: Request, allowed_roles: list) -> dict:
     """检查当前用户是否在允许的角色列表中，否则 403"""
     user = request.state.user
-    if user["role"] not in allowed_roles:
+    if not user or not user.get("role") or user["role"] not in allowed_roles:
         raise HTTPException(status_code=403, detail="你没有权限执行此操作")
     return user
 
