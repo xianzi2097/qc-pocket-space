@@ -343,47 +343,22 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # ── Token 认证中间件 ──
-# 拦截 /api/* 请求，验证 Authorization header
-# 白名单内的路径（公开接口）不需要认证，无 token 按游客处理
-# 白名单外的路径必须带有效 token
-SKIP_AUTH_PATHS = {"/api/login", "/api/users"}
-
-# 公开 GET 接口（课程列表、课件列表等，游客可读）
-PUBLIC_READ_PREFIXES = {"/api/courses"}
-
+# 统一赋予角色身份：有 token → 验证取 role；无 token / 过期 → role=guest
+# 具体权限由各接口的 require_role() 控制
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    # 白名单精确匹配
-    if request.url.path in SKIP_AUTH_PATHS:
-        request.state.user = None
-        return await call_next(request)
-
-    # 公开读接口前缀匹配（游客可 GET，写操作仍需认证）
-    if request.method == "GET" and any(
-        request.url.path.startswith(p) for p in PUBLIC_READ_PREFIXES
-    ):
-        # 有 token 就验证，没有就当游客
-        auth = request.headers.get("authorization")
-        if auth:
-            try:
-                request.state.user = verify_token(auth)
-            except HTTPException:
-                request.state.user = None
-        else:
-            request.state.user = None
-        return await call_next(request)
-
-    # 受保护路径：必须带有效 token
     auth = request.headers.get("authorization")
-    try:
-        user_info = verify_token(auth)
-        request.state.user = user_info
-    except HTTPException:
-        return JSONResponse(status_code=401, content={"detail": "请先登录"})
+    user = None
+    if auth:
+        try:
+            user = verify_token(auth)
+        except HTTPException:
+            pass  # 无效/过期 token → 当游客
 
+    request.state.user = user or {"username": "guest", "role": "guest"}
     return await call_next(request)
 
 @app.exception_handler(RequestValidationError)
