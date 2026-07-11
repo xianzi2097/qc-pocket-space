@@ -1214,18 +1214,6 @@ def delete_class(request: Request, class_name: str):
     _save_classes(caller["username"], classes)
     return {"status": "success", "message": f"班级 [{class_name}] 已移到回收站"}
 
-@app.delete("/api/courses/{course_name:path}")
-def delete_course(request: Request, course_name: str):
-    """删除课程（移到回收站）"""
-    caller = require_role(request, ["admin", "teacher"])
-    base = _get_teacher_course_dir(caller["username"])
-    course_path = _safe_path(base, course_name)
-    if not os.path.exists(course_path):
-        raise HTTPException(status_code=404, detail="课程不存在")
-    rel_path = os.path.join("courses", f"{caller['username']}_course", course_name)
-    _move_to_trash(course_path, "course", caller["username"], rel_path)
-    return {"status": "success", "message": f"课程 [{course_name}] 已移到回收站"}
-
 # ── 统一回收站 API ──
 
 @app.get("/api/trash/items")
@@ -1750,17 +1738,6 @@ async def upload_file(
         "path": f"/share/{caller['username']}_course/{course_name}/{lesson_name}/"
     }
 
-@app.delete("/api/courses/{course_name:path}/permanent")
-def permanent_delete_course(request: Request, course_name: str):
-    """永久删除课程（不经过回收站）"""
-    caller = require_role(request, ["admin", "teacher"])
-    base = _get_teacher_course_dir(caller["username"])
-    course_path = _safe_path(base, course_name)
-    if not os.path.exists(course_path):
-        raise HTTPException(status_code=404, detail="课程不存在")
-    shutil.rmtree(course_path)
-    return {"status": "success", "message": f"课程 [{course_name}] 已永久删除"}
-
 # ==========================================
 # 保存课件 sb3（Scratch 编辑器保存到课程）
 # ==========================================
@@ -1799,3 +1776,29 @@ async def save_sb3(
         "message": f"{filename} 已保存",
         "path": f"/share/{caller['username']}_course/{course_name}/{lesson_name}/"
     }
+
+# ==========================================
+# 课程删除（带 :path 的路由必须放在所有课程子路由之后）
+# ==========================================
+@app.delete("/api/courses/{course_name:path}/permanent")
+def permanent_delete_course(request: Request, course_name: str):
+    """永久删除课程（不经过回收站）"""
+    caller = require_role(request, ["admin", "teacher"])
+    base = _get_teacher_course_dir(caller["username"])
+    course_path = _safe_path(base, course_name)
+    if not os.path.exists(course_path):
+        raise HTTPException(status_code=404, detail="课程不存在")
+    shutil.rmtree(course_path)
+    return {"status": "success", "message": f"课程 [{course_name}] 已永久删除"}
+
+@app.delete("/api/courses/{course_name:path}")
+def delete_course(request: Request, course_name: str):
+    """删除课程（移到回收站）"""
+    caller = require_role(request, ["admin", "teacher"])
+    base = _get_teacher_course_dir(caller["username"])
+    course_path = _safe_path(base, course_name)
+    if not os.path.exists(course_path):
+        raise HTTPException(status_code=404, detail="课程不存在")
+    rel_path = os.path.join("courses", f"{caller['username']}_course", course_name)
+    _move_to_trash(course_path, "course", caller["username"], rel_path)
+    return {"status": "success", "message": f"课程 [{course_name}] 已移到回收站"}
