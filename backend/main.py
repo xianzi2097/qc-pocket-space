@@ -138,13 +138,6 @@ def write_info_json(user: UserModel):
     with open(info_path, "w", encoding="utf-8") as f:
         json.dump(info, f, ensure_ascii=False, indent=2)
 
-def _make_student_username(teacher_username: str, class_name: str, student_name: str) -> str:
-    """生成学生用户名：老师用户名_班级名_学生名（去空格）"""
-    safe_teacher = teacher_username.replace(" ", "")
-    safe_class = class_name.replace(" ", "")
-    safe_student = student_name.replace(" ", "")
-    return f"{safe_teacher}_{safe_class}_{safe_student}"
-
 def _ensure_user(db: Session, username: str, role: str, avatar: str, descriptors: dict) -> UserModel:
     """确保用户存在：已存在则返回，不存在则创建"""
     user = db.query(UserModel).filter(UserModel.username == username).first()
@@ -1308,10 +1301,9 @@ def add_student(request: Request, class_name: str, form: StudentForm, db: Sessio
                     if not user:
                         raise HTTPException(status_code=404, detail="学生不存在")
                 else:
-                    # 新学生 → 自动创建系统账号
-                    new_username = _make_student_username(caller["username"], class_name, form.name)
+                    # 新学生 → 自动创建系统账号，直接用学生名做用户名
                     new_user = _ensure_user(
-                        db_local, new_username, "student", "default.jpg",
+                        db_local, form.name, "student", "default.jpg",
                         {"teacher": caller["username"]}
                     )
                     user_id = new_user.id
