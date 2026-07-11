@@ -3,7 +3,7 @@ import os
 import glob as _glob
 import shutil
 from fastapi import APIRouter, Depends, HTTPException, Request
-from utils import get_db, get_current_user, _safe_path, _get_notes_base, NotebookForm, NoteSaveForm
+from utils import get_db, get_current_user, _safe_path, NotebookForm, NoteSaveForm
 
 router = APIRouter()
 
