@@ -401,7 +401,7 @@ class StudentForm(BaseModel):
     existing_id: str = ""
 
 class SessionStudentRecord(BaseModel):
-    id: str
+    id: str = ""
     name: str
     remark: str = ""
     status: str = "present"
