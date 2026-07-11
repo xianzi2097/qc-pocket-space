@@ -1076,6 +1076,7 @@ def _load_classes(teacher_username: str) -> list:
 
 def _save_classes(teacher_username: str, classes: list):
     path = _get_classes_path(teacher_username)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(classes, f, ensure_ascii=False, indent=2)
 
