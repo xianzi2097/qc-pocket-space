@@ -138,6 +138,31 @@ def write_info_json(user: UserModel):
     with open(info_path, "w", encoding="utf-8") as f:
         json.dump(info, f, ensure_ascii=False, indent=2)
 
+def _make_student_username(teacher_username: str, class_name: str, student_name: str) -> str:
+    """生成学生用户名：老师用户名_班级名_学生名（去空格）"""
+    safe_teacher = teacher_username.replace(" ", "")
+    safe_class = class_name.replace(" ", "")
+    safe_student = student_name.replace(" ", "")
+    return f"{safe_teacher}_{safe_class}_{safe_student}"
+
+def _ensure_user(db: Session, username: str, role: str, avatar: str, descriptors: dict) -> UserModel:
+    """确保用户存在：已存在则返回，不存在则创建"""
+    user = db.query(UserModel).filter(UserModel.username == username).first()
+    if user:
+        return user
+    user = UserModel(
+        username=username,
+        password="111111",  # 默认密码
+        role=role,
+        avatar_path=avatar,
+        qc_descriptors=json.dumps(descriptors, ensure_ascii=False)
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    ensure_user_dirs(user)
+    return user
+
 def ensure_user_dirs(user: UserModel):
     """为新用户创建标准目录 + info.json"""
     user_dir = get_user_dir(user)
@@ -191,6 +216,12 @@ def move_to_trash(user: UserModel, db: Session) -> dict:
         trashed_at=timestamp
     )
     db.add(trash)
+
+    # 清除该用户的所有 token，防止删除后继续访问
+    tokens_to_remove = [t for t, info in ACTIVE_TOKENS.items() if info["username"] == user.username]
+    for t in tokens_to_remove:
+        del ACTIVE_TOKENS[t]
+    print(f"[安全] 已清除用户 {user.username} 的 {len(tokens_to_remove)} 个 token")
 
     db.delete(user)
     db.commit()
@@ -378,7 +409,10 @@ def get_db():
 # ==========================================
 def get_current_user(request: Request) -> dict:
     """从 token 获取当前用户信息（中间件已验证）"""
-    return request.state.user
+    user = request.state.user
+    if user["role"] == "guest":
+        raise HTTPException(status_code=401, detail="未登录，请先登录")
+    return user
 
 def require_role(request: Request, allowed_roles: list) -> dict:
     """检查当前用户是否在允许的角色列表中，否则 403"""
