@@ -3,6 +3,7 @@ import os
 import json
 import shutil
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.orm import Session
 from models import TrashModel, SessionLocal
 from utils import (
     get_db, get_current_user, require_role, restore_from_trash,
