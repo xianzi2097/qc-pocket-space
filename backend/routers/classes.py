@@ -178,6 +178,8 @@ def list_all_students(request: Request):
 @router.delete("/api/classes/{class_name}/students/{student_id}")
 def remove_student(request: Request, class_name: str, student_id: str):
     caller = require_role(request, ["admin", "teacher"])
+    if not student_id.isdigit():
+        raise HTTPException(status_code=400, detail="无效的学生ID")
     classes = _load_classes(caller["username"])
     target_id = int(student_id)
     for c in classes:
