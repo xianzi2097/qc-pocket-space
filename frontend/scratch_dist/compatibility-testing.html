@@ -26,31 +26,53 @@
                 font-family: &quot;Segoe UI&quot;, system-ui, sans-serif;
             "
         >
-            <div style="font-size: 3rem; margin-bottom: 20px">🍊</div>
-            <div
-                style="
-                    width: 40px;
-                    height: 40px;
-                    border: 4px solid rgba(255, 255, 255, 0.2);
-                    border-top-color: #4facfe;
-                    border-radius: 50%;
-                    animation: cloudSpin 0.8s linear infinite;
-                    margin-bottom: 16px;
-                "
-            ></div>
-            <p
-                id="cloud-loading-text"
-                style="color: #a0a0c0; font-size: 0.95rem; margin: 0"
-            >
-                正在加载 Scratch...
-            </p>
             <style>
-                @keyframes cloudSpin {
-                    to {
-                        transform: rotate(360deg);
-                    }
+                .qc-loader {
+                    position: relative;
+                    width: 120px;
+                    height: 90px;
+                    margin: 0 auto;
+                }
+                .qc-loader:before {
+                    content: &quot;&quot;;
+                    position: absolute;
+                    bottom: 30px;
+                    left: 50px;
+                    height: 30px;
+                    width: 30px;
+                    border-radius: 50%;
+                    background: #2a9d8f;
+                    animation: qc-bounce 0.5s ease-in-out infinite alternate;
+                }
+                .qc-loader:after {
+                    content: &quot;&quot;;
+                    position: absolute;
+                    right: 0;
+                    top: 0;
+                    height: 7px;
+                    width: 45px;
+                    border-radius: 4px;
+                    box-shadow: 0 5px 0 #f2f2f2, -35px 50px 0 #f2f2f2, -70px 95px 0 #f2f2f2;
+                    animation: qc-step 1s ease-in-out infinite;
+                }
+                @keyframes qc-bounce {
+                    0% { transform: scale(1, 0.7); }
+                    40% { transform: scale(0.8, 1.2); }
+                    60% { transform: scale(1, 1); }
+                    100% { bottom: 140px; }
+                }
+                @keyframes qc-step {
+                    0% { box-shadow: 0 10px 0 rgba(0,0,0,0), 0 10px 0 #f2f2f2, -35px 50px 0 #f2f2f2, -70px 90px 0 #f2f2f2; }
+                    100% { box-shadow: 0 10px 0 #f2f2f2, -35px 50px 0 #f2f2f2, -70px 90px 0 #f2f2f2, -70px 90px 0 rgba(0,0,0,0); }
                 }
             </style>
+            <div class="qc-loader"></div>
+            <p
+                id="cloud-loading-text"
+                style="color: #a0a0c0; font-size: 0.95rem; margin-top: 16px"
+            >
+                青橙加载中...
+            </p>
         </div>
     </body>
 </html>
