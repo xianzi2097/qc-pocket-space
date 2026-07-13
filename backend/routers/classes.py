@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from models import UserModel, SessionLocal, USERS_DIR
 from utils import (
     get_db, get_current_user, require_role, _ensure_user,
-    _load_classes, _save_classes, _get_classes_path,
+    _load_classes, _save_classes, _get_classes_path, _resolve_user_dir,
     ClassForm, StudentForm
 )
 
@@ -48,13 +48,33 @@ def create_class(request: Request, form: ClassForm):
 @router.put("/api/classes/{class_name}")
 def update_class(request: Request, class_name: str, form: ClassForm):
     caller = require_role(request, ["admin", "teacher"])
+    if form.name == class_name:
+        # 没改名，只改 schedule
+        classes = _load_classes(caller["username"])
+        for c in classes:
+            if c["name"] == class_name:
+                c["schedule"] = form.schedule
+                _save_classes(caller["username"], classes)
+                return {"status": "success"}
+        raise HTTPException(status_code=404, detail="班级不存在")
+
     classes = _load_classes(caller["username"])
+    if any(c["name"] == form.name for c in classes):
+        raise HTTPException(status_code=400, detail="目标班级名已存在")
+
     for c in classes:
         if c["name"] == class_name:
             c["name"] = form.name
             c["schedule"] = form.schedule
             _save_classes(caller["username"], classes)
-            return {"status": "success"}
+            # 同步重命名 sessions 目录
+            user_dir = _resolve_user_dir(caller["username"])
+            if user_dir:
+                old_sessions = os.path.join(user_dir, "sessions", class_name)
+                new_sessions = os.path.join(user_dir, "sessions", form.name)
+                if os.path.isdir(old_sessions):
+                    os.rename(old_sessions, new_sessions)
+            return {"status": "success", "message": f"班级 [{class_name}] 已改名为 [{form.name}]"}
     raise HTTPException(status_code=404, detail="班级不存在")
 
 
