@@ -5,10 +5,51 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>qx-dashboard-ts</title>
-    <script type="module" crossorigin src="/assets/index-CQE82kYK.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-WZ2tzo0M.css">
+    <script type="module" crossorigin src="/assets/index-BhVAcvEj.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Bk3S8UZ2.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="splash-loader" style="
+        position: fixed; inset: 0; z-index: 99999;
+        display: flex; flex-direction: column;
+        justify-content: center; align-items: center;
+        background: #0f172a; color: #fff;
+        font-family: system-ui, sans-serif;
+      ">
+        <style>
+          .sp-ball {
+            position: relative; width: 120px; height: 90px; margin: 0 auto;
+          }
+          .sp-ball:before, .sp-ball:after {
+            content: ''; position: absolute;
+          }
+          .sp-ball:before {
+            bottom: 30px; left: 50px;
+            height: 30px; width: 30px;
+            border-radius: 50%; background: #2a9d8f;
+            animation: sp-bounce .5s ease-in-out infinite alternate;
+          }
+          .sp-ball:after {
+            right: 0; top: 0; height: 7px; width: 45px;
+            border-radius: 4px;
+            box-shadow: 0 5px 0 #f2f2f2, -35px 50px 0 #f2f2f2, -70px 95px 0 #f2f2f2;
+            animation: sp-step 1s ease-in-out infinite;
+          }
+          @keyframes sp-bounce {
+            0% { transform: scale(1,.7); }
+            40% { transform: scale(.8,1.2); }
+            60% { transform: scale(1,1); }
+            100% { bottom: 140px; }
+          }
+          @keyframes sp-step {
+            0% { box-shadow: 0 10px 0 #0000, 0 10px 0 #f2f2f2, -35px 50px 0 #f2f2f2, -70px 90px 0 #f2f2f2; }
+            100% { box-shadow: 0 10px 0 #f2f2f2, -35px 50px 0 #f2f2f2, -70px 90px 0 #f2f2f2, -70px 90px 0 #0000; }
+          }
+        </style>
+        <div class="sp-ball"></div>
+        <p style="color: #94a3b8; font-size: .95rem; margin-top: 16px">青橙加载中...</p>
+      </div>
+    </div>
   </body>
 </html>
