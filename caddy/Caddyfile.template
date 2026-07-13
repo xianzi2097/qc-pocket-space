@@ -16,11 +16,16 @@
     encode gzip zstd
 	
     # 0.后端大脑：把所有 /api/ 开头的流量，拦截下来交给 FastAPI
-    reverse_proxy /api/* localhost:{{FASTAPI_PORT}}
-    
-    # 1. 默认根目录：公开主页（4 卡片布局，低年级入口）
-    root * "{{SITE_PATH}}/dashboard"
-    file_server
+    handle /api/* {
+        reverse_proxy localhost:{{FASTAPI_PORT}}
+    }
+
+    # 1. 前端 SPA（所有路由 / /courses /dashboard 等统一 try_files 兜底）
+    handle {
+        root * "{{SITE_PATH}}/dashboard"
+        try_files {path} /index.html
+        file_server
+    }
 
     # ================= 强化跨域配置 (保持不变) =================
     header {
@@ -79,10 +84,4 @@
         file_server
     }
 
-    # 7. React 后台看板（SPA，需要 try_files 兜底）
-    handle_path /dashboard/* {
-        root * "{{SITE_PATH}}/dashboard"
-        try_files {path} /index.html
-        file_server
-    }
 }
