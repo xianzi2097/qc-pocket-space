@@ -133,6 +133,8 @@ async def upload_file(
     request: Request, course_name: str, lesson_name: str, file: UploadFile = File(...),
 ):
     caller = require_role(request, ["admin", "teacher"])
+    if lesson_name == course_name:
+        raise HTTPException(status_code=400, detail="课件名不能与课程名相同")
     base = _get_teacher_course_dir(caller["username"])
     course_path = _safe_path(base, course_name)
     if not os.path.exists(course_path):
@@ -154,6 +156,8 @@ async def save_sb3(
     file_type: str = "main", file: UploadFile = File(...),
 ):
     caller = require_role(request, ["admin", "teacher"])
+    if lesson_name == course_name:
+        raise HTTPException(status_code=400, detail="课件名不能与课程名相同")
     base = _get_teacher_course_dir(caller["username"])
     course_path = _safe_path(base, course_name)
     if not os.path.exists(course_path):
