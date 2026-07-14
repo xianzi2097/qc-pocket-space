@@ -18,6 +18,12 @@ for _d in [_DATA_ROOT, USERS_DIR,
     os.makedirs(_d, exist_ok=True)
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False, "timeout": 10})
+
+# 开启 WAL 模式，提升并发读写性能
+with engine.connect() as _conn:
+    _conn.execute(__import__("sqlalchemy").text("PRAGMA journal_mode=WAL"))
+    _conn.commit()
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

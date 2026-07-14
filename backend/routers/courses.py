@@ -135,6 +135,10 @@ async def upload_file(
     caller = require_role(request, ["admin", "teacher"])
     if lesson_name == course_name:
         raise HTTPException(status_code=400, detail="课件名不能与课程名相同")
+    # 文件名安全过滤：防止路径穿越
+    safe_name = os.path.basename(file.filename or "unnamed").lstrip(".")
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="文件名无效")
     base = _get_teacher_course_dir(caller["username"])
     course_path = _safe_path(base, course_name)
     if not os.path.exists(course_path):
@@ -142,10 +146,13 @@ async def upload_file(
     lesson_path = os.path.join(course_path, lesson_name)
     os.makedirs(lesson_path, exist_ok=True)
     content = await file.read()
-    with open(os.path.join(lesson_path, file.filename), "wb") as f:
+    # 文件大小限制：50MB
+    if len(content) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="文件过大，最大 50MB")
+    with open(os.path.join(lesson_path, safe_name), "wb") as f:
         f.write(content)
     return {
-        "status": "success", "message": f"文件 [{file.filename}] 已上传",
+        "status": "success", "message": f"文件 [{safe_name}] 已上传",
         "path": f"/share/{caller['username']}_course/{course_name}/{lesson_name}/"
     }
 
@@ -166,6 +173,9 @@ async def save_sb3(
     os.makedirs(lesson_path, exist_ok=True)
     filename = "main.sb3" if file_type == "main" else "student.sb3"
     content = await file.read()
+    # 文件大小限制：50MB
+    if len(content) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="文件过大，最大 50MB")
     with open(os.path.join(lesson_path, filename), "wb") as f:
         f.write(content)
     return {
