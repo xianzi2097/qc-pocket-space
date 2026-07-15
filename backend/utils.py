@@ -2,6 +2,7 @@
 import os
 import re
 import json
+import hashlib
 import secrets
 import shutil
 from datetime import datetime
@@ -9,6 +10,24 @@ from fastapi import HTTPException, Request, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from models import SessionLocal, UserModel, TrashModel, USERS_DIR
+
+# ==========================================
+# 密码哈希
+# ==========================================
+def hash_password(password: str) -> str:
+    """生成 sha256$salt$hash 格式的密码哈希"""
+    salt = secrets.token_hex(16)
+    h = hashlib.sha256((salt + password).encode()).hexdigest()
+    return f"sha256${salt}${h}"
+
+def verify_password(password: str, stored: str) -> bool:
+    """验证密码（sha256$salt$hash 格式）"""
+    if stored and stored.startswith("sha256$"):
+        parts = stored.split("$", 2)
+        if len(parts) == 3:
+            salt, h = parts[1], parts[2]
+            return hashlib.sha256((salt + password).encode()).hexdigest() == h
+    return False
 
 # ==========================================
 # 路径常量
@@ -116,7 +135,7 @@ def _ensure_user(db: Session, username: str, role: str, avatar: str, descriptors
         return user
     user = UserModel(
         username=username,
-        password="111111",
+        password=hash_password("111111"),
         role=role,
         avatar_path=avatar,
         qc_descriptors=json.dumps(descriptors, ensure_ascii=False)
@@ -189,7 +208,7 @@ def restore_from_trash(trash_id: int, db: Session) -> dict:
         avatar_path = info["avatar_path"]
         qc_descriptors = json.dumps(info.get("descriptors", {}), ensure_ascii=False)
         db_snap = json.loads(trash.db_snapshot or "{}")
-        password = db_snap.get("password", "111111")
+        password = db_snap.get("password", hash_password("111111"))
     else:
         db_snap = json.loads(trash.db_snapshot or "{}")
         username = db_snap["username"]

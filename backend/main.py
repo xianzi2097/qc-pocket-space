@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from models import Base, engine, SessionLocal, UserModel, USERS_DIR
-from utils import verify_token
+from utils import verify_token, hash_password
 
 
 def _ensure_admin():
@@ -14,7 +14,7 @@ def _ensure_admin():
         if db.query(UserModel).filter(UserModel.username == "admin").first():
             return
         user = UserModel(
-            username="admin", password="111111",
+            username="admin", password=hash_password("111111"),
             role="admin", avatar_path="default.jpg", qc_descriptors="{}"
         )
         db.add(user)

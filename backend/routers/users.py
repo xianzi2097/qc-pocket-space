@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from models import UserModel, SessionLocal
 from utils import (
     get_db, get_current_user, require_role, get_user_dir, move_to_trash,
+    hash_password, verify_password,
     AvatarUpdateForm, ChangePasswordForm, DescriptorsUpdateForm
 )
 
@@ -97,11 +98,11 @@ def change_password(request: Request, form: ChangePasswordForm, db: Session = De
     user = db.query(UserModel).filter(UserModel.username == caller["username"]).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    if user.password != form.old_password:
+    if not verify_password(form.old_password, user.password):
         raise HTTPException(status_code=400, detail="原密码错误")
     if not form.new_password.strip():
         raise HTTPException(status_code=400, detail="新密码不能为空")
-    user.password = form.new_password
+    user.password = hash_password(form.new_password)
     db.commit()
     return {"status": "success", "message": "密码修改成功！"}
 

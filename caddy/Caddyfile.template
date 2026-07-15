@@ -21,8 +21,9 @@
     }
 
     # 0.1 宣传落地页
-    handle /landing/* {
+    handle /landing* {
         root * "{{SITE_PATH}}/landing"
+        try_files {path} /index.html
         file_server
     }
 

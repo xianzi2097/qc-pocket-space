@@ -4,7 +4,7 @@ import random
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from models import UserModel
-from utils import get_db, get_current_user, require_role, generate_token, ensure_user_dirs, RegisterForm, LoginForm
+from utils import get_db, get_current_user, require_role, generate_token, ensure_user_dirs, hash_password, verify_password, RegisterForm, LoginForm
 
 router = APIRouter()
 
@@ -23,7 +23,7 @@ def register_user(request: Request, form: RegisterForm, db: Session = Depends(ge
 
     avatar_name = f"avatar_{str(random.randint(1, 78)).zfill(2)}.jpg"
     new_user = UserModel(
-        username=form.username, password=form.password,
+        username=form.username, password=hash_password(form.password),
         role=form.role, avatar_path=avatar_name, qc_descriptors="{}"
     )
     db.add(new_user)
@@ -35,7 +35,7 @@ def register_user(request: Request, form: RegisterForm, db: Session = Depends(ge
 @router.post("/api/login")
 def login_user(form: LoginForm, db: Session = Depends(get_db)):
     user = db.query(UserModel).filter(UserModel.username == form.username).first()
-    if user and user.password == form.password:
+    if user and verify_password(form.password, user.password):
         avatar_path = user.avatar_path or "default.jpg"
         if avatar_path.endswith(".png"):
             avatar_path = avatar_path[:-4] + ".jpg"
