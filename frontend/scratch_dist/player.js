@@ -138665,8 +138665,8 @@ class SaveToCourse extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
         // 白名单开启 → 只保留白名单勾选的积木（没勾就全删）
         studentBlob = yield createFilteredSb3(mainBlob, whitelistBlockIds);
       } else {
-        // 白名单未开启 → 全部保留，两版相同
-        studentBlob = mainBlob;
+        // 白名单未开启 → 全部删除，学生得到空白项目
+        studentBlob = yield createFilteredSb3(mainBlob, null);
       }
 
       // 3. 上传 main.sb3
