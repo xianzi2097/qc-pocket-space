@@ -12,7 +12,7 @@ def _ensure_admin():
     db = SessionLocal()
     try:
         if db.query(UserModel).filter(UserModel.username == "admin").first():
-            print("[startup] admin 已存在")
+            print("[startup] admin already exists")
             return
         user = UserModel(
             username="admin", password=hash_password("111111"),
@@ -20,9 +20,9 @@ def _ensure_admin():
         )
         db.add(user)
         db.commit()
-        print(f"[startup] ✅ admin 已创建 (密码: 111111)")
+        print("[startup] admin created (pw: 111111)")
     except Exception as e:
-        print(f"[startup] ❌ admin 创建失败: {e}")
+        print(f"[startup] admin create failed: {e}")
     finally:
         db.close()
 
