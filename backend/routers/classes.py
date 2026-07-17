@@ -18,16 +18,25 @@ def list_classes(request: Request, db: Session = Depends(get_db)):
     caller = get_current_user(request)
     classes = _load_classes(caller["username"])
     for c in classes:
+        # 兼容旧格式：schedule 是 list 则转为 dict
+        if isinstance(c.get("schedule"), list):
+            c["schedule"] = {"days": c["schedule"], "time": "", "location": ""}
+        elif not isinstance(c.get("schedule"), dict):
+            c["schedule"] = {"days": [], "time": "", "location": ""}
         enriched = []
         for s in c.get("students", []):
             user_id = s.get("user_id")
             if user_id:
                 user = db.query(UserModel).filter(UserModel.id == user_id).first()
-                enriched.append({
+                entry = {
                     "user_id": user_id,
                     "username": user.username if user else "未知",
                     "name": s.get("name", user.username if user else "未知"),
-                })
+                }
+                # 学生有独立上课日则带上
+                if s.get("schedule"):
+                    entry["schedule"] = s["schedule"]
+                enriched.append(entry)
             else:
                 enriched.append(s)
         c["students"] = enriched
@@ -127,7 +136,10 @@ def add_student(request: Request, class_name: str, form: StudentForm, db: Sessio
                         {"teacher": caller["username"]}
                     )
                     user_id = new_user.id
-                c["students"].append({"user_id": user_id, "name": form.name})
+                entry = {"user_id": user_id, "name": form.name}
+                if form.schedule:
+                    entry["schedule"] = form.schedule
+                c["students"].append(entry)
                 _save_classes(caller["username"], classes)
                 return {"status": "success", "user_id": user_id}
         raise HTTPException(status_code=404, detail="班级不存在")
@@ -207,4 +219,31 @@ def remove_student(request: Request, class_name: str, student_id: str):
             c["students"] = [s for s in c["students"] if s.get("user_id") != target_id]
             _save_classes(caller["username"], classes)
             return {"status": "success"}
+    raise HTTPException(status_code=404, detail="班级不存在")
+
+
+from pydantic import BaseModel as _BaseModel
+
+class _StudentScheduleForm(_BaseModel):
+    schedule: dict | None = None  # {"days": ["周六"]} 或 None（恢复默认）
+
+@router.patch("/api/classes/{class_name}/students/{student_id}/schedule")
+def update_student_schedule(request: Request, class_name: str, student_id: str, form: _StudentScheduleForm):
+    """更新学生的个人上课日"""
+    caller = require_role(request, ["admin", "teacher"])
+    if not student_id.isdigit():
+        raise HTTPException(status_code=400, detail="无效的学生ID")
+    classes = _load_classes(caller["username"])
+    target_id = int(student_id)
+    for c in classes:
+        if c["name"] == class_name:
+            for s in c.get("students", []):
+                if s.get("user_id") == target_id:
+                    if form.schedule:
+                        s["schedule"] = form.schedule
+                    else:
+                        s.pop("schedule", None)  # 删除个人设置，恢复跟随班级
+                    _save_classes(caller["username"], classes)
+                    return {"status": "success"}
+            raise HTTPException(status_code=404, detail="学生在班级中未找到")
     raise HTTPException(status_code=404, detail="班级不存在")

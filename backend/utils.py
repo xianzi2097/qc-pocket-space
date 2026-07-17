@@ -411,13 +411,14 @@ class NoteSaveForm(BaseModel):
 
 class ClassForm(BaseModel):
     name: str
-    schedule: list[str] = []
+    schedule: dict = {}  # {"days": ["周三","周五"], "time": "14:00", "location": "301教室"}
 
 class StudentForm(BaseModel):
     name: str
     account: str = ""
     remark: str = ""
     existing_id: str = ""
+    schedule: dict | None = None  # 可选的个人上课日，如 {"days": ["周六"]}
 
 class SessionStudentRecord(BaseModel):
     name: str
