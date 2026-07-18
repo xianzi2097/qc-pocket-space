@@ -53,3 +53,121 @@ def login_user(form: LoginForm, db: Session = Depends(get_db)):
             }
         }
     raise HTTPException(status_code=401, detail="账号或密码错误")
+
+
+# ============================================================
+#  批量注册（供启动器调用）
+# ============================================================
+from pydantic import BaseModel
+from typing import List, Optional
+import os
+import json
+
+class BatchRegisterItem(BaseModel):
+    username: str
+    password: str
+    role: str  # "teacher" or "student"
+    teacher: Optional[str] = None  # 学生所属老师
+
+class BatchRegisterForm(BaseModel):
+    users: List[BatchRegisterItem]
+    default_password: str = "111111"
+
+@router.post("/api/admin/batch-register")
+def batch_register(request: Request, form: BatchRegisterForm, db: Session = Depends(get_db)):
+    """批量注册老师和学生（启动器专用）"""
+    caller = get_current_user(request)
+    require_role(request, ["admin"])
+    
+    results = {"success": 0, "fail": 0, "skip": 0, "details": []}
+    
+    for item in form.users:
+        try:
+            # 检查是否已存在
+            existing = db.query(UserModel).filter(UserModel.username == item.username).first()
+            if existing:
+                if existing.role != item.role:
+                    results["details"].append({"username": item.username, "status": "skip", "msg": f"已是 {existing.role}"})
+                    results["skip"] += 1
+                else:
+                    results["details"].append({"username": item.username, "status": "skip", "msg": "已存在"})
+                    results["skip"] += 1
+                continue
+            
+            # 创建用户
+            avatar_name = f"avatar_{str(random.randint(1, 78)).zfill(2)}.jpg"
+            qc_desc = json.dumps({"teacher": item.teacher}, ensure_ascii=False) if item.teacher else "{}"
+            
+            new_user = UserModel(
+                username=item.username,
+                password=hash_password(item.password or form.default_password),
+                role=item.role,
+                avatar_path=avatar_name,
+                qc_descriptors=qc_desc
+            )
+            db.add(new_user)
+            db.commit()
+            ensure_user_dirs(new_user)
+            
+            results["details"].append({"username": item.username, "status": "success", "msg": "创建成功"})
+            results["success"] += 1
+            
+        except Exception as e:
+            db.rollback()
+            results["details"].append({"username": item.username, "status": "fail", "msg": str(e)})
+            results["fail"] += 1
+    
+    return {"status": "success", "message": f"批量注册完成：成功 {results['success']}，跳过 {results['skip']}，失败 {results['fail']}", **results}
+
+
+# ============================================================
+#  班级管理（供启动器调用）
+# ============================================================
+class ClassItem(BaseModel):
+    name: str
+    students: List[dict] = []  # [{"user_id": 1, "name": "xxx"}]
+
+class SaveClassesForm(BaseModel):
+    teacher: str
+    classes: List[ClassItem]
+
+def _get_classes_file(teacher: str) -> str:
+    """获取班级配置文件路径"""
+    from utils import _get_teacher_course_dir
+    # 班级文件放在用户目录下
+    users_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "..", "data", "users", "teachers")
+    teacher_dir = os.path.join(users_dir, teacher)
+    os.makedirs(teacher_dir, exist_ok=True)
+    return os.path.join(teacher_dir, "classes.json")
+
+@router.get("/api/admin/classes/{teacher}")
+def get_classes(teacher: str, request: Request, db: Session = Depends(get_db)):
+    """获取老师的班级列表"""
+    caller = get_current_user(request)
+    require_role(request, ["admin"])
+    
+    classes_file = _get_classes_file(teacher)
+    if not os.path.exists(classes_file):
+        return {"status": "success", "classes": []}
+    
+    try:
+        with open(classes_file, "r", encoding="utf-8") as f:
+            classes = json.load(f)
+        return {"status": "success", "classes": classes}
+    except Exception:
+        return {"status": "success", "classes": []}
+
+@router.post("/api/admin/classes/{teacher}")
+def save_classes(teacher: str, request: Request, form: SaveClassesForm, db: Session = Depends(get_db)):
+    """保存老师的班级列表"""
+    caller = get_current_user(request)
+    require_role(request, ["admin"])
+    
+    classes_file = _get_classes_file(teacher)
+    try:
+        classes_data = [c.model_dump() for c in form.classes]
+        with open(classes_file, "w", encoding="utf-8") as f:
+            json.dump(classes_data, f, ensure_ascii=False, indent=2)
+        return {"status": "success", "message": f"班级数据已保存"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存失败: {e}")

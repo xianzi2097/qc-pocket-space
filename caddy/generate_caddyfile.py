@@ -47,27 +47,91 @@ def main():
     else:
         site_domain_list = site_domain
 
-    # 读模板
-    template_path = os.path.join(script_dir, "Caddyfile.template")
-    if not os.path.exists(template_path):
-        print(f"[错误] 找不到模板文件: {template_path}")
-        sys.exit(1)
+    # 构建 Caddyfile 内容（f-string 直接生成，无需模板文件）
+    caddyfile = f"""# ================= 全局配置：定义插件执行顺序 =================
+# 注意：这部分必须在文件的最顶端！
+{{
+    order webdav before file_server
+}}
 
-    with open(template_path, "r", encoding="utf-8") as f:
-        content = f.read()
+# ================= 你的网站配置 =================
+{site_domain_list} {{
+    # www → 主域名 301 跳转
+    @www {{
+        host www.{site_domain}
+    }}
+    redir @www https://{site_domain}{{uri}}
+    encode gzip zstd
 
-    # 注入绝对路径和域名
-    content = content.replace("{{SITE_PATH}}", site_path)
-    content = content.replace("{{DATA_PATH}}", data_path)
-    content = content.replace("{{SITE_DOMAIN}}", site_domain)
-    content = content.replace("{{SITE_DOMAIN_LIST}}", site_domain_list)
-    content = content.replace("{{FASTAPI_PORT}}", fastapi_port)
-    content = content.replace("{{WWW_REDIRECT}}", "")
+    # 0.后端大脑：把所有 /api/ 开头的流量，拦截下来交给 FastAPI
+    handle /api/* {{
+        reverse_proxy localhost:{fastapi_port}
+    }}
+
+    # 0.1 宣传落地页
+    handle /landing* {{
+        root * "{site_path}/landing"
+        try_files {{path}} /index.html
+        file_server
+    }}
+
+    # 1. 前端 SPA（所有路由 / /courses /dashboard 等统一 try_files 兜底）
+    handle {{
+        root * "{site_path}/dashboard"
+        try_files {{path}} /index.html
+        file_server
+    }}
+
+    # ================= 强化跨域配置 =================
+    header {{
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "*"
+        Access-Control-Expose-Headers "*"
+    }}
+
+    @options {{
+        method OPTIONS
+    }}
+    respond @options 200
+
+    # 2. 学习手册：映射到 VitePress 打包目录
+    handle_path /docs/* {{
+        root * "{site_path}/vitepress_dist"
+        file_server
+    }}
+
+    # 3. 核心素材共享（data/courses/）
+    handle_path /share/* {{
+        root * "{data_path}/courses"
+        @get method GET HEAD
+        handle @get {{
+            file_server browse
+        }}
+        handle {{
+            webdav
+        }}
+    }}
+
+    # 5. 电子教室路由
+    handle_path /classroom/* {{
+        root * "{site_path}/classroom"
+        file_server
+    }}
+
+    # 6. Scratch 在线编辑器前端
+    handle_path /Scratch/* {{
+        root * "{site_path}/scratch_dist"
+        try_files {{path}} /index.html
+        file_server
+    }}
+
+}}"""
 
     # 写出最终的 Caddyfile（覆盖旧的）
     caddyfile_path = os.path.join(script_dir, "Caddyfile")
     with open(caddyfile_path, "w", encoding="utf-8") as f:
-        f.write(content)
+        f.write(caddyfile)
 
     print(f"[OK] Caddyfile 已生成")
     print(f"     路径   = {site_path}")

@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from utils import (
     get_db, get_current_user, require_role,
-    _safe_path, _get_teacher_course_dir, _move_to_trash, COURSE_BASE,
+    _safe_path, _get_teacher_course_dir, _move_to_trash,
     CourseCreateForm
 )
 

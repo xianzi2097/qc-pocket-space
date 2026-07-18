@@ -40,6 +40,7 @@ os.makedirs(COURSE_BASE, exist_ok=True)
 # ==========================================
 # Token 认证
 # ==========================================
+# ponytail: 内存 token，重启丢失。局域网小工具够用就不管。
 ACTIVE_TOKENS: dict[str, dict] = {}
 
 def generate_token(username: str, role: str) -> str:

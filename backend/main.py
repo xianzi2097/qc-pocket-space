@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from models import Base, engine, SessionLocal, UserModel, USERS_DIR
+from models import Base, engine, SessionLocal, UserModel
 from utils import verify_token, hash_password
 
 
@@ -27,34 +27,9 @@ def _ensure_admin():
         db.close()
 
 
-def check_orphan_folders():
-    db = SessionLocal()
-    try:
-        db_ids = set()
-        for row in db.query(UserModel.id).all():
-            db_ids.add(str(row[0]))
-        orphans = []
-        for role_dir in ["admins", "teachers", "students"]:
-            role_path = os.path.join(USERS_DIR, role_dir)
-            if not os.path.exists(role_path):
-                continue
-            for name in os.listdir(role_path):
-                p = os.path.join(role_path, name)
-                if os.path.isdir(p) and not name.startswith(".") and name not in db_ids:
-                    orphans.append((role_dir, name, p))
-        if orphans:
-            print("[WARNING] Orphan folders found (no DB record):")
-            for role_dir, name, path in orphans:
-                print(f"  {role_dir}/{name}  ->  {path}")
-            print("[i] Background mode, keeping orphan folders")
-    finally:
-        db.close()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _ensure_admin()
-    check_orphan_folders()
     yield
 
 
