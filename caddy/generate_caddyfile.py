@@ -82,12 +82,12 @@ def main():
         file_server
     }}
 
-    # ================= 强化跨域配置 =================
+    # ================= 跨域配置（局域网部署，仅允许本地域名） =================
     header {{
-        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Origin "{site_domain}"
         Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-        Access-Control-Allow-Headers "*"
-        Access-Control-Expose-Headers "*"
+        Access-Control-Allow-Headers "Content-Type, Authorization"
+        Access-Control-Expose-Headers "Content-Type"
     }}
 
     @options {{

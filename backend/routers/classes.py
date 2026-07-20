@@ -24,10 +24,14 @@ def list_classes(request: Request, db: Session = Depends(get_db)):
         elif not isinstance(c.get("schedule"), dict):
             c["schedule"] = {"days": [], "time": "", "location": ""}
         enriched = []
+        user_ids = [s["user_id"] for s in c.get("students", []) if s.get("user_id")]
+        users_map = {}
+        if user_ids:
+            users_map = {u.id: u for u in db.query(UserModel).filter(UserModel.id.in_(user_ids)).all()}
         for s in c.get("students", []):
             user_id = s.get("user_id")
             if user_id:
-                user = db.query(UserModel).filter(UserModel.id == user_id).first()
+                user = users_map.get(user_id)
                 entry = {
                     "user_id": user_id,
                     "username": user.username if user else "未知",

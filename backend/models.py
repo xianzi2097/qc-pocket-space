@@ -1,6 +1,6 @@
 """数据模型 + 数据库引擎"""
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Text
+from sqlalchemy import create_engine, Column, Integer, String, Text, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -21,7 +21,7 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread
 
 # 开启 WAL 模式，提升并发读写性能
 with engine.connect() as _conn:
-    _conn.execute(__import__("sqlalchemy").text("PRAGMA journal_mode=WAL"))
+    _conn.execute(text("PRAGMA journal_mode=WAL"))
     _conn.commit()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -32,7 +32,7 @@ class UserModel(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
-    password = Column(String)
+    password = Column(String(255))
     role = Column(String)                                # "admin" / "teacher" / "student"
     avatar_path = Column(String, default="avatar_01.jpg")
     qc_descriptors = Column(Text, default="{}")

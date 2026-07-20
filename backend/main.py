@@ -20,8 +20,9 @@ def _ensure_admin():
         )
         db.add(user)
         db.commit()
-        print("[startup] admin created (pw: 111111)")
+        print("[startup] admin created (default password, change immediately)")
     except Exception as e:
+        db.rollback()
         print(f"[startup] admin create failed: {e}")
     finally:
         db.close()

@@ -1,12 +1,31 @@
 """注册 / 登录路由"""
 import json
+import os
 import random
+from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from models import UserModel
 from utils import get_db, get_current_user, require_role, generate_token, ensure_user_dirs, hash_password, verify_password, RegisterForm, LoginForm
 
 router = APIRouter()
+
+# ============================================================
+#  登录限流：同 IP 5 次失败 → 锁定 30 秒
+# ============================================================
+import time
+from collections import defaultdict
+
+LOGIN_FAILURES: dict[str, list[float]] = defaultdict(list)
+
+def _check_login_rate(request: Request):
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    failures = [t for t in LOGIN_FAILURES[ip] if now - t < 30]
+    LOGIN_FAILURES[ip] = failures
+    if len(failures) >= 5:
+        raise HTTPException(status_code=429, detail="登录尝试过于频繁，请 30 秒后再试")
 
 
 @router.post("/api/register")
@@ -33,7 +52,8 @@ def register_user(request: Request, form: RegisterForm, db: Session = Depends(ge
 
 
 @router.post("/api/login")
-def login_user(form: LoginForm, db: Session = Depends(get_db)):
+def login_user(request: Request, form: LoginForm, db: Session = Depends(get_db)):
+    _check_login_rate(request)
     user = db.query(UserModel).filter(UserModel.username == form.username).first()
     if user and verify_password(form.password, user.password):
         avatar_path = user.avatar_path or "default.jpg"
@@ -52,16 +72,15 @@ def login_user(form: LoginForm, db: Session = Depends(get_db)):
                 "descriptors": descriptors
             }
         }
+    # 记录失败次数（限流用）
+    ip = request.client.host if request.client else "unknown"
+    LOGIN_FAILURES[ip].append(time.time())
     raise HTTPException(status_code=401, detail="账号或密码错误")
 
 
 # ============================================================
 #  批量注册（供启动器调用）
 # ============================================================
-from pydantic import BaseModel
-from typing import List, Optional
-import os
-import json
 
 class BatchRegisterItem(BaseModel):
     username: str
