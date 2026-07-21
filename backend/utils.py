@@ -4,6 +4,7 @@ import re
 import json
 import hashlib
 import secrets
+import time
 import shutil
 from datetime import datetime
 from fastapi import HTTPException, Request, Depends
@@ -40,15 +41,21 @@ os.makedirs(COURSE_BASE, exist_ok=True)
 # ==========================================
 # Token 认证
 # ==========================================
-# ponytail: 内存 token，重启丢失。局域网小工具够用就不管。
+# 内存 token 存活跃会话。24h 过期 + 顶号 + 退出登录清 token。重启丢失（可接受）。
 ACTIVE_TOKENS: dict[str, dict] = {}
 
 def generate_token(username: str, role: str) -> str:
+    # ⛔ 踢掉此用户的旧 token（顶号）
+    old = [t for t, info in ACTIVE_TOKENS.items() if info["username"] == username]
+    for t in old:
+        del ACTIVE_TOKENS[t]
+    now = time.time()
     token = secrets.token_hex(32)
     ACTIVE_TOKENS[token] = {
         "username": username,
         "role": role,
-        "created_at": datetime.now().isoformat()
+        "created_at": now,
+        "expires_at": now + 86400,  # 24h
     }
     return token
 
@@ -58,10 +65,19 @@ def verify_token(authorization: str | None) -> dict:
     parts = authorization.split(" ", 1)
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
+    now = time.time()
+    # 惰性清理所有过期 token
+    expired = [t for t, info in list(ACTIVE_TOKENS.items())
+               if info.get("expires_at", 0) < now]
+    for t in expired:
+        del ACTIVE_TOKENS[t]
     token = parts[1]
     user_info = ACTIVE_TOKENS.get(token)
     if not user_info:
         raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
+    if user_info.get("expires_at", 0) < now:
+        del ACTIVE_TOKENS[token]
+        raise HTTPException(status_code=401, detail="登录已过期")
     return user_info
 
 def get_db():

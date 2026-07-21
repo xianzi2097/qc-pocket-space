@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from models import UserModel
-from utils import get_db, get_current_user, require_role, generate_token, ensure_user_dirs, hash_password, verify_password, RegisterForm, LoginForm
+from utils import get_db, get_current_user, require_role, generate_token, ensure_user_dirs, hash_password, verify_password, ACTIVE_TOKENS, RegisterForm, LoginForm
 
 router = APIRouter()
 
@@ -18,6 +18,10 @@ import time
 from collections import defaultdict
 
 LOGIN_FAILURES: dict[str, list[float]] = defaultdict(list)
+
+# 测试用：重置登录限流状态
+def _reset_login_failures():
+    LOGIN_FAILURES.clear()
 
 def _check_login_rate(request: Request):
     ip = request.client.host if request.client else "unknown"
@@ -76,6 +80,20 @@ def login_user(request: Request, form: LoginForm, db: Session = Depends(get_db))
     ip = request.client.host if request.client else "unknown"
     LOGIN_FAILURES[ip].append(time.time())
     raise HTTPException(status_code=401, detail="账号或密码错误")
+
+
+# ============================================================
+#  退出登录
+# ============================================================
+
+@router.post("/api/logout")
+def logout(request: Request):
+    auth = request.headers.get("authorization")
+    if auth:
+        parts = auth.split(" ", 1)
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            ACTIVE_TOKENS.pop(parts[1], None)
+    return {"status": "success", "message": "已退出登录"}
 
 
 # ============================================================

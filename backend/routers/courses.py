@@ -48,7 +48,7 @@ def create_course(request: Request, form: CourseCreateForm):
     caller = require_role(request, ["admin", "teacher"])
     course_dir = _get_teacher_course_dir(caller["username"])
     os.makedirs(course_dir, exist_ok=True)
-    course_path = os.path.join(course_dir, form.name)
+    course_path = _safe_path(course_dir, form.name)
     if os.path.exists(course_path):
         raise HTTPException(status_code=400, detail="课程已存在")
     os.makedirs(course_path)
@@ -143,7 +143,7 @@ async def upload_file(
     course_path = _safe_path(base, course_name)
     if not os.path.exists(course_path):
         raise HTTPException(status_code=404, detail="课程不存在")
-    lesson_path = os.path.join(course_path, lesson_name)
+    lesson_path = _safe_path(course_path, lesson_name)
     os.makedirs(lesson_path, exist_ok=True)
     content = await file.read()
     # 文件大小限制：50MB
@@ -169,7 +169,7 @@ async def save_sb3(
     course_path = _safe_path(base, course_name)
     if not os.path.exists(course_path):
         raise HTTPException(status_code=404, detail="课程不存在")
-    lesson_path = os.path.join(course_path, lesson_name)
+    lesson_path = _safe_path(course_path, lesson_name)
     os.makedirs(lesson_path, exist_ok=True)
     filename = "main.sb3" if file_type == "main" else "student.sb3"
     content = await file.read()
