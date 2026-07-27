@@ -301,7 +301,9 @@ def _save_sessions(username: str, class_name: str, month: str, sessions: list):
 # 课程工具
 # ==========================================
 def _get_teacher_course_dir(teacher_username: str) -> str:
-    return os.path.join(COURSE_BASE, f"{teacher_username}_course")
+    # 兼容 seed_dev_data.py 创建的目录名（不含 (t) 后缀和空格）
+    clean = teacher_username.replace("(t)", "").replace(" ", "")
+    return os.path.join(COURSE_BASE, f"{clean}_course")
 
 # ==========================================
 # 消息工具
