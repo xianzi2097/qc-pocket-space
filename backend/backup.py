@@ -6,22 +6,23 @@
 - 备份范围：整个 data/（数据库 + users/ + courses/ + trash/），不是只有 qingcheng.db
 - 数据库用 sqlite3 官方 backup API 生成一致快照（自动包含 WAL 里尚未合并的写入）
 - 备份位置：data 同级 backups/（例如 QC-PocketSpace/backups/）
-- 保留策略：最近 7 份，最旧自动清理
-- 触发：后台线程每 10 分钟检查一次，距上次备份 >= 24h 才备份一次
+- 保留策略：最近 14 份，最旧自动清理（覆盖约半个月）
+- 触发：后台线程每 10 分钟检查一次，距上次备份 >= 间隔才备份（默认 24h=1 天，可配）
 
 与启动器备份（qx-launcher/app/backup.py）的分工：
   · 后端（本文件）＝自动层：服务【运行中】时可用
-      - 服务常驻期间每天自动备份，保留最近 7 份
+      - 服务常驻期间每天自动备份，保留最近 14 份
   · 启动器（qx-launcher/app/backup.py）＝手动层：服务【未运行】时可用
       - 手动备份（导出到 U 盘等）、从备份 ZIP 恢复、启动前自动备份
 
 两者时间错开、互为补充，共同覆盖全天候：
   服务没跑 → 靠启动器；服务在跑 → 靠后端。
-行为已统一：同一备份目录 backups/、同一命名 auto_*.zip、保留最近 7 份。
+行为已统一：同一备份目录 backups/、同一命名 auto_*.zip、保留最近 14 份。
 
 可通过环境变量控制：
-    QC_DISABLE_AUTO_BACKUP=1  禁用自动备份
-    QC_BACKUP_KEEP=14         保留份数（默认 7）
+    QC_DISABLE_AUTO_BACKUP=1        禁用自动备份
+    QC_BACKUP_INTERVAL_HOURS=48     备份间隔（小时），默认 24
+    QC_BACKUP_KEEP=30               保留份数，默认 14
 """
 import os
 import time
@@ -39,10 +40,11 @@ DB_PATH = os.path.join(DATA_ROOT, "qingcheng.db")
 # data 同级 backups/（例如 QC-PocketSpace/backups/）
 BACKUP_ROOT = os.path.abspath(os.path.join(BACKEND_DIR, "..", "..", "backups"))
 
-# ── 策略 ──
+# ── 策略（可按机构调整） ──
 CHECK_INTERVAL = 600       # 每 10 分钟检查一次（600s）
-BACKUP_INTERVAL = 86400    # 距上次备份超过 24h 才备份
-KEEP = int(os.environ.get("QC_BACKUP_KEEP", "7"))
+# 备份间隔（小时），默认 24h=1 天；机构课程集中可调大，如 48=2 天
+BACKUP_INTERVAL = int(os.environ.get("QC_BACKUP_INTERVAL_HOURS", "24")) * 3600
+KEEP = int(os.environ.get("QC_BACKUP_KEEP", "14"))   # 保留份数，默认 14（覆盖约半个月）
 DISABLED = os.environ.get("QC_DISABLE_AUTO_BACKUP", "0") == "1"
 
 _PREFIX = "auto_"  # 自动备份文件名前缀，用于区分手动备份
