@@ -7,7 +7,7 @@
 - 数据库用 sqlite3 官方 backup API 生成一致快照（自动包含 WAL 里尚未合并的写入）
 - 备份位置：data 同级 backups/（例如 QC-PocketSpace/backups/）
 - 保留策略：最近 7 份，最旧自动清理
-- 触发：后台线程每小时检查一次，距上次备份 >= 24h 才备份一次
+- 触发：后台线程每 10 分钟检查一次，距上次备份 >= 24h 才备份一次
 
 与启动器备份（qx-launcher/app/backup.py）的分工：
   · 后端（本文件）＝自动层：服务【运行中】时可用
@@ -40,7 +40,7 @@ DB_PATH = os.path.join(DATA_ROOT, "qingcheng.db")
 BACKUP_ROOT = os.path.abspath(os.path.join(BACKEND_DIR, "..", "..", "backups"))
 
 # ── 策略 ──
-CHECK_INTERVAL = 600       # 每小时（600s）检查一次
+CHECK_INTERVAL = 600       # 每 10 分钟检查一次（600s）
 BACKUP_INTERVAL = 86400    # 距上次备份超过 24h 才备份
 KEEP = int(os.environ.get("QC_BACKUP_KEEP", "7"))
 DISABLED = os.environ.get("QC_DISABLE_AUTO_BACKUP", "0") == "1"
