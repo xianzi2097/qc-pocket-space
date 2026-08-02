@@ -31,6 +31,12 @@ def _ensure_admin():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _ensure_admin()
+    # 每日定时自动备份（服务常驻期间每天备份整个 data/，保留最近 N 份）
+    try:
+        from backup import start_auto_backup
+        start_auto_backup()
+    except Exception as e:
+        print(f"[startup] 自动备份初始化失败（不影响启动）: {e}")
     yield
 
 
