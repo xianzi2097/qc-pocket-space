@@ -48,13 +48,7 @@ def main():
         site_domain_list = site_domain
 
     # 构建 Caddyfile 内容（f-string 直接生成，无需模板文件）
-    caddyfile = f"""# ================= 全局配置：定义插件执行顺序 =================
-# 注意：这部分必须在文件的最顶端！
-{{
-    order webdav before file_server
-}}
-
-# ================= 你的网站配置 =================
+    caddyfile = f"""# ================= 你的网站配置 =================
 {site_domain_list} {{
     # www → 主域名 301 跳转
     @www {{
@@ -101,16 +95,10 @@ def main():
         file_server
     }}
 
-    # 3. 核心素材共享（data/courses/）
+    # 3. 核心素材共享（data/courses/）—— 只读：学生浏览/下载课件；写走网页后台上传（/api）
     handle_path /share/* {{
         root * "{data_path}/courses"
-        @get method GET HEAD
-        handle @get {{
-            file_server browse
-        }}
-        handle {{
-            webdav
-        }}
+        file_server browse
     }}
 
     # 5. 电子教室路由
