@@ -1,19 +1,21 @@
-PocketSpace License (兼容 CC BY-NC 4.0)
-版权所有 © 2026 Arin
+MIT License
 
-### 使用许可
-任何人可在非商业范畴内，享有以下权利：
-1. 复制、分发、公开展示与运行本软件
-2. 对代码进行修改、重构及衍生二次开发
-3. 应用于个人学习、学术研究、教学及公益场景
+Copyright (c) 2026 Arin
 
-### 约束条款
-1. 禁止商用：不得以本软件及其衍生版本，直接、间接谋取各类商业收益
-2. 保留署名：使用、改编分发时，必须标注原作者与项目原始出处
-3. 协议自主：衍生作品可选用其他合规许可协议，无需强制沿用本协议
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-### 免责声明
-本软件按现有状态交付使用，作者不对使用过程中产生的设备故障、数据损失及相关法律责任承担任何赔偿义务。
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-作者：Arin
-创建时间：2026年
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
