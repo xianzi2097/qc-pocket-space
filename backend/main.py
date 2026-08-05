@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from models import Base, engine, SessionLocal, UserModel
 from utils import verify_token, hash_password
 
@@ -56,6 +57,13 @@ async def auth_middleware(request: Request, call_next):
             pass
     request.state.user = user or {"username": "guest", "role": "guest"}
     return await call_next(request)
+
+
+# 信任来自 Caddy(127.0.0.1) 的 X-Forwarded-For 头，让 request.client.host 拿到真实客户端 IP。
+# 修复登录限流：反代下所有请求都来自 127.0.0.1，原按 IP 计数变成“全校共用一把锁”，
+# 任何一个人输错 5 次密码，全校 30 秒登不进来。加了它之后“谁乱试锁谁”。
+# 只信 127.0.0.1（Caddy）带来的头，客户端自己伪造的 X-Forwarded-For 一律忽略。
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["127.0.0.1"])
 
 
 @app.exception_handler(RequestValidationError)
