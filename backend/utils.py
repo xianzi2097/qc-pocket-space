@@ -257,7 +257,7 @@ def _get_classes_path(teacher_username: str) -> str:
     try:
         user = db.query(UserModel).filter(UserModel.username == teacher_username).first()
         if user:
-            return os.path.join(USERS_DIR, "teachers", str(user.id), "classes.json")
+            return os.path.join(get_user_dir(user), "classes.json")
         return os.path.join(USERS_DIR, "teachers", teacher_username, "classes.json")
     finally:
         db.close()

@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.post("/api/sessions/{class_name}")
 def save_session(request: Request, class_name: str, form: SessionForm):
-    caller = require_role(request, ["admin", "teacher"])
+    caller = require_role(request, ["teacher"])
     month = form.date[:7]
     sessions = _load_sessions(caller["username"], class_name, month)
     new_record = {
@@ -61,7 +61,7 @@ def list_sessions(request: Request, class_name: str, month: str = ""):
 @router.get("/api/sessions/student/{student_name}")
 def list_student_sessions(request: Request, student_name: str):
     """全局扫描所有老师的课堂记录"""
-    require_role(request, ["admin", "teacher"])
+    require_role(request, ["teacher"])
     teachers_dir = os.path.join(USERS_DIR, "teachers")
     if not os.path.exists(teachers_dir):
         return {"status": "success", "sessions": []}
@@ -121,7 +121,7 @@ def get_session(request: Request, class_name: str, date: str):
 
 @router.delete("/api/sessions/{class_name}/{date}")
 def delete_session(request: Request, class_name: str, date: str):
-    caller = require_role(request, ["admin", "teacher"])
+    caller = require_role(request, ["teacher"])
     month = date[:7]
     sessions = _load_sessions(caller["username"], class_name, month)
     filtered = [s for s in sessions if s["date"] != date]

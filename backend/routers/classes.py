@@ -49,7 +49,7 @@ def list_classes(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/api/classes")
 def create_class(request: Request, form: ClassForm):
-    caller = require_role(request, ["admin", "teacher"])
+    caller = require_role(request, ["teacher"])
     classes = _load_classes(caller["username"])
     if any(c["name"] == form.name for c in classes):
         raise HTTPException(status_code=400, detail="班级已存在")
@@ -60,7 +60,7 @@ def create_class(request: Request, form: ClassForm):
 
 @router.put("/api/classes/{class_name}")
 def update_class(request: Request, class_name: str, form: ClassForm):
-    caller = require_role(request, ["admin", "teacher"])
+    caller = require_role(request, ["teacher"])
     if form.name == class_name:
         # 没改名，只改 schedule
         classes = _load_classes(caller["username"])
@@ -93,7 +93,7 @@ def update_class(request: Request, class_name: str, form: ClassForm):
 
 @router.delete("/api/classes/{class_name}")
 def delete_class(request: Request, class_name: str):
-    caller = require_role(request, ["admin", "teacher"])
+    caller = require_role(request, ["teacher"])
     from utils import TRASH_DIR, _move_to_trash
     classes = _load_classes(caller["username"])
     deleted = None
@@ -123,7 +123,7 @@ def delete_class(request: Request, class_name: str):
 
 @router.post("/api/classes/{class_name}/students")
 def add_student(request: Request, class_name: str, form: StudentForm, db: Session = Depends(get_db)):
-    caller = require_role(request, ["admin", "teacher"])
+    caller = require_role(request, ["teacher"])
     db_local = SessionLocal()
     try:
         classes = _load_classes(caller["username"])
@@ -153,7 +153,7 @@ def add_student(request: Request, class_name: str, form: StudentForm, db: Sessio
 
 @router.get("/api/classes/find-student")
 def find_student(request: Request, name: str = ""):
-    require_role(request, ["admin", "teacher"])
+    require_role(request, ["teacher"])
     teachers_dir = os.path.join(USERS_DIR, "teachers")
     if not os.path.exists(teachers_dir):
         return {"status": "success", "matches": []}
@@ -189,7 +189,7 @@ def find_student(request: Request, name: str = ""):
 
 @router.get("/api/students/list")
 def list_all_students(request: Request):
-    require_role(request, ["admin", "teacher"])
+    require_role(request, ["teacher"])
     students_dir = os.path.join(USERS_DIR, "students")
     if not os.path.exists(students_dir):
         return {"status": "success", "students": []}
@@ -213,7 +213,7 @@ def list_all_students(request: Request):
 
 @router.delete("/api/classes/{class_name}/students/{student_id}")
 def remove_student(request: Request, class_name: str, student_id: str):
-    caller = require_role(request, ["admin", "teacher"])
+    caller = require_role(request, ["teacher"])
     if not student_id.isdigit():
         raise HTTPException(status_code=400, detail="无效的学生ID")
     classes = _load_classes(caller["username"])
@@ -234,7 +234,7 @@ class _StudentScheduleForm(_BaseModel):
 @router.patch("/api/classes/{class_name}/students/{student_id}/schedule")
 def update_student_schedule(request: Request, class_name: str, student_id: str, form: _StudentScheduleForm):
     """更新学生的个人上课日"""
-    caller = require_role(request, ["admin", "teacher"])
+    caller = require_role(request, ["teacher"])
     if not student_id.isdigit():
         raise HTTPException(status_code=400, detail="无效的学生ID")
     classes = _load_classes(caller["username"])

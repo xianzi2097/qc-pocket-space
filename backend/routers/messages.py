@@ -17,7 +17,7 @@ router = APIRouter()
 
 @router.post("/api/messages/send")
 def send_message(request: Request, form: SendMessageForm, db: Session = Depends(get_db)):
-    caller = require_role(request, ["admin", "teacher"])
+    caller = require_role(request, ["teacher"])
     recipient = db.query(UserModel).filter(
         UserModel.username == form.recipient, UserModel.role == "student"
     ).first()
