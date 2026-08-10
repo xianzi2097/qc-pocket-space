@@ -157,6 +157,23 @@ async def upload_file(
     }
 
 
+@router.post("/api/courses/{course_name}/materials/{lesson_name}/folder")
+def create_material_folder(request: Request, course_name: str, lesson_name: str):
+    """新建课件文件夹（Python/C++ 课程）：直接 mkdir，无需上传 .keep 占位文件"""
+    caller = require_role(request, ["admin", "teacher"])
+    if lesson_name == course_name:
+        raise HTTPException(status_code=400, detail="课件名不能与课程名相同")
+    base = _get_teacher_course_dir(caller["username"])
+    course_path = _safe_path(base, course_name)
+    if not os.path.exists(course_path):
+        raise HTTPException(status_code=404, detail="课程不存在")
+    lesson_path = _safe_path(course_path, lesson_name)
+    if os.path.exists(lesson_path):
+        raise HTTPException(status_code=400, detail="课件已存在")
+    os.makedirs(lesson_path)
+    return {"status": "success", "message": f"课件文件夹 [{lesson_name}] 已创建"}
+
+
 @router.post("/api/courses/{course_name}/materials/{lesson_name}/save-sb3")
 async def save_sb3(
     request: Request, course_name: str, lesson_name: str,
