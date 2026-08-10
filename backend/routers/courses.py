@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from utils import (
     get_db, get_current_user, require_role,
     _safe_path, _get_teacher_course_dir, _move_to_trash,
-    CourseCreateForm
+    CourseCreateForm, RenameForm
 )
 
 router = APIRouter()
@@ -172,6 +172,87 @@ def create_material_folder(request: Request, course_name: str, lesson_name: str)
         raise HTTPException(status_code=400, detail="课件已存在")
     os.makedirs(lesson_path)
     return {"status": "success", "message": f"课件文件夹 [{lesson_name}] 已创建"}
+
+
+def _valid_new_name(new_name: str) -> str:
+    """校验并清洗重命名目标：非空、不含路径分隔符"""
+    new_name = (new_name or "").strip()
+    if not new_name or "/" in new_name or "\\" in new_name:
+        raise HTTPException(status_code=400, detail="名称无效（不能为空或含 / \\）")
+    return new_name
+
+
+@router.post("/api/courses/{course_name}/rename")
+def rename_course(request: Request, course_name: str, form: RenameForm):
+    """重命名课程：改文件夹名 + 同步 course.json 的 name"""
+    caller = require_role(request, ["admin", "teacher"])
+    new_name = _valid_new_name(form.new_name)
+    if new_name == course_name:
+        raise HTTPException(status_code=400, detail="新名称与原名相同")
+    base = _get_teacher_course_dir(caller["username"])
+    old_path = _safe_path(base, course_name)
+    if not os.path.exists(old_path):
+        raise HTTPException(status_code=404, detail="课程不存在")
+    new_path = _safe_path(base, new_name)
+    if os.path.exists(new_path):
+        raise HTTPException(status_code=400, detail="课程已存在")
+    os.rename(old_path, new_path)
+    meta_path = os.path.join(new_path, "course.json")
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            meta["name"] = new_name
+            with open(meta_path, "w", encoding="utf-8") as f:
+                json.dump(meta, f, ensure_ascii=False, indent=2)
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {"status": "success", "message": f"课程已重命名为 [{new_name}]"}
+
+
+@router.post("/api/courses/{course_name}/materials/{lesson_name}/rename")
+def rename_material(request: Request, course_name: str, lesson_name: str, form: RenameForm):
+    """重命名课件文件夹（Scratch 与 Python/C++ 通用）"""
+    caller = require_role(request, ["admin", "teacher"])
+    new_name = _valid_new_name(form.new_name)
+    if new_name == lesson_name:
+        raise HTTPException(status_code=400, detail="新名称与原名相同")
+    base = _get_teacher_course_dir(caller["username"])
+    course_path = _safe_path(base, course_name)
+    if not os.path.exists(course_path):
+        raise HTTPException(status_code=404, detail="课程不存在")
+    old_path = _safe_path(course_path, lesson_name)
+    if not os.path.exists(old_path):
+        raise HTTPException(status_code=404, detail="课件不存在")
+    new_path = _safe_path(course_path, new_name)
+    if os.path.exists(new_path):
+        raise HTTPException(status_code=400, detail="课件已存在")
+    os.rename(old_path, new_path)
+    return {"status": "success", "message": f"课件已重命名为 [{new_name}]"}
+
+
+@router.post("/api/courses/{course_name}/materials/{lesson_name}/{filename}/rename")
+def rename_file(request: Request, course_name: str, lesson_name: str, filename: str, form: RenameForm):
+    """重命名课件文件夹内的文件"""
+    caller = require_role(request, ["admin", "teacher"])
+    new_name = _valid_new_name(form.new_name)
+    if new_name == filename:
+        raise HTTPException(status_code=400, detail="新名称与原名相同")
+    base = _get_teacher_course_dir(caller["username"])
+    course_path = _safe_path(base, course_name)
+    if not os.path.exists(course_path):
+        raise HTTPException(status_code=404, detail="课程不存在")
+    lesson_path = _safe_path(course_path, lesson_name)
+    if not os.path.exists(lesson_path):
+        raise HTTPException(status_code=404, detail="课件不存在")
+    old_path = _safe_path(lesson_path, filename)
+    if not os.path.isfile(old_path):
+        raise HTTPException(status_code=404, detail="文件不存在")
+    new_path = _safe_path(lesson_path, new_name)
+    if os.path.exists(new_path):
+        raise HTTPException(status_code=400, detail="文件已存在")
+    os.rename(old_path, new_path)
+    return {"status": "success", "message": f"文件已重命名为 [{new_name}]"}
 
 
 @router.post("/api/courses/{course_name}/materials/{lesson_name}/save-sb3")

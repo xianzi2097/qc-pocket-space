@@ -454,3 +454,6 @@ class CourseCreateForm(BaseModel):
     teacher: str
     name: str
     course_type: str = "scratch"
+
+class RenameForm(BaseModel):
+    new_name: str
