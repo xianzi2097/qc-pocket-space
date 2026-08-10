@@ -169,13 +169,19 @@ class SaveClassesForm(BaseModel):
     classes: List[ClassItem]
 
 def _get_classes_file(teacher: str) -> str:
-    """获取班级配置文件路径"""
-    from utils import _get_teacher_course_dir
-    # 班级文件放在用户目录下
-    users_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "..", "data", "users", "teachers")
-    teacher_dir = os.path.join(users_dir, teacher)
-    os.makedirs(teacher_dir, exist_ok=True)
-    return os.path.join(teacher_dir, "classes.json")
+    """获取班级配置文件路径（统一按用户 id 目录）"""
+    from models import SessionLocal, UserModel
+    from utils import get_user_dir
+    db = SessionLocal()
+    try:
+        user = db.query(UserModel).filter(UserModel.username == teacher).first()
+        if not user:
+            raise HTTPException(status_code=404, detail=f"老师 [{teacher}] 不存在")
+        teacher_dir = get_user_dir(user)
+        os.makedirs(teacher_dir, exist_ok=True)
+        return os.path.join(teacher_dir, "classes.json")
+    finally:
+        db.close()
 
 @router.get("/api/admin/classes/{teacher}")
 def get_classes(teacher: str, request: Request, db: Session = Depends(get_db)):

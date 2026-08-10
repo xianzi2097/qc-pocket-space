@@ -1,6 +1,7 @@
 """班级 + 学生管理路由"""
 import os
 import json
+import random
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from models import UserModel, SessionLocal, USERS_DIR
@@ -135,8 +136,9 @@ def add_student(request: Request, class_name: str, form: StudentForm, db: Sessio
                     if not user:
                         raise HTTPException(status_code=404, detail="学生不存在")
                 else:
+                    avatar_name = f"avatar_{str(random.randint(1, 78)).zfill(2)}.jpg"
                     new_user = _ensure_user(
-                        db_local, form.name, "student", "default.jpg",
+                        db_local, form.name, "student", avatar_name,
                         {"teacher": caller["username"]}
                     )
                     user_id = new_user.id

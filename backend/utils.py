@@ -141,7 +141,6 @@ def write_info_json(user: UserModel):
         "role": user.role,
         "avatar_path": user.avatar_path,
         "descriptors": descriptors,
-        "subfolders": ["sb3_projects", "notes"] if user.role == "student" else [],
     }
     with open(os.path.join(user_dir, "info.json"), "w", encoding="utf-8") as f:
         json.dump(info, f, ensure_ascii=False, indent=2)
@@ -256,9 +255,9 @@ def _get_classes_path(teacher_username: str) -> str:
     db = SessionLocal()
     try:
         user = db.query(UserModel).filter(UserModel.username == teacher_username).first()
-        if user:
-            return os.path.join(get_user_dir(user), "classes.json")
-        return os.path.join(USERS_DIR, "teachers", teacher_username, "classes.json")
+        if not user:
+            raise HTTPException(status_code=404, detail=f"老师 [{teacher_username}] 不存在")
+        return os.path.join(get_user_dir(user), "classes.json")
     finally:
         db.close()
 
