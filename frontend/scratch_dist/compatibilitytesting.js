@@ -140916,7 +140916,7 @@ const dragThreshold = 3; // Same as the block drag threshold
 class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
   constructor(props) {
     super(props);
-    lodash_bindall__WEBPACK_IMPORTED_MODULE_0___default()(this, ['attachMouseEvents', 'cancelMouseDownTimeout', 'detachMouseEvents', 'handleDoubleClick', 'handleQuestionAnswered', 'onMouseUp', 'onMouseMove', 'onMouseDown', 'onStartDrag', 'onStopDrag', 'onWheel', 'updateRect', 'questionListener', 'setDragCanvas', 'clearDragCanvas', 'drawDragCanvas', 'positionDragCanvas']);
+    lodash_bindall__WEBPACK_IMPORTED_MODULE_0___default()(this, ["attachMouseEvents", "cancelMouseDownTimeout", "detachMouseEvents", "handleDoubleClick", "handleQuestionAnswered", "onMouseUp", "onMouseMove", "onMouseDown", "onStartDrag", "onStopDrag", "onWheel", "updateRect", "questionListener", "setDragCanvas", "clearDragCanvas", "drawDragCanvas", "positionDragCanvas"]);
     this.state = {
       mouseDownTimeoutId: null,
       mouseDownPosition: null,
@@ -140930,7 +140930,7 @@ class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
       this.renderer = this.props.vm.renderer;
       this.canvas = this.renderer.canvas;
     } else {
-      this.canvas = document.createElement('canvas');
+      this.canvas = document.createElement("canvas");
       this.renderer = new (scratch_render__WEBPACK_IMPORTED_MODULE_2___default())(this.canvas);
       this.props.vm.attachRenderer(this.renderer);
 
@@ -140949,7 +140949,7 @@ class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
     this.attachRectEvents();
     this.attachMouseEvents(this.canvas);
     this.updateRect();
-    this.props.vm.runtime.addListener('QUESTION', this.questionListener);
+    this.props.vm.runtime.addListener("QUESTION", this.questionListener);
   }
   shouldComponentUpdate(nextProps, nextState) {
     return this.props.stageSize !== nextProps.stageSize || this.props.isColorPicking !== nextProps.isColorPicking || this.state.colorInfo !== nextState.colorInfo || this.props.isFullScreen !== nextProps.isFullScreen || this.state.question !== nextState.question || this.props.micIndicator !== nextProps.micIndicator || this.props.isStarted !== nextProps.isStarted;
@@ -140967,7 +140967,7 @@ class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
     this.detachMouseEvents(this.canvas);
     this.detachRectEvents();
     this.stopColorPickingLoop();
-    this.props.vm.runtime.removeListener('QUESTION', this.questionListener);
+    this.props.vm.runtime.removeListener("QUESTION", this.questionListener);
   }
   questionListener(question) {
     this.setState({
@@ -140978,12 +140978,12 @@ class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
     this.setState({
       question: null
     }, () => {
-      this.props.vm.runtime.emit('ANSWER', answer);
+      this.props.vm.runtime.emit("ANSWER", answer);
     });
   }
   startColorPickingLoop() {
     this.intervalId = setInterval(() => {
-      if (typeof this.pickX === 'number') {
+      if (typeof this.pickX === "number") {
         this.setState({
           colorInfo: this.getColorInfo(this.pickX, this.pickY)
         });
@@ -140994,30 +140994,38 @@ class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
     clearInterval(this.intervalId);
   }
   attachMouseEvents(canvas) {
-    document.addEventListener('mousemove', this.onMouseMove);
-    document.addEventListener('mouseup', this.onMouseUp);
-    document.addEventListener('touchmove', this.onMouseMove);
-    document.addEventListener('touchend', this.onMouseUp);
-    canvas.addEventListener('mousedown', this.onMouseDown);
-    canvas.addEventListener('touchstart', this.onMouseDown);
-    canvas.addEventListener('wheel', this.onWheel);
+    document.addEventListener("mousemove", this.onMouseMove);
+    document.addEventListener("mouseup", this.onMouseUp);
+    // 非被动监听：红外大屏的浏览器会把 touchmove 当页面滚动/平移吞掉，
+    // 必须允许 preventDefault 才能保住拖拽手势。
+    document.addEventListener("touchmove", this.onMouseMove, {
+      passive: false
+    });
+    document.addEventListener("touchend", this.onMouseUp, {
+      passive: false
+    });
+    canvas.addEventListener("mousedown", this.onMouseDown);
+    canvas.addEventListener("touchstart", this.onMouseDown, {
+      passive: false
+    });
+    canvas.addEventListener("wheel", this.onWheel);
   }
   detachMouseEvents(canvas) {
-    document.removeEventListener('mousemove', this.onMouseMove);
-    document.removeEventListener('mouseup', this.onMouseUp);
-    document.removeEventListener('touchmove', this.onMouseMove);
-    document.removeEventListener('touchend', this.onMouseUp);
-    canvas.removeEventListener('mousedown', this.onMouseDown);
-    canvas.removeEventListener('touchstart', this.onMouseDown);
-    canvas.removeEventListener('wheel', this.onWheel);
+    document.removeEventListener("mousemove", this.onMouseMove);
+    document.removeEventListener("mouseup", this.onMouseUp);
+    document.removeEventListener("touchmove", this.onMouseMove);
+    document.removeEventListener("touchend", this.onMouseUp);
+    canvas.removeEventListener("mousedown", this.onMouseDown);
+    canvas.removeEventListener("touchstart", this.onMouseDown);
+    canvas.removeEventListener("wheel", this.onWheel);
   }
   attachRectEvents() {
-    window.addEventListener('resize', this.updateRect);
-    window.addEventListener('scroll', this.updateRect);
+    window.addEventListener("resize", this.updateRect);
+    window.addEventListener("scroll", this.updateRect);
   }
   detachRectEvents() {
-    window.removeEventListener('resize', this.updateRect);
-    window.removeEventListener('scroll', this.updateRect);
+    window.removeEventListener("resize", this.updateRect);
+    window.removeEventListener("scroll", this.updateRect);
   }
   updateRect() {
     this.rect = this.canvas.getBoundingClientRect();
@@ -141046,6 +141054,11 @@ class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
     this.props.vm.setEditingTarget(targetId);
   }
   onMouseMove(e) {
+    // 触摸拖动时主动阻止默认行为，避免浏览器把手指滑动当作页面滚动/平移，
+    // 否则角色会拖不动（红外触屏上尤为明显）。
+    if (e.type === "touchmove" && (this.state.mouseDown || this.state.isDragging)) {
+      e.preventDefault();
+    }
     const {
       x,
       y
@@ -141083,7 +141096,7 @@ class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
       canvasWidth: this.rect.width,
       canvasHeight: this.rect.height
     };
-    this.props.vm.postIOData('mouse', coordinates);
+    this.props.vm.postIOData("mouse", coordinates);
   }
   onMouseUp(e) {
     const {
@@ -141107,7 +141120,7 @@ class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
     if (this.state.isDragging) {
       this.onStopDrag(mousePosition[0], mousePosition[1]);
     }
-    this.props.vm.postIOData('mouse', data);
+    this.props.vm.postIOData("mouse", data);
     if (this.props.isColorPicking && mousePosition[0] > 0 && mousePosition[0] < this.rect.width && mousePosition[1] > 0 && mousePosition[1] < this.rect.height) {
       const {
         r,
@@ -141157,7 +141170,7 @@ class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
         canvasWidth: this.rect.width,
         canvasHeight: this.rect.height
       };
-      this.props.vm.postIOData('mouse', data);
+      this.props.vm.postIOData("mouse", data);
       if (e.preventDefault) {
         // Prevent default to prevent touch from dragging page
         e.preventDefault();
@@ -141173,7 +141186,7 @@ class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
       deltaX: e.deltaX,
       deltaY: e.deltaY
     };
-    this.props.vm.postIOData('mouseWheel', data);
+    this.props.vm.postIOData("mouseWheel", data);
   }
   cancelMouseDownTimeout() {
     if (this.state.mouseDownTimeoutId !== null) {
@@ -141202,16 +141215,16 @@ class Stage extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
     // On high-DPI devices, the canvas size in layout-pixels is not equal to the size of the extracted data.
     this.dragCanvas.style.width = "".concat(boundsWidth, "px");
     this.dragCanvas.style.height = "".concat(boundsHeight, "px");
-    this.dragCanvas.getContext('2d').putImageData(imageData, 0, 0);
+    this.dragCanvas.getContext("2d").putImageData(imageData, 0, 0);
     // Position so that pick location is at (0, 0) so that  positionDragCanvas()
     // can use translation to move to mouse position smoothly.
     this.dragCanvas.style.left = "".concat(boundsX - x, "px");
     this.dragCanvas.style.top = "".concat(boundsY - y, "px");
-    this.dragCanvas.style.display = 'block';
+    this.dragCanvas.style.display = "block";
   }
   clearDragCanvas() {
     this.dragCanvas.width = this.dragCanvas.height = 0;
-    this.dragCanvas.style.display = 'none';
+    this.dragCanvas.style.display = "none";
   }
   positionDragCanvas(mouseX, mouseY) {
     // mouseX/Y are relative to stage top/left, and dragCanvas is already
