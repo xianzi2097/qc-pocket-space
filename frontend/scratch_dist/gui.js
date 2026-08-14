@@ -130111,8 +130111,11 @@ class SketchPad extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
   }
   handleDragMove(e) {
     if (!this.state.dragging) return;
-    const left = this.state.startLeft + (e.clientX - this.state.dragStartX);
-    const top = this.state.startTop + (e.clientY - this.state.dragStartY);
+    // 限制在可视区内，防止拖出浏览器外拉不回来（至少保证标题栏可见）
+    const maxLeft = Math.max(0, window.innerWidth - this.props.note.width);
+    const maxTop = Math.max(0, window.innerHeight - 40); // 40 ≈ 标题栏高度
+    const left = Math.min(Math.max(0, this.state.startLeft + (e.clientX - this.state.dragStartX)), maxLeft);
+    const top = Math.min(Math.max(0, this.state.startTop + (e.clientY - this.state.dragStartY)), maxTop);
     this.props.onUpdate(this.props.note.id, {
       left,
       top
@@ -136287,10 +136290,16 @@ class GUI extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
   // 页面内弹窗预览——浮动窗口，不遮挡积木操作
   // 页面内弹窗预览——浮动窗口，不遮挡积木操作
   openPreviewPanel(fileUrl) {
-    if (document.getElementById("preview-panel")) return;
-    const playerUrl = "/Scratch/player.html?previewMode&file=".concat(encodeURIComponent(fileUrl));
     const boxW = 540;
     const boxH = 480;
+    // 已打开：复位到初始居中位置（兜底，防止学生拖丢后拉不回来）
+    const existingPanel = document.getElementById("preview-panel");
+    if (existingPanel) {
+      existingPanel.style.left = Math.max(0, (window.innerWidth - boxW) / 2) + "px";
+      existingPanel.style.top = Math.max(0, (window.innerHeight - boxH) / 2) + "px";
+      return;
+    }
+    const playerUrl = "/Scratch/player.html?previewMode&file=".concat(encodeURIComponent(fileUrl));
     const box = document.createElement("div");
     box.id = "preview-panel";
     Object.assign(box.style, {
@@ -136374,8 +136383,13 @@ class GUI extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
     // 方案B：Pointer Events 统一处理鼠标/触摸/笔（需配合 header 的 touch-action:none）
     const onPointerMove = e => {
       if (!dragging) return;
-      box.style.left = ol + (e.clientX - sx) + "px";
-      box.style.top = ot + (e.clientY - sy) + "px";
+      // 限制在可视区内，防止拖出浏览器外拉不回来（至少保证标题栏可见）
+      const maxLeft = Math.max(0, window.innerWidth - boxW);
+      const maxTop = Math.max(0, window.innerHeight - 36); // 36 = 标题栏高度
+      const left = Math.min(Math.max(0, ol + (e.clientX - sx)), maxLeft);
+      const top = Math.min(Math.max(0, ot + (e.clientY - sy)), maxTop);
+      box.style.left = left + "px";
+      box.style.top = top + "px";
     };
     const onPointerUp = () => {
       dragging = false;
