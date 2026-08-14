@@ -136297,6 +136297,18 @@ class GUI extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
     if (existingPanel) {
       existingPanel.style.left = Math.max(0, (window.innerWidth - boxW) / 2) + "px";
       existingPanel.style.top = Math.max(0, (window.innerHeight - boxH) / 2) + "px";
+      // 折叠状态下再点示例：顺便展开回完整窗口（兜底，防止学生找不到小标签）
+      if (existingPanel.dataset.collapsed === "1") {
+        const frame = existingPanel.querySelector("iframe");
+        if (frame) frame.style.display = "";
+        existingPanel.style.width = boxW + "px";
+        existingPanel.style.height = boxH + "px";
+        const cb = existingPanel.querySelector(".preview-collapse-btn");
+        const eb = existingPanel.querySelector(".preview-expand-btn");
+        if (cb) cb.style.display = "flex";
+        if (eb) eb.style.display = "none";
+        delete existingPanel.dataset.collapsed;
+      }
       return;
     }
     const playerUrl = "/Scratch/player.html?previewMode&file=".concat(encodeURIComponent(fileUrl));
@@ -136340,6 +136352,35 @@ class GUI extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
       fontWeight: "500"
     });
     header.appendChild(title);
+
+    // 折叠（最小化）：学生可把大窗口收成一个小标签，避免占屏幕
+    const makeIconBtn = (innerSvg, titleText, className) => {
+      const btn = document.createElement("span");
+      btn.className = className;
+      btn.innerHTML = innerSvg;
+      Object.assign(btn.style, {
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "28px",
+        height: "28px",
+        borderRadius: "6px"
+      });
+      btn.title = titleText;
+      btn.addEventListener("mouseenter", () => {
+        btn.style.background = "rgba(255,255,255,0.2)";
+      });
+      btn.addEventListener("mouseleave", () => {
+        btn.style.background = "transparent";
+      });
+      return btn;
+    };
+    const collapseBtn = makeIconBtn('<svg viewBox="0 0 20 20" width="18" height="18">' + '<line x1="4" y1="10" x2="16" y2="10" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round"/>' + "</svg>", "收起（最小化）", "preview-collapse-btn");
+    const expandBtn = makeIconBtn('<svg viewBox="0 0 20 20" width="18" height="18">' + '<rect x="4" y="4" width="12" height="12" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2" rx="2"/>' + "</svg>", "展开", "preview-expand-btn");
+    expandBtn.style.display = "none";
+    header.appendChild(collapseBtn);
+    header.appendChild(expandBtn);
     const closeBtn = document.createElement("span");
     closeBtn.innerHTML = '<svg viewBox="0 0 20 20" width="18" height="18">' + '<line x1="5" y1="5" x2="15" y2="15" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round"/>' + '<line x1="15" y1="5" x2="5" y2="15" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round"/>' + "</svg>";
     Object.assign(closeBtn.style, {
@@ -136383,9 +136424,11 @@ class GUI extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
     // 方案B：Pointer Events 统一处理鼠标/触摸/笔（需配合 header 的 touch-action:none）
     const onPointerMove = e => {
       if (!dragging) return;
-      // 限制在可视区内，防止拖出浏览器外拉不回来（至少保证标题栏可见）
-      const maxLeft = Math.max(0, window.innerWidth - boxW);
-      const maxTop = Math.max(0, window.innerHeight - 36); // 36 = 标题栏高度
+      // 限制在可视区内，防止拖出浏览器外拉不回来（折叠时按小标签尺寸钳制）
+      const w = box.offsetWidth;
+      const h = box.offsetHeight;
+      const maxLeft = Math.max(0, window.innerWidth - w);
+      const maxTop = Math.max(0, window.innerHeight - h);
       const left = Math.min(Math.max(0, ol + (e.clientX - sx)), maxLeft);
       const top = Math.min(Math.max(0, ot + (e.clientY - sy)), maxTop);
       box.style.left = left + "px";
@@ -136398,7 +136441,7 @@ class GUI extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
     document.addEventListener("pointermove", onPointerMove);
     document.addEventListener("pointerup", onPointerUp);
     header.addEventListener("pointerdown", e => {
-      if (e.target === closeBtn || closeBtn.contains(e.target)) return;
+      if (e.target === closeBtn || closeBtn.contains(e.target) || e.target === collapseBtn || collapseBtn.contains(e.target) || e.target === expandBtn || expandBtn.contains(e.target)) return;
       dragging = true;
       sx = e.clientX;
       sy = e.clientY;
@@ -136431,6 +136474,36 @@ class GUI extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
       win.document.addEventListener("pointerdown", restoreFocus, true);
     };
     iframe.addEventListener("load", onIframeLoad);
+
+    // 折叠/展开：大窗口收成一个小标签（无任务栏，靠这个小标签找回）
+    const collapse = () => {
+      box.dataset.collapsed = "1";
+      iframe.style.display = "none";
+      box.style.width = "150px";
+      box.style.height = "36px";
+      collapseBtn.style.display = "none";
+      expandBtn.style.display = "flex";
+      // 保持当前位置不越界
+      const maxLeft = Math.max(0, window.innerWidth - 150);
+      const maxTop = Math.max(0, window.innerHeight - 36);
+      box.style.left = Math.min(parseInt(box.style.left) || 0, maxLeft) + "px";
+      box.style.top = Math.min(parseInt(box.style.top) || 0, maxTop) + "px";
+    };
+    const expand = () => {
+      delete box.dataset.collapsed;
+      iframe.style.display = "";
+      box.style.width = boxW + "px";
+      box.style.height = boxH + "px";
+      collapseBtn.style.display = "flex";
+      expandBtn.style.display = "none";
+      // 恢复后重新钳制回可视区（小标签可能在角落，恢复后要保证能看见）
+      const maxLeft = Math.max(0, window.innerWidth - boxW);
+      const maxTop = Math.max(0, window.innerHeight - boxH);
+      box.style.left = Math.min(parseInt(box.style.left) || 0, maxLeft) + "px";
+      box.style.top = Math.min(parseInt(box.style.top) || 0, maxTop) + "px";
+    };
+    collapseBtn.addEventListener("click", collapse);
+    expandBtn.addEventListener("click", expand);
     box.appendChild(header);
     box.appendChild(iframe);
     document.body.appendChild(box);
