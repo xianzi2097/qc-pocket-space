@@ -136379,8 +136379,16 @@ class GUI extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
     const collapseBtn = makeIconBtn('<svg viewBox="0 0 20 20" width="18" height="18">' + '<line x1="4" y1="10" x2="16" y2="10" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round"/>' + "</svg>", "收起（最小化）", "preview-collapse-btn");
     const expandBtn = makeIconBtn('<svg viewBox="0 0 20 20" width="18" height="18">' + '<rect x="4" y="4" width="12" height="12" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2" rx="2"/>' + "</svg>", "展开", "preview-expand-btn");
     expandBtn.style.display = "none";
-    header.appendChild(collapseBtn);
-    header.appendChild(expandBtn);
+    // 按钮组：折叠/展开/关闭 聚在右侧、紧挨关闭键，像 Windows 一样，不居中
+    const btnGroup = document.createElement("div");
+    Object.assign(btnGroup.style, {
+      display: "flex",
+      alignItems: "center",
+      gap: "4px",
+      flexShrink: "0"
+    });
+    btnGroup.appendChild(collapseBtn);
+    btnGroup.appendChild(expandBtn);
     const closeBtn = document.createElement("span");
     closeBtn.innerHTML = '<svg viewBox="0 0 20 20" width="18" height="18">' + '<line x1="5" y1="5" x2="15" y2="15" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round"/>' + '<line x1="15" y1="5" x2="5" y2="15" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round"/>' + "</svg>";
     Object.assign(closeBtn.style, {
@@ -136402,7 +136410,8 @@ class GUI extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
       closeBtn.style.background = "transparent";
       closeBtn.querySelector("svg line").setAttribute("stroke", "rgba(255,255,255,0.7)");
     });
-    header.appendChild(closeBtn);
+    btnGroup.appendChild(closeBtn);
+    header.appendChild(btnGroup);
 
     // 拖拽层逻辑不变...
     const blocker = document.createElement("div");
