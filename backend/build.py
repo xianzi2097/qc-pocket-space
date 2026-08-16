@@ -91,7 +91,10 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
     logf = open(log_path, "w", encoding="utf-8")
 
     def log(msg: str) -> None:
-        print(msg, flush=True)
+        try:
+            print(msg, flush=True)
+        except (UnicodeEncodeError, OSError):
+            pass  # 控制台编码不支持某些字符（如 ✓）时忽略控制台输出，日志文件仍完整写入
         logf.write(msg + "\n")
         logf.flush()
 
