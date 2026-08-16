@@ -48,7 +48,7 @@ def get_active_status(course_id: str) -> dict:
 
 def remove_site(teacher_key: str, course_id: str) -> None:
     """删除课程时清理渲染产物与日志"""
-    final_dir = os.path.join(SITES_DIR, teacher_key, course_id)
+    final_dir = os.path.join(SITES_DIR, course_id)
     shutil.rmtree(final_dir, ignore_errors=True)
     shutil.rmtree(final_dir + ".bak", ignore_errors=True)
     log_path = os.path.join(LOGS_DIR, f"{teacher_key}_{course_id}.log")
@@ -164,7 +164,10 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
 
         # 4. 跑 build
         env = dict(os.environ)
-        env["VP_BASE"] = f"/course/{teacher_key}/{course_id}/"
+        # URL 前缀只用课程 id（纯 ASCII）。base 若含中文（如老师名），Vite 会把 base
+        # URL-encode，而 vitepress 客户端路由 pathToFile 用 decodeURIComponent 解码路径后
+        # 再按编码后 base 长度切片，长度错位导致子页面 404。课程归属老师记录在 course.json。
+        env["VP_BASE"] = f"/course/{course_id}/"
         cmd = [NODE_EXE, "node_modules/vitepress/bin/vitepress.js", "build", "docs"]
         log("=== 开始渲染 ===")
         log("命令: " + " ".join(cmd))
@@ -185,7 +188,7 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
             raise RuntimeError("渲染产物缺失 index.html")
 
         # 5. 原子替换到正式目录
-        final_dir = os.path.join(SITES_DIR, teacher_key, course_id)
+        final_dir = os.path.join(SITES_DIR, course_id)
         os.makedirs(os.path.dirname(final_dir), exist_ok=True)
         bak = final_dir + ".bak"
         if os.path.exists(final_dir):

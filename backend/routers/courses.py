@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from utils import (
     get_db, get_current_user, require_role,
     _safe_path, _get_teacher_course_dir, _get_teacher_key,
-    _move_to_trash, _gen_course_id, _resolve_course_format,
+    _move_to_trash, _gen_unique_course_id, _resolve_course_format,
     _read_course_meta, _write_course_meta,
     CourseCreateForm, RenameForm
 )
@@ -47,7 +47,7 @@ def list_courses(teacher: str = ""):
             "description": meta.get("description", ""),
             "material_count": len(materials),
             "publish": meta.get("publish", {"status": "idle"}),
-            "teacher_key": _get_teacher_key(teacher),  # 用于构造 /course/<老师>/<id>/ 的 URL
+            "teacher_key": _get_teacher_key(teacher),  # 课程归属老师（仅展示用，URL 不再含老师层）
         })
     return {"status": "success", "courses": courses}
 
@@ -62,13 +62,14 @@ def create_course(request: Request, form: CourseCreateForm):
         existing_path = os.path.join(course_dir, existing)
         if os.path.isdir(existing_path) and _read_course_meta(existing_path).get("name") == form.name:
             raise HTTPException(status_code=400, detail="课程已存在")
-    course_id = _gen_course_id()
+    course_id = _gen_unique_course_id()
     course_path = _safe_path(course_dir, course_id)
     os.makedirs(course_path)
     fmt = _resolve_course_format(form.course_type, form.format)
     meta = {
         "id": course_id, "name": form.name, "type": form.course_type,
         "format": fmt, "description": "", "tags": [],
+        "teacher": caller["username"],  # 课程归属老师（URL 不含老师层，归属记录在此）
         "publish": {"status": "idle"},
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }

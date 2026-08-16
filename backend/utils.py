@@ -35,6 +35,7 @@ def verify_password(password: str, stored: str) -> bool:
 # ==========================================
 TRASH_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "trash"))
 COURSE_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "courses"))
+COURSE_SITES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "course_vitepress_dist"))
 os.makedirs(TRASH_DIR, exist_ok=True)
 os.makedirs(COURSE_BASE, exist_ok=True)
 
@@ -311,6 +312,30 @@ def _get_teacher_course_dir(teacher_username: str) -> str:
 def _gen_course_id() -> str:
     """生成课程文件夹 id：c + 时间戳 + 4 位随机（唯一、URL 安全、永不复用）"""
     return "c" + datetime.now().strftime("%Y%m%d%H%M%S") + secrets.token_hex(2)
+
+
+def _course_id_taken(course_id: str) -> bool:
+    """课程 id 是否已被占用。URL/渲染产物不含老师层，课程 id 是全局命名空间，
+    因此需要跨所有老师课程目录 + 全局渲染产物两层查重。"""
+    if os.path.exists(os.path.join(COURSE_SITES_DIR, course_id)):
+        return True
+    try:
+        for d in os.listdir(COURSE_BASE):
+            if d.endswith("_course") and os.path.isdir(os.path.join(COURSE_BASE, d)):
+                if os.path.exists(os.path.join(COURSE_BASE, d, course_id)):
+                    return True
+    except OSError:
+        pass
+    return False
+
+
+def _gen_unique_course_id() -> str:
+    """生成全局唯一的课程 id：撞号自动换号重试（同一秒创建时靠随机位兜底）。"""
+    for _ in range(50):
+        cid = _gen_course_id()
+        if not _course_id_taken(cid):
+            return cid
+    raise HTTPException(status_code=500, detail="课程 ID 生成失败，请重试")
 
 
 def _resolve_course_format(course_type: str, fmt: str) -> str:
