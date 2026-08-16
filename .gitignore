@@ -39,6 +39,8 @@ caddy/data/
 # Node / 前端依赖
 # =========================
 node_modules/
+!runtime/vitepress-template/node_modules/
+!runtime/vitepress-template/node_modules/**
 npm-debug.log*
 yarn-error.log*
 package-lock.json
