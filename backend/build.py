@@ -223,9 +223,12 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
 
 
 def _build_sidebar(docs_dir: str) -> list:
-    """递归生成 vitepress sidebar：顶层目录=分组、嵌套=collapsible、md=link"""
+    """递归生成 vitepress sidebar：
+    - 目录 = 分组；若目录内有 index.md，则目录标题链接到该目录首页
+    - md = 页面；所有 index.md 都跳过（首页不作为侧边栏条目）
+    """
 
-    def walk(dirpath: str, rel_prefix: str = "", is_root: bool = False) -> list:
+    def walk(dirpath: str, rel_prefix: str = "") -> list:
         items = []
         try:
             names = sorted(os.listdir(dirpath))
@@ -237,15 +240,17 @@ def _build_sidebar(docs_dir: str) -> list:
             fp = os.path.join(dirpath, name)
             rel = f"{rel_prefix}/{name}" if rel_prefix else name
             if os.path.isdir(fp):
+                has_index = os.path.exists(os.path.join(fp, "index.md"))
                 sub = walk(fp, rel)
-                if sub:  # 目录里至少有一个 md 才显示为分组
-                    items.append({
-                        "text": name, "collapsible": True, "collapsed": False, "items": sub,
-                    })
-            elif name.endswith(".md"):
-                if is_root and name == "index.md":
-                    continue  # 根目录 index.md 是首页，不进侧边栏
-                items.append({"text": name[:-3], "link": "/" + rel[:-3]})
+                if has_index or sub:
+                    item = {"text": name, "collapsible": True, "collapsed": False}
+                    if has_index:
+                        item["link"] = f"/{rel}/"
+                    if sub:
+                        item["items"] = sub
+                    items.append(item)
+            elif name.endswith(".md") and name != "index.md":
+                items.append({"text": name[:-3], "link": f"/{rel[:-3]}"})
         return items
 
-    return walk(docs_dir, is_root=True)
+    return walk(docs_dir)
