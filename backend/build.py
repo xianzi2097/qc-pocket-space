@@ -74,6 +74,29 @@ def _clear_workspace_docs() -> None:
             os.remove(p)
 
 
+def _ensure_index(docs_dir: str, title: str) -> None:
+    """课程根目录没有 index.md 时自动生成一个首页（课程名 + 顶层条目）"""
+    if os.path.exists(os.path.join(docs_dir, "index.md")):
+        return
+    lines = [f"# {title}", ""]
+    for name in sorted(os.listdir(docs_dir)):
+        if name.startswith(".") or name == "course.json":
+            continue
+        p = os.path.join(docs_dir, name)
+        if os.path.isdir(p):
+            if os.path.exists(os.path.join(p, "index.md")):
+                lines.append(f"- [{name}](/{name}/)")
+            else:
+                lines.append(f"- 📁 {name}")
+        elif name.endswith(".md"):
+            lines.append(f"- [{name[:-3]}](/{name[:-3]})")
+    if len(lines) == 1:
+        lines.append("")
+        lines.append("本课程暂无内容，请上传 md 文件。")
+    with open(os.path.join(docs_dir, "index.md"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def _build_worker(teacher_key: str, course_id: str, course_path: str) -> None:
     with _build_lock:  # 串行
         try:
@@ -128,6 +151,9 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
                 shutil.copytree(src, dst)
             else:
                 shutil.copy2(src, dst)
+
+        # 2.5 无首页时自动生成 index.md（否则 vitepress 不产 index.html）
+        _ensure_index(docs_dir, meta.get("name") or "课程")
 
         # 3. 生成 sidebar
         sidebar = _build_sidebar(docs_dir)
