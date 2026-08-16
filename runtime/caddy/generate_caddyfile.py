@@ -10,10 +10,10 @@ import sys
 
 
 def main():
-    # 这个脚本放在 caddy/ 目录下
+    # 这个脚本放在 runtime/caddy/ 目录下
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    # 项目根目录 = caddy/ 的上一级
-    project_root = os.path.dirname(script_dir)
+    # 项目根目录 = runtime/caddy/ 的上两级（qc-pocket-space/）
+    project_root = os.path.dirname(os.path.dirname(script_dir))
     # Caddy 需要正斜杠
     site_path = os.path.join(project_root, "frontend").replace("\\", "/")
     data_path = os.path.join(os.path.dirname(project_root), "data").replace("\\", "/")
@@ -92,6 +92,12 @@ def main():
     # 2. 学习手册：映射到 VitePress 打包目录
     handle_path /docs/* {{
         root * "{site_path}/vitepress_dist"
+        file_server
+    }}
+
+    # 2.1 电子书课程站点：运行时 vitepress 渲染产物（只读，学生浏览）
+    handle_path /course/* {{
+        root * "{site_path}/course_vitepress_dist"
         file_server
     }}
 

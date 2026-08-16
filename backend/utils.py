@@ -299,10 +299,43 @@ def _save_sessions(username: str, class_name: str, month: str, sessions: list):
 # ==========================================
 # 课程工具
 # ==========================================
+def _get_teacher_key(teacher_username: str) -> str:
+    """课程目录/URL 中使用的老师标识（去掉 (t) 和空格，兼容 seed 数据）"""
+    return teacher_username.replace("(t)", "").replace(" ", "")
+
+
 def _get_teacher_course_dir(teacher_username: str) -> str:
-    # 兼容 seed_dev_data.py 创建的目录名（不含 (t) 后缀和空格）
-    clean = teacher_username.replace("(t)", "").replace(" ", "")
-    return os.path.join(COURSE_BASE, f"{clean}_course")
+    return os.path.join(COURSE_BASE, f"{_get_teacher_key(teacher_username)}_course")
+
+
+def _gen_course_id() -> str:
+    """生成课程文件夹 id：c + 时间戳 + 4 位随机（唯一、URL 安全、永不复用）"""
+    return "c" + datetime.now().strftime("%Y%m%d%H%M%S") + secrets.token_hex(2)
+
+
+def _resolve_course_format(course_type: str, fmt: str) -> str:
+    """推断打开方式：显式 format 优先；否则 scratch→scratch，python/cpp→folder"""
+    if fmt in ("scratch", "folder", "ebook"):
+        return fmt
+    return "scratch" if course_type == "scratch" else "folder"
+
+
+def _read_course_meta(course_path: str) -> dict:
+    """读取 course.json；不存在/损坏返回空 dict（不写盘）"""
+    meta_path = os.path.join(course_path, "course.json")
+    meta = {}
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            meta = {}
+    return meta
+
+
+def _write_course_meta(course_path: str, meta: dict) -> None:
+    with open(os.path.join(course_path, "course.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
 
 # ==========================================
 # 消息工具
@@ -453,6 +486,7 @@ class CourseCreateForm(BaseModel):
     teacher: str
     name: str
     course_type: str = "scratch"
+    format: str = ""  # scratch | folder | ebook；空则按 course_type 推断
 
 class RenameForm(BaseModel):
     new_name: str
