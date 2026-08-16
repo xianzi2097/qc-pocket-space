@@ -16,7 +16,7 @@ export default withMermaid({
     math: true,
   },
 
-  title: 'CodeNova',
+  title: process.env.VP_TITLE || 'CodeNova',
   description: '课程文档',
 
   mermaid: {},

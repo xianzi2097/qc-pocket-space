@@ -168,6 +168,7 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
         # URL-encode，而 vitepress 客户端路由 pathToFile 用 decodeURIComponent 解码路径后
         # 再按编码后 base 长度切片，长度错位导致子页面 404。课程归属老师记录在 course.json。
         env["VP_BASE"] = f"/course/{course_id}/"
+        env["VP_TITLE"] = meta.get("name") or "课程"
         cmd = [NODE_EXE, "node_modules/vitepress/bin/vitepress.js", "build", "docs"]
         log("=== 开始渲染 ===")
         log("命令: " + " ".join(cmd))
