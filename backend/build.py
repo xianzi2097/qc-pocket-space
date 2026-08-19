@@ -74,11 +74,14 @@ def _clear_workspace_docs() -> None:
             os.remove(p)
 
 
-def _ensure_index(docs_dir: str, title: str) -> None:
-    """课程根目录没有 index.md 时自动生成一个首页（课程名 + 顶层条目）"""
+def _ensure_index(docs_dir: str, title: str, description: str = "") -> None:
+    """课程根目录没有 index.md 时自动生成一个首页（课程名 + 描述 + 顶层条目）"""
     if os.path.exists(os.path.join(docs_dir, "index.md")):
         return
-    lines = [f"# {title}", ""]
+    lines = [f"# {title}"]
+    if description.strip():
+        lines += ["", description.strip()]
+    lines.append("")
     for name in sorted(os.listdir(docs_dir)):
         if name.startswith(".") or name == "course.json":
             continue
@@ -175,7 +178,7 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
                     log(f"📝 课程名更新为: {top_dirs[0]}")
 
         # 2.5 无首页时自动生成 index.md（否则 vitepress 不产 index.html）
-        _ensure_index(docs_dir, meta.get("name") or "课程")
+        _ensure_index(docs_dir, meta.get("name") or "课程", meta.get("description", ""))
 
         # 3. 生成 sidebar（读 _order.json 支持自定义排序）
         order_map = _read_order_file(course_path)
