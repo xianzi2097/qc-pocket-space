@@ -68,10 +68,7 @@ def permanent_delete_trash(request: Request, trash_id: int, db: Session = Depend
 def list_trash_items(request: Request):
     caller = get_current_user(request)
     owner = caller["username"] if caller["role"] != "admin" else ""
-    import logging
-    logging.warning(f"[trash/list] caller={caller['username']} role={caller['role']} owner='{owner}'")
     items = _list_trash_items(owner=owner)
-    logging.warning(f"[trash/list] found {len(items)} items: {[i.get('_folder') for i in items]}")
     return {"status": "success", "items": items}
 
 
@@ -112,7 +109,7 @@ def restore_trash_item(request: Request, folder_name: str):
 
 @router.delete("/api/trash/items/{folder_name}")
 def permanent_delete_item(request: Request, folder_name: str):
-    require_role(request, ["admin"])
+    require_role(request, ["admin", "teacher"])
     folder_path = os.path.join(TRASH_DIR, folder_name)
     if not os.path.exists(folder_path):
         raise HTTPException(status_code=404, detail="回收站中未找到该项目")
