@@ -155,6 +155,17 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
             else:
                 shutil.copy2(src, dst)
 
+        # 2.1 若课程根目录只有一个子目录、没有其他文件，压平一层
+        top_entries = [n for n in os.listdir(docs_dir) if not n.startswith(".")]
+        top_dirs = [n for n in top_entries if os.path.isdir(os.path.join(docs_dir, n))]
+        top_files = [n for n in top_entries if os.path.isfile(os.path.join(docs_dir, n))]
+        if len(top_dirs) == 1 and len(top_files) == 0:
+            sole = os.path.join(docs_dir, top_dirs[0])
+            for child in os.listdir(sole):
+                shutil.move(os.path.join(sole, child), os.path.join(docs_dir, child))
+            shutil.rmtree(sole)
+            log(f"📚 压平顶层目录: {top_dirs[0]}/")
+
         # 2.5 无首页时自动生成 index.md（否则 vitepress 不产 index.html）
         _ensure_index(docs_dir, meta.get("name") or "课程", meta.get("description", ""))
 
