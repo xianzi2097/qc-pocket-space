@@ -27,8 +27,8 @@ export default withMermaid({
   themeConfig: {
     logoLink: { link: '/../../', target: '_self' },
     nav: [
-      { text: '🏠 首页', link: '/../../', target: '_self' },
-      { text: '📚 课程广场', link: '/../../', target: '_self' },
+      { text: '首页', link: '/../../', target: '_self' },
+      { text: '课程广场', link: '/../../', target: '_self' },
     ],
     sidebar,
   },
