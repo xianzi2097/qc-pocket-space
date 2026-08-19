@@ -390,6 +390,42 @@ def _resolve_course_format(course_type: str, fmt: str) -> str:
     return "scratch" if course_type == "scratch" else "folder"
 
 
+def _natural_sort_key(name: str):
+    """自然排序键：L1 L2 L10 按数字顺序"""
+    import re as _re
+    return [int(c) if c.isdigit() else c.lower() for c in _re.split(r'(\d+)', name)]
+
+
+def _read_order_file(course_path: str) -> dict:
+    """读取 _order.json；不存在返回空 dict，格式错误返回空 dict"""
+    order_path = os.path.join(course_path, "_order.json")
+    if not os.path.exists(order_path):
+        return {}
+    try:
+        with open(order_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def check_order_file(course_path: str) -> str | None:
+    """检查 _order.json 是否有问题，返回警告消息或 None"""
+    order_path = os.path.join(course_path, "_order.json")
+    if not os.path.exists(order_path):
+        return None
+    try:
+        with open(order_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return "_order.json 格式错误：应为字典 {\"\": [...], ...}，已忽略"
+        return None
+    except json.JSONDecodeError as e:
+        return f"_order.json 解析失败（{e.msg} 第{e.lineno}行），已按自然排序兜底"
+    except OSError as e:
+        return f"_order.json 读取失败（{e}），已按自然排序兜底"
+
+
 def _read_course_meta(course_path: str) -> dict:
     """读取 course.json；不存在/损坏返回空 dict（不写盘）"""
     meta_path = os.path.join(course_path, "course.json")

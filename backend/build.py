@@ -13,7 +13,7 @@ import subprocess
 import threading
 from datetime import datetime
 
-from utils import _read_course_meta, _write_course_meta
+from utils import _read_course_meta, _write_course_meta, _natural_sort_key, _read_order_file, check_order_file
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 QC_DIR = os.path.abspath(os.path.join(BACKEND_DIR, ".."))            # qc-pocket-space
@@ -157,6 +157,9 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
 
         # 3. 生成 sidebar（读 _order.json 支持自定义排序）
         order_map = _read_order_file(course_path)
+        order_warn = check_order_file(course_path)
+        if order_warn:
+            log(f"⚠ {order_warn}")
         sidebar = _build_sidebar(docs_dir, order_map=order_map)
         gen_dir = os.path.join(vp_dir, "gen")
         os.makedirs(gen_dir, exist_ok=True)

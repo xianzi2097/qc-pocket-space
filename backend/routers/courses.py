@@ -8,7 +8,7 @@ from utils import (
     get_db, get_current_user, require_role,
     _safe_path, _get_teacher_course_dir, _get_teacher_key,
     _move_to_trash, _gen_unique_course_id, _resolve_course_format,
-    _read_course_meta, _write_course_meta,
+    _read_course_meta, _write_course_meta, _natural_sort_key, _read_order_file,
     CourseCreateForm, CourseUpdateForm, RenameForm
 )
 
@@ -324,25 +324,6 @@ def _split_rel(rel: str) -> list:
     if not rel:
         return []
     return [p for p in rel.replace("\\", "/").split("/") if p not in (".", "..")]
-
-
-def _natural_sort_key(name: str):
-    """自然排序键：L1 L2 L10 按数字顺序"""
-    import re as _re
-    return [int(c) if c.isdigit() else c.lower() for c in _re.split(r'(\d+)', name)]
-
-
-def _read_order_file(course_path: str) -> dict:
-    """读取 _order.json"""
-    order_path = os.path.join(course_path, "_order.json")
-    if not os.path.exists(order_path):
-        return {}
-    try:
-        with open(order_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except (json.JSONDecodeError, OSError):
-        return {}
 
 
 def _walk_tree(path: str, order_map: dict = None, rel_prefix: str = "") -> list:
