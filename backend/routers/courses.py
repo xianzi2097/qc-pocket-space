@@ -67,8 +67,10 @@ def create_course(request: Request, form: CourseCreateForm):
     course_path = _safe_path(course_dir, course_id)
     os.makedirs(course_path)
     fmt = _resolve_course_format(form.course_type, form.format)
+    # ebook 课程：名称由上传文件名决定，创建时可为空
+    course_name = form.name.strip() if form.name.strip() else ("电子书课程" if fmt == "ebook" else form.name.strip())
     meta = {
-        "id": course_id, "name": form.name, "type": form.course_type,
+        "id": course_id, "name": course_name, "type": form.course_type,
         "format": fmt, "description": form.description, "tags": form.tags,
         "teacher": caller["username"],  # 课程归属老师（URL 不含老师层，归属记录在此）
         "publish": {"status": "idle"},

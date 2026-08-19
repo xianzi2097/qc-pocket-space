@@ -551,7 +551,7 @@ class SessionForm(BaseModel):
 
 class CourseCreateForm(BaseModel):
     teacher: str
-    name: str
+    name: str = ""  # ebook 课程可为空，由上传文件名决定
     course_type: str = "scratch"
     format: str = ""  # scratch | folder | ebook；空则按 course_type 推断
     tags: list[str] = []  # 课程标签
