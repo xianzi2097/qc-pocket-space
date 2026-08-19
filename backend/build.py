@@ -23,7 +23,7 @@ NODE_EXE = os.path.join(RUNTIME_DIR, "node", "node.exe")
 SITES_DIR = os.path.join(QC_DIR, "frontend", "course_vitepress_dist")
 LOGS_DIR = os.path.abspath(os.path.join(BACKEND_DIR, "..", "..", "data", "build_logs"))
 
-_BUILD_TIMEOUT = 120  # 秒
+_BUILD_TIMEOUT = 300  # 秒（服务器性能弱，vitepress 渲染可能较慢，放宽到 5 分钟）
 
 _build_lock = threading.Lock()   # 全局串行：一次只渲染一门课
 _active = {}                     # course_id -> "building"
