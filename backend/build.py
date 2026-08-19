@@ -144,27 +144,31 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
         # 1. 清空 docs，但保留 .vitepress（配置 + 主题 + gen）
         _clear_workspace_docs()
 
-        # 2. 拷贝课程内容（排除 course.json 与隐藏文件）
-        for name in os.listdir(course_path):
-            if name == "course.json" or name.startswith("."):
-                continue
-            src = os.path.join(course_path, name)
-            dst = os.path.join(docs_dir, name)
-            if os.path.isdir(src):
-                shutil.copytree(src, dst)
-            else:
-                shutil.copy2(src, dst)
-
-        # 2.1 若课程根目录只有一个子目录、没有其他文件，压平一层
-        top_entries = [n for n in os.listdir(docs_dir) if not n.startswith(".")]
-        top_dirs = [n for n in top_entries if os.path.isdir(os.path.join(docs_dir, n))]
-        top_files = [n for n in top_entries if os.path.isfile(os.path.join(docs_dir, n))]
-        if len(top_dirs) == 1 and len(top_files) == 0:
-            sole = os.path.join(docs_dir, top_dirs[0])
-            for child in os.listdir(sole):
-                shutil.move(os.path.join(sole, child), os.path.join(docs_dir, child))
-            shutil.rmtree(sole)
-            log(f"📚 压平顶层目录: {top_dirs[0]}/")
+        # 2. 拷贝课程内容到 docs（用户只传一个文件夹，拷里面的根目录内容）
+        course_items = [n for n in os.listdir(course_path)
+                        if not n.startswith(".") and n != "course.json"]
+        # 找到用户上传的那个文件夹（唯一一个非隐藏目录）
+        upload_dirs = [n for n in course_items if os.path.isdir(os.path.join(course_path, n))]
+        if len(upload_dirs) == 1 and len(course_items) == 1:
+            # 拷贝文件夹内的内容（不是文件夹本身）
+            src_dir = os.path.join(course_path, upload_dirs[0])
+            for child in os.listdir(src_dir):
+                child_src = os.path.join(src_dir, child)
+                child_dst = os.path.join(docs_dir, child)
+                if os.path.isdir(child_src):
+                    shutil.copytree(child_src, child_dst)
+                else:
+                    shutil.copy2(child_src, child_dst)
+            log(f"📚 拷贝内容: {upload_dirs[0]}/* → docs/")
+        else:
+            # 兜底：直接拷
+            for name in course_items:
+                src = os.path.join(course_path, name)
+                dst = os.path.join(docs_dir, name)
+                if os.path.isdir(src):
+                    shutil.copytree(src, dst)
+                else:
+                    shutil.copy2(src, dst)
 
         # 2.5 无首页时自动生成 index.md（否则 vitepress 不产 index.html）
         _ensure_index(docs_dir, meta.get("name") or "课程", meta.get("description", ""))
