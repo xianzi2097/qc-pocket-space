@@ -1,10 +1,11 @@
 import DefaultTheme from 'vitepress/theme'
 import './custom.css'
+import { Home, BookOpen } from '@lucide/vue'
 
 export default {
   extends: DefaultTheme,
   enhanceApp({ app }) {
-    // 全局注册可视化组件，.md 里可直接使用
-    // app.component('ComponentName', Component)
+    app.component('IconHome', Home)
+    app.component('IconBookOpen', BookOpen)
   }
 }
