@@ -391,7 +391,12 @@ async def reorder_tree_entry(request: Request, course_id: str, name: str, dir: s
     order_path = os.path.join(course_path, "_order.json")
     with open(order_path, "w", encoding="utf-8") as f:
         json.dump(order_map, f, ensure_ascii=False, indent=2)
-    return {"status": "success", "message": f"{name} 已{('上移' if direction == 'up' else '下移')}"}
+    # 验证写入成功
+    with open(order_path, "r", encoding="utf-8") as f:
+        verify = json.load(f)
+    import logging
+    logging.info(f"[reorder] dir='{rel_key}' wrote {len(ordered)} items, verified={rel_key in verify}")
+    return {"status": "success", "message": f"{name} 已{('上移' if direction == 'up' else '下移')}", "order": ordered}
 
 
 @router.post("/api/courses/{course_id}/tree/folder")
