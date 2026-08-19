@@ -429,6 +429,18 @@ async def upload_tree_file(request: Request, course_id: str, path: str = "", fil
         raise HTTPException(status_code=413, detail="文件过大，最大 50MB")
     with open(os.path.join(target_dir, safe_name), "wb") as f:
         f.write(content)
+    # ebook 课程：首次上传时自动用文件名/目录名更新课程显示名
+    meta = _read_course_meta(course_path)
+    fmt = _resolve_course_format(meta.get("type", ""), meta.get("format", ""))
+    if fmt == "ebook" and meta.get("name") in ("电子书课程", ""):
+        # 有 path（子目录上传）→ 用 path 第一段；无 path → 用文件名去后缀
+        if path:
+            new_name = path.strip("/").split("/")[0]
+        else:
+            new_name = os.path.splitext(safe_name)[0]
+        if new_name:
+            meta["name"] = new_name
+            _write_course_meta(course_path, meta)
     return {"status": "success", "message": f"文件 [{safe_name}] 已上传", "name": safe_name}
 
 
