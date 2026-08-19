@@ -9,7 +9,7 @@ from utils import (
     _safe_path, _get_teacher_course_dir, _get_teacher_key,
     _move_to_trash, _gen_unique_course_id, _resolve_course_format,
     _read_course_meta, _write_course_meta,
-    CourseCreateForm, RenameForm
+    CourseCreateForm, CourseUpdateForm, RenameForm
 )
 
 router = APIRouter()
@@ -45,6 +45,7 @@ def list_courses(teacher: str = ""):
             "type": meta.get("type", "scratch"),
             "format": _resolve_course_format(meta.get("type", "scratch"), meta.get("format", "")),
             "description": meta.get("description", ""),
+            "tags": meta.get("tags", []),
             "material_count": len(materials),
             "publish": meta.get("publish", {"status": "idle"}),
             "teacher_key": _get_teacher_key(teacher),  # 课程归属老师（仅展示用，URL 不再含老师层）
@@ -68,7 +69,7 @@ def create_course(request: Request, form: CourseCreateForm):
     fmt = _resolve_course_format(form.course_type, form.format)
     meta = {
         "id": course_id, "name": form.name, "type": form.course_type,
-        "format": fmt, "description": "", "tags": [],
+        "format": fmt, "description": form.description, "tags": form.tags,
         "teacher": caller["username"],  # 课程归属老师（URL 不含老师层，归属记录在此）
         "publish": {"status": "idle"},
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -197,6 +198,24 @@ def _valid_new_name(new_name: str) -> str:
     if not new_name or "/" in new_name or "\\" in new_name:
         raise HTTPException(status_code=400, detail="名称无效（不能为空或含 / \\）")
     return new_name
+
+
+@router.put("/api/courses/{course_id}")
+def update_course(request: Request, course_id: str, form: CourseUpdateForm):
+    """更新课程元信息（名称、描述、标签、类型、打开方式）"""
+    caller = require_role(request, ["admin", "teacher"])
+    base = _get_teacher_course_dir(caller["username"])
+    course_path = _safe_path(base, course_id)
+    if not os.path.exists(course_path):
+        raise HTTPException(status_code=404, detail="课程不存在")
+    meta = _read_course_meta(course_path)
+    meta["name"] = form.name
+    meta["description"] = form.description
+    meta["tags"] = form.tags
+    meta["type"] = form.course_type
+    meta["format"] = _resolve_course_format(form.course_type, form.format)
+    _write_course_meta(course_path, meta)
+    return {"status": "success", "message": "课程信息已更新"}
 
 
 @router.post("/api/courses/{course_name}/rename")

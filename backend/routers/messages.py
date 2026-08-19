@@ -9,7 +9,7 @@ from models import UserModel
 from utils import (
     get_db, get_current_user, require_role,
     _safe_path, _get_msgs_dir, _write_msg, _find_msg_file,
-    SendMessageForm
+    SendMessageForm, _atomic_save
 )
 
 router = APIRouter()
@@ -87,8 +87,7 @@ def mark_read(request: Request, msg_id: str, folder: str = ""):
     with open(fp, "r", encoding="utf-8") as f:
         data = json.load(f)
     data["is_read"] = True
-    with open(fp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    _atomic_save(fp, data)
     return {"status": "success"}
 
 

@@ -12,7 +12,7 @@ export default withMermaid({
   ignoreDeadLinks: true,
 
   markdown: {
-    lineNumbers: false,
+    lineNumbers: true,
     math: true,
   },
 

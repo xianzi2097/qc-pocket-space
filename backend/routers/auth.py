@@ -7,29 +7,68 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from models import UserModel
-from utils import get_db, get_current_user, require_role, generate_token, ensure_user_dirs, hash_password, verify_password, ACTIVE_TOKENS, RegisterForm, LoginForm
+from utils import get_db, get_current_user, require_role, generate_token, ensure_user_dirs, hash_password, verify_password, ACTIVE_TOKENS, RegisterForm, LoginForm, _atomic_save
 
 router = APIRouter()
 
 # ============================================================
-#  登录限流：同 IP 5 次失败 → 锁定 30 秒
+#  登录限流：梯度封禁（连续失败越多，封禁越久）
+#    5 次 → 封 30 秒
+#   10 次 → 封 5 分钟
+#   15 次 → 封 30 分钟
+#   20 次 → 封 2 小时
 # ============================================================
 import time
 from collections import defaultdict
 
-LOGIN_FAILURES: dict[str, list[float]] = defaultdict(list)
+# {ip: {"count": int, "locked_until": float}}
+LOGIN_FAILURES: dict[str, dict] = defaultdict(lambda: {"count": 0, "locked_until": 0})
 
-# 测试用：重置登录限流状态
 def _reset_login_failures():
     LOGIN_FAILURES.clear()
+
+# 梯度封禁规则：(失败次数阈值, 封禁秒数)
+_LOCKOUT_RULES = [
+    (5,  30),       # 5 次 → 封 30 秒
+    (10, 300),      # 10 次 → 封 5 分钟
+    (15, 1800),     # 15 次 → 封 30 分钟
+    (20, 7200),     # 20 次 → 封 2 小时
+]
+
+def _get_lockout_seconds(count: int) -> int:
+    """根据累计失败次数返回封禁秒数"""
+    seconds = 0
+    for threshold, lock_sec in _LOCKOUT_RULES:
+        if count >= threshold:
+            seconds = lock_sec
+    return seconds
 
 def _check_login_rate(request: Request):
     ip = request.client.host if request.client else "unknown"
     now = time.time()
-    failures = [t for t in LOGIN_FAILURES[ip] if now - t < 30]
-    LOGIN_FAILURES[ip] = failures
-    if len(failures) >= 5:
-        raise HTTPException(status_code=429, detail="登录尝试过于频繁，请 30 秒后再试")
+    record = LOGIN_FAILURES[ip]
+
+    # 还在封禁期内 → 拒绝
+    if record["locked_until"] > now:
+        remain = int(record["locked_until"] - now)
+        raise HTTPException(
+            status_code=429,
+            detail=f"登录尝试过于频繁，请 {remain} 秒后再试"
+        )
+    # 封禁已过期 → 重置计数
+    elif record["locked_until"] > 0 and record["locked_until"] <= now:
+        record["count"] = 0
+        record["locked_until"] = 0
+
+def _record_login_failure(request: Request):
+    """记录一次登录失败，达到阈值时触发封禁"""
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    record = LOGIN_FAILURES[ip]
+    record["count"] += 1
+    lock_sec = _get_lockout_seconds(record["count"])
+    if lock_sec > 0:
+        record["locked_until"] = now + lock_sec
 
 
 @router.post("/api/register")
@@ -76,9 +115,8 @@ def login_user(request: Request, form: LoginForm, db: Session = Depends(get_db))
                 "descriptors": descriptors
             }
         }
-    # 记录失败次数（限流用）
-    ip = request.client.host if request.client else "unknown"
-    LOGIN_FAILURES[ip].append(time.time())
+    # 登录失败，记录并触发梯度封禁
+    _record_login_failure(request)
     raise HTTPException(status_code=401, detail="账号或密码错误")
 
 
@@ -209,8 +247,7 @@ def save_classes(teacher: str, request: Request, form: SaveClassesForm, db: Sess
     classes_file = _get_classes_file(teacher)
     try:
         classes_data = [c.model_dump() for c in form.classes]
-        with open(classes_file, "w", encoding="utf-8") as f:
-            json.dump(classes_data, f, ensure_ascii=False, indent=2)
+        _atomic_save(classes_file, classes_data)
         return {"status": "success", "message": f"班级数据已保存"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存失败: {e}")

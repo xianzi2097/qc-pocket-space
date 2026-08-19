@@ -8,7 +8,7 @@ from models import UserModel, SessionLocal, USERS_DIR
 from utils import (
     get_db, get_current_user, require_role, _ensure_user,
     _load_classes, _save_classes, _get_classes_path, _resolve_user_dir,
-    ClassForm, StudentForm
+    ClassForm, StudentForm, _atomic_save
 )
 
 router = APIRouter()
@@ -106,8 +106,7 @@ def delete_class(request: Request, class_name: str):
         raise HTTPException(status_code=404, detail="班级不存在")
     tmp = os.path.join(TRASH_DIR, f"__tmp_{caller['username']}_{class_name}.json")
     os.makedirs(TRASH_DIR, exist_ok=True)
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump({"class_data": deleted}, f, ensure_ascii=False, indent=2)
+    _atomic_save(tmp, {"class_data": deleted})
     try:
         _move_to_trash(tmp, "class", caller["username"], class_name)
     except Exception:

@@ -3,7 +3,7 @@ import os
 import glob as _glob
 import shutil
 from fastapi import APIRouter, Depends, HTTPException, Request
-from utils import get_db, get_current_user, _safe_path, NotebookForm, NoteSaveForm
+from utils import get_db, get_current_user, _safe_path, NotebookForm, NoteSaveForm, _atomic_write_file
 
 router = APIRouter()
 
@@ -112,8 +112,7 @@ def save_note(request: Request, form: NoteSaveForm, notebook: str = ""):
     base = os.path.join(_get_notes_base(caller["username"]), notebook)
     os.makedirs(base, exist_ok=True)
     fp = _safe_path(base, form.filename)
-    with open(fp, "w", encoding="utf-8") as f:
-        f.write(form.content)
+    _atomic_write_file(fp, form.content)
     return {"status": "success", "message": f"笔记 [{form.filename}] 保存成功！"}
 
 

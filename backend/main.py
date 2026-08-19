@@ -6,7 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from models import Base, engine, SessionLocal, UserModel
-from utils import verify_token, hash_password
+from utils import verify_token, hash_password, self_check_user_dirs
 
 
 def _ensure_admin():
@@ -32,6 +32,7 @@ def _ensure_admin():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _ensure_admin()
+    self_check_user_dirs()
     # 每日定时自动备份（服务常驻期间每天备份整个 data/，保留最近 N 份）
     try:
         from backup import start_auto_backup

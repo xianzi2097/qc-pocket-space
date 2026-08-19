@@ -31,6 +31,27 @@ def verify_password(password: str, stored: str) -> bool:
     return False
 
 # ==========================================
+# 原子写入
+# ==========================================
+def _atomic_save(fp: str, data):
+    """原子写入 JSON：先写临时文件再 rename，断电/崩溃不会损坏原文件。"""
+    tmp = fp + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, fp)
+
+def _atomic_write_file(fp: str, content: str):
+    """原子写入文本文件：先写临时文件再 rename，断电/崩溃不会损坏原文件。"""
+    tmp = fp + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(content)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, fp)
+
+# ==========================================
 # 路径常量
 # ==========================================
 TRASH_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "trash"))
@@ -143,8 +164,7 @@ def write_info_json(user: UserModel):
         "avatar_path": user.avatar_path,
         "descriptors": descriptors,
     }
-    with open(os.path.join(user_dir, "info.json"), "w", encoding="utf-8") as f:
-        json.dump(info, f, ensure_ascii=False, indent=2)
+    _atomic_save(os.path.join(user_dir, "info.json"), info)
 
 def _ensure_user(db: Session, username: str, role: str, avatar: str, descriptors: dict) -> UserModel:
     user = db.query(UserModel).filter(UserModel.username == username).first()
@@ -171,6 +191,33 @@ def ensure_user_dirs(user: UserModel):
             os.makedirs(os.path.join(user_dir, sub), exist_ok=True)
             os.makedirs(os.path.join(user_dir, "messages", "收件箱"), exist_ok=True)
     write_info_json(user)
+
+
+def self_check_user_dirs():
+    """启动时自检：扫描 DB 里的用户，确保目录和子目录都存在。
+    断电/崩溃导致 DB 写成功但目录没建的情况，这里补建。
+    只建目录不改数据，是初始化逻辑，不是防丢失。"""
+    db = SessionLocal()
+    try:
+        users = db.query(UserModel).all()
+        fixed = 0
+        for user in users:
+            user_dir = get_user_dir(user)
+            if not os.path.exists(user_dir):
+                ensure_user_dirs(user)
+                fixed += 1
+            elif user.role == "student":
+                # 补建学生子目录（旧版本升级可能缺少）
+                for sub in ["sb3_projects", "notes", "messages"]:
+                    os.makedirs(os.path.join(user_dir, sub), exist_ok=True)
+                os.makedirs(os.path.join(user_dir, "messages", "收件箱"), exist_ok=True)
+        if fixed:
+            print(f"[startup] self-check: 补建了 {fixed} 个用户目录")
+        else:
+            print("[startup] self-check: 所有用户目录正常")
+    finally:
+        db.close()
+
 
 # ==========================================
 # 软删除 / 恢复用户
@@ -272,8 +319,7 @@ def _load_classes(teacher_username: str) -> list:
 def _save_classes(teacher_username: str, classes: list):
     path = _get_classes_path(teacher_username)
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(classes, f, ensure_ascii=False, indent=2)
+    _atomic_save(path, classes)
 
 # ==========================================
 # 课堂记录工具
@@ -294,8 +340,7 @@ def _load_sessions(username: str, class_name: str, month: str) -> list:
 def _save_sessions(username: str, class_name: str, month: str, sessions: list):
     fp = _get_session_path(username, class_name, month)
     os.makedirs(os.path.dirname(fp), exist_ok=True)
-    with open(fp, "w", encoding="utf-8") as f:
-        json.dump(sessions, f, ensure_ascii=False, indent=2)
+    _atomic_save(fp, sessions)
 
 # ==========================================
 # 课程工具
@@ -359,8 +404,7 @@ def _read_course_meta(course_path: str) -> dict:
 
 
 def _write_course_meta(course_path: str, meta: dict) -> None:
-    with open(os.path.join(course_path, "course.json"), "w", encoding="utf-8") as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2)
+    _atomic_save(os.path.join(course_path, "course.json"), meta)
 
 # ==========================================
 # 消息工具
@@ -380,8 +424,7 @@ def _write_msg(username: str, folder: str, msg_id: str, sender: str, subject: st
         "id": msg_id, "sender": sender, "subject": subject, "body": body,
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "is_read": False
     }
-    with open(os.path.join(folder_dir, f"{msg_id}.json"), "w", encoding="utf-8") as f:
-        json.dump(msg, f, ensure_ascii=False, indent=2)
+    _atomic_save(os.path.join(folder_dir, f"{msg_id}.json"), msg)
 
 def _find_msg_file(username: str, folder: str | None, msg_id: str) -> str | None:
     base = _get_msgs_dir(username)
@@ -412,8 +455,7 @@ def _move_to_trash(source_path: str, trash_type: str, owner: str, original_path:
         "original_path": original_path,
         "deleted_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
-    with open(os.path.join(dst, ".trash.json"), "w", encoding="utf-8") as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2)
+    _atomic_save(os.path.join(dst, ".trash.json"), meta)
     return trash_folder_name
 
 def _list_trash_items(owner: str = "") -> list:
@@ -512,6 +554,15 @@ class CourseCreateForm(BaseModel):
     name: str
     course_type: str = "scratch"
     format: str = ""  # scratch | folder | ebook；空则按 course_type 推断
+    tags: list[str] = []  # 课程标签
+    description: str = ""  # 课程描述
 
 class RenameForm(BaseModel):
     new_name: str
+
+class CourseUpdateForm(BaseModel):
+    name: str
+    description: str = ""
+    tags: list[str] = []
+    course_type: str = "scratch"
+    format: str = ""
