@@ -68,7 +68,10 @@ def permanent_delete_trash(request: Request, trash_id: int, db: Session = Depend
 def list_trash_items(request: Request):
     caller = get_current_user(request)
     owner = caller["username"] if caller["role"] != "admin" else ""
+    import logging
+    logging.warning(f"[trash/list] caller={caller['username']} role={caller['role']} owner='{owner}'")
     items = _list_trash_items(owner=owner)
+    logging.warning(f"[trash/list] found {len(items)} items: {[i.get('_folder') for i in items]}")
     return {"status": "success", "items": items}
 
 
