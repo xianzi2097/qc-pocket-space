@@ -326,18 +326,44 @@ def _split_rel(rel: str) -> list:
     return [p for p in rel.replace("\\", "/").split("/") if p not in (".", "..")]
 
 
-def _walk_tree(path: str) -> list:
+def _natural_sort_key(name: str):
+    """自然排序键：L1 L2 L10 按数字顺序"""
+    import re as _re
+    return [int(c) if c.isdigit() else c.lower() for c in _re.split(r'(\d+)', name)]
+
+
+def _read_order_file(course_path: str) -> dict:
+    """读取 _order.json"""
+    order_path = os.path.join(course_path, "_order.json")
+    if not os.path.exists(order_path):
+        return {}
+    try:
+        with open(order_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _walk_tree(path: str, order_map: dict = None, rel_prefix: str = "") -> list:
     entries = []
     try:
-        names = sorted(os.listdir(path))
+        all_names = [n for n in os.listdir(path)
+                     if not n.startswith(".") and n not in ("course.json", "_order.json")]
     except OSError:
         return entries
-    for name in names:
-        if name.startswith(".") or name == "course.json":
-            continue
+    # 排序：_order.json 优先，fallback 自然排序
+    custom_order = (order_map or {}).get(rel_prefix)
+    if custom_order:
+        order_index = {name: i for i, name in enumerate(custom_order)}
+        all_names.sort(key=lambda n: order_index.get(n, 9999))
+    else:
+        all_names.sort(key=_natural_sort_key)
+    for name in all_names:
         fp = os.path.join(path, name)
+        child_rel = f"{rel_prefix}/{name}" if rel_prefix else name
         if os.path.isdir(fp):
-            entries.append({"name": name, "type": "dir", "children": _walk_tree(fp)})
+            entries.append({"name": name, "type": "dir", "children": _walk_tree(fp, order_map, child_rel)})
         elif os.path.isfile(fp):
             entries.append({"name": name, "type": "file", "size": os.path.getsize(fp)})
     return entries
@@ -347,7 +373,44 @@ def _walk_tree(path: str) -> list:
 def get_course_tree(request: Request, course_id: str):
     caller = require_role(request, ["admin", "teacher"])
     course_path = _get_course_path(caller, course_id)
-    return {"status": "success", "tree": _walk_tree(course_path)}
+    order_map = _read_order_file(course_path)
+    return {"status": "success", "tree": _walk_tree(course_path, order_map)}
+
+
+@router.post("/api/courses/{course_id}/tree/reorder")
+async def reorder_tree_entry(request: Request, course_id: str, name: str, dir: str = "", direction: str = "up"):
+    """调整同级条目顺序（query 参数版）"""
+    caller = require_role(request, ["admin", "teacher"])
+    course_path = _get_course_path(caller, course_id)
+    if direction not in ("up", "down"):
+        raise HTTPException(status_code=400, detail="direction 必须是 up 或 down")
+    # 找到父目录在课程内的相对路径
+    dir_path = _safe_path(course_path, *_split_rel(dir)) if dir else course_path
+    if not os.path.isdir(dir_path):
+        raise HTTPException(status_code=404, detail="目录不存在")
+    rel_key = dir.strip("/")  # _order.json 的 key，空字符串 = 根目录
+    order_map = _read_order_file(course_path)
+    # 获取当前同级条目列表
+    siblings = [n for n in os.listdir(dir_path)
+                if not n.startswith(".") and n not in ("course.json", "_order.json")]
+    current_order = order_map.get(rel_key, siblings)
+    # 保留当前 order 中存在且磁盘上也存在的条目，追加磁盘上有但 order 中没有的
+    existing_set = set(siblings)
+    ordered = [n for n in current_order if n in existing_set]
+    ordered.extend(n for n in siblings if n not in ordered)
+    if name not in ordered:
+        raise HTTPException(status_code=404, detail=f"未找到 {name}")
+    idx = ordered.index(name)
+    new_idx = idx - 1 if direction == "up" else idx + 1
+    if new_idx < 0 or new_idx >= len(ordered):
+        return {"status": "success", "message": "已在边界，无需调整"}
+    ordered[idx], ordered[new_idx] = ordered[new_idx], ordered[idx]
+    # 写回 _order.json
+    order_map[rel_key] = ordered
+    order_path = os.path.join(course_path, "_order.json")
+    with open(order_path, "w", encoding="utf-8") as f:
+        json.dump(order_map, f, ensure_ascii=False, indent=2)
+    return {"status": "success", "message": f"{name} 已{('上移' if direction == 'up' else '下移')}"}
 
 
 @router.post("/api/courses/{course_id}/tree/folder")

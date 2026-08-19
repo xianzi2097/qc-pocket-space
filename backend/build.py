@@ -155,8 +155,9 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
         # 2.5 无首页时自动生成 index.md（否则 vitepress 不产 index.html）
         _ensure_index(docs_dir, meta.get("name") or "课程")
 
-        # 3. 生成 sidebar
-        sidebar = _build_sidebar(docs_dir)
+        # 3. 生成 sidebar（读 _order.json 支持自定义排序）
+        order_map = _read_order_file(course_path)
+        sidebar = _build_sidebar(docs_dir, order_map=order_map)
         gen_dir = os.path.join(vp_dir, "gen")
         os.makedirs(gen_dir, exist_ok=True)
         with open(os.path.join(gen_dir, "sidebar.mjs"), "w", encoding="utf-8") as f:
@@ -226,18 +227,29 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
             pass
 
 
-def _build_sidebar(docs_dir: str) -> list:
+def _build_sidebar(docs_dir: str, order_map: dict = None, rel_prefix: str = "") -> list:
     """递归生成 vitepress sidebar：
     - 目录 = 分组；若目录内有 index.md，则目录标题链接到该目录首页
     - md = 页面；所有 index.md 都跳过（首页不作为侧边栏条目）
+    - _order.json 有定义则按它排，否则自然排序
     """
+    if order_map is None:
+        order_map = {}
 
     def walk(dirpath: str, rel_prefix: str = "") -> list:
         items = []
         try:
-            names = sorted(os.listdir(dirpath))
+            all_names = [n for n in os.listdir(dirpath)
+                         if not n.startswith(".") and n != "course.json"]
         except OSError:
             return items
+        custom_order = order_map.get(rel_prefix)
+        if custom_order:
+            order_index = {name: i for i, name in enumerate(custom_order)}
+            all_names.sort(key=lambda n: order_index.get(n, 9999))
+        else:
+            all_names.sort(key=_natural_sort_key)
+        names = all_names
         for name in names:
             if name.startswith(".") or name == "course.json":
                 continue
