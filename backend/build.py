@@ -155,30 +155,18 @@ def _do_build(teacher_key: str, course_id: str, course_path: str) -> None:
             else:
                 shutil.copy2(src, dst)
 
-        # 2.1 ebook 课程：若 docs 里只有一个子目录或一个文件，
-        #     把内容上提一层（去掉 zip 解压的多余嵌套）并更新课程名。
+        # 2.1 ebook 课程：若 docs 里只有一个子目录，压平（去掉 zip 解压的多余嵌套）
         fmt = _resolve_course_format(meta.get("type", ""), meta.get("format", ""))
-        if fmt == "ebook" and meta.get("name") in ("电子书课程", ""):
+        if fmt == "ebook":
             top_entries = [n for n in os.listdir(docs_dir) if not n.startswith(".")]
             top_dirs = [n for n in top_entries if os.path.isdir(os.path.join(docs_dir, n))]
             top_files = [n for n in top_entries if os.path.isfile(os.path.join(docs_dir, n))]
-            # 情况1：唯一子目录（zip 解压），压平 + 用目录名
             if len(top_dirs) == 1 and len(top_files) == 0:
                 sole_dir = os.path.join(docs_dir, top_dirs[0])
                 for child in os.listdir(sole_dir):
                     shutil.move(os.path.join(sole_dir, child), os.path.join(docs_dir, child))
                 shutil.rmtree(sole_dir)
-                meta["name"] = top_dirs[0]
-                _write_course_meta(course_path, meta)
-                log(f"📚 压平顶层目录: {top_dirs[0]}/ → docs/，课程名更新为: {top_dirs[0]}")
-            # 情况2：只有一个文件（直接上传单文件），用文件名（去后缀）
-            elif len(top_dirs) == 0 and len(top_files) == 1:
-                fname = top_files[0]
-                new_name = os.path.splitext(fname)[0]
-                if new_name:
-                    meta["name"] = new_name
-                    _write_course_meta(course_path, meta)
-                    log(f"📝 课程名更新为: {new_name}")
+                log(f"📚 压平顶层目录: {top_dirs[0]}/ → docs/")
 
         # 2.5 无首页时自动生成 index.md（否则 vitepress 不产 index.html）
         _ensure_index(docs_dir, meta.get("name") or "课程", meta.get("description", ""))
