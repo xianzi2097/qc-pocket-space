@@ -359,12 +359,12 @@ def get_course_tree(request: Request, course_id: str):
 
 
 @router.post("/api/courses/{course_id}/tree/reorder")
-async def reorder_tree_entry(request: Request, course_id: str, name: str, dir: str = "", direction: str = "up"):
-    """调整同级条目顺序（query 参数版）"""
+async def reorder_tree_entry(request: Request, course_id: str, name: str, dir: str = "", direction: str = "up", target: str = ""):
+    """调整同级条目顺序：direction=up/down 逐格移动，direction=swap + target 直接拖拽定位"""
     caller = require_role(request, ["admin", "teacher"])
     course_path = _get_course_path(caller, course_id)
-    if direction not in ("up", "down"):
-        raise HTTPException(status_code=400, detail="direction 必须是 up 或 down")
+    if direction not in ("up", "down", "swap"):
+        raise HTTPException(status_code=400, detail="direction 必须是 up、down 或 swap")
     # 找到父目录在课程内的相对路径
     dir_path = _safe_path(course_path, *_split_rel(dir)) if dir else course_path
     if not os.path.isdir(dir_path):
@@ -381,22 +381,29 @@ async def reorder_tree_entry(request: Request, course_id: str, name: str, dir: s
     ordered.extend(n for n in siblings if n not in ordered)
     if name not in ordered:
         raise HTTPException(status_code=404, detail=f"未找到 {name}")
-    idx = ordered.index(name)
-    new_idx = idx - 1 if direction == "up" else idx + 1
-    if new_idx < 0 or new_idx >= len(ordered):
-        return {"status": "success", "message": "已在边界，无需调整"}
-    ordered[idx], ordered[new_idx] = ordered[new_idx], ordered[idx]
+    if direction == "swap" and target:
+        # 拖拽排序：把 name 移到 target 的位置
+        if target not in ordered:
+            raise HTTPException(status_code=404, detail=f"未找到 {target}")
+        old_idx = ordered.index(name)
+        new_idx = ordered.index(target)
+        if old_idx == new_idx:
+            return {"status": "success", "message": "位置未变"}
+        # arrayMove 语义：移除 old_idx 插入到 new_idx
+        item = ordered.pop(old_idx)
+        ordered.insert(new_idx, item)
+    else:
+        idx = ordered.index(name)
+        new_idx = idx - 1 if direction == "up" else idx + 1
+        if new_idx < 0 or new_idx >= len(ordered):
+            return {"status": "success", "message": "已在边界，无需调整"}
+        ordered[idx], ordered[new_idx] = ordered[new_idx], ordered[idx]
     # 写回 _order.json
     order_map[rel_key] = ordered
     order_path = os.path.join(course_path, "_order.json")
     with open(order_path, "w", encoding="utf-8") as f:
         json.dump(order_map, f, ensure_ascii=False, indent=2)
-    # 验证写入成功
-    with open(order_path, "r", encoding="utf-8") as f:
-        verify = json.load(f)
-    import logging
-    logging.info(f"[reorder] dir='{rel_key}' wrote {len(ordered)} items, verified={rel_key in verify}")
-    return {"status": "success", "message": f"{name} 已{('上移' if direction == 'up' else '下移')}", "order": ordered}
+    return {"status": "success", "message": f"{name} 已调整顺序", "order": ordered}
 
 
 @router.post("/api/courses/{course_id}/tree/folder")
