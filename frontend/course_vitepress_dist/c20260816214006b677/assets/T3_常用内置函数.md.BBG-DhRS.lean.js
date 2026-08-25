@@ -1,0 +1,1 @@
+import{_ as i,c as a,o as n,a1 as t}from"./chunks/framework.CPez64_w.js";const g=JSON.parse('{"title":"","description":"","frontmatter":{},"headers":[],"relativePath":"T3/常用内置函数.md","filePath":"T3/常用内置函数.md"}'),h={name:"T3/常用内置函数.md"};function l(p,s,e,k,r,d){return n(),a("div",null,[...s[0]||(s[0]=[t("",145)])])}const o=i(h,[["render",l]]);export{g as __pageData,o as default};

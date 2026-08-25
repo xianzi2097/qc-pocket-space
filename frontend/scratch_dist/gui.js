@@ -127517,6 +127517,7 @@ class MenuBar extends react__WEBPACK_IMPORTED_MODULE_5__.Component {
             if (courseData.status === "success" && courseData.courses) {
               courseData.courses.forEach(c => {
                 allOptions.push({
+                  id: c.id,
                   name: c.name,
                   material_count: c.material_count,
                   teacher: teachers[i].username
@@ -127528,7 +127529,7 @@ class MenuBar extends react__WEBPACK_IMPORTED_MODULE_5__.Component {
             sel.innerHTML = '<option value="">暂无课程，请先创建</option>';
             return;
           }
-          sel.innerHTML = allOptions.map(c => "<option value=\"".concat(c.name, "\" data-teacher=\"").concat(c.teacher, "\">").concat(c.name, "\uFF08").concat(c.teacher, "\uFF09</option>")).join("");
+          sel.innerHTML = allOptions.map(c => "<option value=\"".concat(c.id, "\" data-teacher=\"").concat(c.teacher, "\">").concat(c.name, "\uFF08").concat(c.teacher, "\uFF09</option>")).join("");
         });
       }).catch(() => {
         sel.innerHTML = '<option value="">加载失败</option>';

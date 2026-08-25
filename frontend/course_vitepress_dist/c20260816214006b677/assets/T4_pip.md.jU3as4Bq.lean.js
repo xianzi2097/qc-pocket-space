@@ -1,0 +1,1 @@
+import{_ as a,c as i,o as e,a1 as n}from"./chunks/framework.CPez64_w.js";const b=JSON.parse('{"title":"pip 包管理","description":"","frontmatter":{},"headers":[],"relativePath":"T4/pip.md","filePath":"T4/pip.md"}'),p={name:"T4/pip.md"};function t(l,s,d,r,h,c){return e(),i("div",null,[...s[0]||(s[0]=[n("",58)])])}const u=a(p,[["render",t]]);export{b as __pageData,u as default};

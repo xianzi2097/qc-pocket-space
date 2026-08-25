@@ -1,0 +1,1 @@
+import{_ as i,c as a,o as n,a1 as e}from"./chunks/framework.CPez64_w.js";const c=JSON.parse('{"title":"🛠 函数","description":"","frontmatter":{},"headers":[],"relativePath":"L1/函数.md","filePath":"L1/函数.md"}'),l={name:"L1/函数.md"};function p(t,s,h,k,r,d){return n(),a("div",null,[...s[0]||(s[0]=[e("",92)])])}const g=i(l,[["render",p]]);export{c as __pageData,g as default};

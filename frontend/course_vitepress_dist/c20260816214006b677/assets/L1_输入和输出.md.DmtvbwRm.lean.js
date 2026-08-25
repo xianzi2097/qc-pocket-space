@@ -1,0 +1,1 @@
+import{_ as i,c as a,o as t,a1 as n}from"./chunks/framework.CPez64_w.js";const c=JSON.parse('{"title":"💬 输入与输出","description":"","frontmatter":{},"headers":[],"relativePath":"L1/输入和输出.md","filePath":"L1/输入和输出.md"}'),e={name:"L1/输入和输出.md"};function h(l,s,p,d,k,r){return t(),a("div",null,[...s[0]||(s[0]=[n("",80)])])}const u=i(e,[["render",h]]);export{c as __pageData,u as default};

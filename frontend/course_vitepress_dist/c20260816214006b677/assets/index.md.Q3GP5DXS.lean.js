@@ -1,0 +1,1 @@
+import{_ as l,c as i,o as a,a1 as t}from"./chunks/framework.CPez64_w.js";const p=JSON.parse('{"title":"Python 基础语法","description":"","frontmatter":{},"headers":[],"relativePath":"index.md","filePath":"index.md"}'),n={name:"index.md"};function r(o,e,s,d,_,c){return a(),i("div",null,[...e[0]||(e[0]=[t("",2)])])}const T=l(n,[["render",r]]);export{p as __pageData,T as default};
