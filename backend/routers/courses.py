@@ -9,7 +9,7 @@ from utils import (
     _safe_path, _get_teacher_course_dir, _get_teacher_key,
     _move_to_trash, _gen_unique_course_id, _resolve_course_format,
     _read_course_meta, _write_course_meta, _natural_sort_key, _read_order_file,
-    CourseCreateForm, CourseUpdateForm, RenameForm
+    CourseCreateForm, CourseUpdateForm, RenameForm, FeaturedToggleForm
 )
 
 router = APIRouter()
@@ -48,6 +48,7 @@ def list_courses(teacher: str = ""):
             "tags": meta.get("tags", []),
             "material_count": len(materials),
             "publish": meta.get("publish", {"status": "idle"}),
+            "featured": bool(meta.get("featured", False)),  # 精选课程（显示在「精选课程」栏目）
             "teacher_key": _get_teacher_key(teacher),  # 课程归属老师（仅展示用，URL 不再含老师层）
         })
     return {"status": "success", "courses": courses}
@@ -218,6 +219,20 @@ def update_course(request: Request, course_id: str, form: CourseUpdateForm):
     meta["format"] = _resolve_course_format(form.course_type, form.format)
     _write_course_meta(course_path, meta)
     return {"status": "success", "message": "课程信息已更新"}
+
+
+@router.put("/api/courses/{course_id}/featured")
+def set_course_featured(request: Request, course_id: str, form: FeaturedToggleForm):
+    """设置/取消精选：精选课程显示在主页「精选课程」栏目，从「在线课程」列表隐藏"""
+    caller = require_role(request, ["admin", "teacher"])
+    base = _get_teacher_course_dir(caller["username"])
+    course_path = _safe_path(base, course_id)
+    if not os.path.exists(course_path):
+        raise HTTPException(status_code=404, detail="课程不存在")
+    meta = _read_course_meta(course_path)
+    meta["featured"] = form.featured
+    _write_course_meta(course_path, meta)
+    return {"status": "success", "message": "已设为精选" if form.featured else "已取消精选"}
 
 
 @router.post("/api/courses/{course_name}/rename")

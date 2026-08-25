@@ -602,3 +602,7 @@ class CourseUpdateForm(BaseModel):
     tags: list[str] = []
     course_type: str = "scratch"
     format: str = ""
+
+class FeaturedToggleForm(BaseModel):
+    featured: bool  # true=精选（显示在「精选课程」栏目），false=普通（显示在「在线课程」）
+

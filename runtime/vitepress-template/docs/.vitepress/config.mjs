@@ -19,6 +19,16 @@ export default withMermaid({
   title: process.env.VP_TITLE || 'CodeNova',
   description: '课程文档',
 
+  // 关键修复：Windows 下 fs.realpathSync 会把盘符 C: 变成小写 c:，
+  // 导致 resolvePageImports 的 srcPath(c:/...) 与 chunk facadeModuleId(C:/...) 严格比较失败，
+  // 报 "Cannot read properties of undefined (reading 'imports')"。
+  // 开启 preserveSymlinks 让 vitepress 跳过 realpathSync，路径大小写保持一致。
+  vite: {
+    resolve: {
+      preserveSymlinks: true,
+    },
+  },
+
   mermaid: {},
   mermaidPlugin: {
     class: 'mermaid my-class',
