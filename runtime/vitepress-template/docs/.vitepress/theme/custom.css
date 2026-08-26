@@ -636,10 +636,9 @@ html.dark .VPHomeFeatures .VPFeature .icon {
     padding-left: 32px;
   }
 
-  /* 2) 内容区：从侧边栏右缘一直铺到屏幕右缘 */
+  /* 2) 内容区：左侧预留 sidebar 宽度，右侧自然留白给 aside */
   .Layout .VPContent.has-sidebar {
     padding-left: var(--vp-sidebar-width);
-    padding-right: 0;
   }
 
   /* 3) 导航栏：标题回到侧边栏正上方、菜单贴右缘（同 960–1440 行为） */
