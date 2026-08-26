@@ -1,0 +1,1 @@
+import{_ as i,c as a,o as n,a1 as t}from"./chunks/framework.BvL7sh5k.js";const c=JSON.parse('{"title":"🐢 海龟画图","description":"","frontmatter":{},"headers":[],"relativePath":"1. 海龟画图.md","filePath":"1. 海龟画图.md"}'),l={name:"1. 海龟画图.md"};function e(p,s,h,r,d,k){return n(),a("div",null,[...s[0]||(s[0]=[t("",107)])])}const E=i(l,[["render",e]]);export{c as __pageData,E as default};
