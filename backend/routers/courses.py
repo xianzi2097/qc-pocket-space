@@ -82,6 +82,38 @@ def create_course(request: Request, form: CourseCreateForm):
     return {"status": "success", "message": f"课程 [{form.name}] 已创建", "course": course}
 
 
+def _walk_material_tree(dirpath: str, rel_prefix: str = "") -> list:
+    """递归扫描课件目录 → 树结构（文件夹在前、自然排序、跳过隐藏项）。
+    folder 型课程的子文件夹也要能从主页一层层点开。"""
+    items = []
+    try:
+        names = os.listdir(dirpath)
+    except OSError:
+        return items
+    dirs = sorted(
+        (n for n in names if os.path.isdir(os.path.join(dirpath, n)) and not n.startswith(".")),
+        key=_natural_sort_key,
+    )
+    files = sorted(
+        (n for n in names if os.path.isfile(os.path.join(dirpath, n)) and not n.startswith(".")),
+        key=_natural_sort_key,
+    )
+    for n in dirs:
+        rel = f"{rel_prefix}/{n}" if rel_prefix else n
+        items.append({
+            "name": n, "type": "dir",
+            "children": _walk_material_tree(os.path.join(dirpath, n), rel),
+        })
+    for n in files:
+        rel = f"{rel_prefix}/{n}" if rel_prefix else n
+        try:
+            size = os.path.getsize(os.path.join(dirpath, n))
+        except OSError:
+            size = 0
+        items.append({"name": n, "type": "file", "size": size, "path": rel})
+    return items
+
+
 @router.get("/api/courses/{course_name}/materials")
 def list_materials(course_name: str, teacher: str = ""):
     base = _get_teacher_course_dir(teacher)
@@ -95,12 +127,15 @@ def list_materials(course_name: str, teacher: str = ""):
             course_type = json.load(open(meta_path, "r", encoding="utf-8")).get("type", "scratch")
         except (json.JSONDecodeError, OSError):
             pass
+    # /share URL 必须用 key 化的老师标识（磁盘目录名），不能带 "(t)" 显示名后缀，
+    # 否则 Caddy 映射 data/courses 时找不到目录，学生点了就是 404。
+    teacher_key = _get_teacher_key(teacher)
     items = []
     for name in sorted(os.listdir(course_path)):
         fp = os.path.join(course_path, name)
         if not os.path.isdir(fp) or name.startswith("."):
             continue
-        url = f"/share/{teacher}_course/{course_name}/{name}/"
+        url = f"/share/{teacher_key}_course/{course_name}/{name}/"
         if course_type == "scratch":
             sb3_files = [f for f in os.listdir(fp) if f.endswith(".sb3")]
             items.append({
@@ -114,7 +149,11 @@ def list_materials(course_name: str, teacher: str = ""):
                 fpath = os.path.join(fp, fname)
                 if os.path.isfile(fpath) and not fname.startswith("."):
                     files.append({"name": fname, "size": os.path.getsize(fpath)})
-            items.append({"name": name, "files": files, "file_count": len(files), "url": url})
+            items.append({
+                "name": name, "files": files, "file_count": len(files),
+                "tree": _walk_material_tree(fp),  # 递归树：嵌套子文件夹也能从主页打开
+                "url": url,
+            })
     return {"status": "success", "materials": items}
 
 

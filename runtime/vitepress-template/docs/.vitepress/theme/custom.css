@@ -618,3 +618,39 @@ html.dark .VPHomeFeatures .VPFeature .icon {
   background-color: #1a3c2a;
   color: var(--spring-green-dark);
 }
+
+/* ============================================================
+   Phase 1：≥1440px 取消「居中最大布局」补偿
+   原理：VitePress 用 M=(100vw−1440)/2 给 VPSidebar / VPContent /
+   VPNavBar 做画布补偿，导致 Sidebar 右移 + 右侧灰带。
+   下列覆盖值全部等于原生样式在恰好 1440px 时的值，
+   因此断点处零跳动，仅超过 1440 后不再补偿。
+   <1440px（移动端/平板）完全不受影响。不需要 !important
+   （同名选择器，custom.css 后加载自然获胜）。
+   ============================================================ */
+@media (min-width: 1440px) {
+  /* 1) Sidebar 钉死左侧：恢复 960–1440 的定位方式（宽 272、内边距 32，外观零变化） */
+  .VPSidebar {
+    width: var(--vp-sidebar-width);
+    padding-left: 32px;
+  }
+
+  /* 2) 内容区：从侧边栏右缘一直铺到屏幕右缘 */
+  .VPContent.has-sidebar {
+    padding-left: var(--vp-sidebar-width);
+    padding-right: 0;
+  }
+
+  /* 3) 导航栏：标题回到侧边栏正上方、菜单贴右缘（同 960–1440 行为） */
+  .VPNavBar.has-sidebar .title {
+    padding-left: 32px;
+    width: var(--vp-sidebar-width);
+  }
+  .VPNavBar.has-sidebar .content {
+    padding-left: var(--vp-sidebar-width);
+    padding-right: 32px;
+  }
+  .VPNavBar.has-sidebar .divider {
+    padding-left: var(--vp-sidebar-width);
+  }
+}
