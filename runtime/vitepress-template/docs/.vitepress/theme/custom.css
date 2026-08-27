@@ -643,7 +643,7 @@ html.dark .VPHomeFeatures .VPFeature .icon {
 
   /* 2.5) 正文内容区加宽（覆盖默认 688px） */
   .Layout .VPDoc.has-aside .content-container {
-    max-width: 820px !important;
+    max-width: 860px !important;
   }
 
   /* 3) 导航栏：标题回到侧边栏正上方、菜单贴右缘（同 960–1440 行为） */
