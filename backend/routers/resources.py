@@ -205,6 +205,7 @@ def update_resource(request: Request, resource_id: str, name: str = "", category
 def delete_resource(request: Request, resource_id: str):
     caller = require_role(request, ["admin", "teacher"])
     resource_path = _get_resource_path(caller, resource_id)
-    shutil.rmtree(resource_path)
-    return {"status": "success", "message": "资源已删除"}
+    rel_path = os.path.join("resources", f"{caller['username']}_resource", resource_id)
+    _move_to_trash(resource_path, "resource", caller["username"], rel_path)
+    return {"status": "success", "message": "资源已移到回收站"}
 
