@@ -1,9 +1,12 @@
 """资源路由 — 复用课程的文件管理逻辑，加 category 字段"""
 import os
+import io
 import json
 import shutil
+import zipfile
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi.responses import StreamingResponse
 from utils import (
     get_db, get_current_user, require_role,
     _safe_path, _get_teacher_key,
@@ -147,6 +150,41 @@ def get_resource_tree(resource_id: str, path: str = ""):
             meta = _read_resource_meta(resource_path)
             items = _walk_resource_tree(target) if os.path.isdir(target) else []
             return {"status": "success", "tree": items, "meta": meta}
+    raise HTTPException(status_code=404, detail="资源不存在")
+
+
+@router.get("/api/resources/{resource_id}/download")
+def download_resource_zip(resource_id: str, path: str = ""):
+    """打包下载资源（目录/子目录均可），排除 resource.json、_order.json 等元数据"""
+    if not os.path.exists(RESOURCE_BASE):
+        raise HTTPException(status_code=404, detail="资源不存在")
+    for teacher_dir in os.listdir(RESOURCE_BASE):
+        if not teacher_dir.endswith("_resource"):
+            continue
+        resource_path = os.path.join(RESOURCE_BASE, teacher_dir, resource_id)
+        if os.path.isdir(resource_path):
+            target = _safe_path(resource_path, *_split_rel(path)) if path else resource_path
+            if not os.path.exists(target):
+                raise HTTPException(status_code=404, detail="路径不存在")
+            # zip 内相对路径的根名（文件夹名或文件名）
+            base_name = os.path.basename(target.rstrip("/\\"))
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                if os.path.isdir(target):
+                    for root, dirs, files in os.walk(target):
+                        # 排除隐藏文件和元数据
+                        dirs[:] = [d for d in dirs if not d.startswith(".")]
+                        for fn in files:
+                            if fn.startswith(".") or fn in ("resource.json", "_order.json"):
+                                continue
+                            full = os.path.join(root, fn)
+                            rel = os.path.relpath(full, target)
+                            zf.write(full, os.path.join(base_name, rel))
+                else:
+                    zf.write(target, base_name)
+            buf.seek(0)
+            headers = {"Content-Disposition": f'attachment; filename="{base_name}.zip"'}
+            return StreamingResponse(buf, media_type="application/zip", headers=headers)
     raise HTTPException(status_code=404, detail="资源不存在")
 
 
