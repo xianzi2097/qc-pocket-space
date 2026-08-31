@@ -28,14 +28,7 @@ def main():
         site_domain = "localhost"
     fastapi_port = sys.argv[3] if len(sys.argv) > 3 else "8000"
     caddy_port = sys.argv[4] if len(sys.argv) > 4 else ""
-
-    # Judge0 判题机上游地址
-    #   local 模式：i3 局域网本机（Docker 2358）
-    #   server 模式：frpc 隧道 → i3 的 Judge0
-    if mode == "server":
-        judge0_upstream = "38.76.216.46:10654"
-    else:
-        judge0_upstream = "192.168.2.158:2358"
+    judge0_upstream = sys.argv[5].strip() if len(sys.argv) > 5 and sys.argv[5].strip() else ""
 
     # Caddy 地址：本地模式用 `:端口`（纯HTTP），域名模式用 `域名:端口`
     if mode == "local":
@@ -55,6 +48,15 @@ def main():
     else:
         site_domain_list = site_domain
 
+    # 按需生成 Judge0 代理块
+    judge0_block = ""
+    if judge0_upstream:
+        judge0_block = f"""
+    # 0.2 判题机 Judge0：/judge0/* 反向代理到远程 Judge0 实例（handle_path 自动去掉前缀）
+    handle_path /judge0/* {{
+        reverse_proxy {judge0_upstream}
+    }}"""
+
     # 构建 Caddyfile 内容（f-string 直接生成，无需模板文件）
     caddyfile = f"""# ================= 你的网站配置 =================
 {site_domain_list} {{
@@ -69,12 +71,7 @@ def main():
     handle /api/* {{
         reverse_proxy localhost:{fastapi_port}
     }}
-
-    # 0.2 判题机 Judge0：/judge0/* 反向代理到远程 Judge0 实例（handle_path 自动去掉前缀）
-    handle_path /judge0/* {{
-        reverse_proxy {judge0_upstream}
-    }}
-
+{judge0_block}
     # 0.1 宣传落地页
     handle /landing* {{
         root * "{site_path}/landing"
