@@ -126,15 +126,23 @@ def create_resource(request: Request, form: ResourceCreateForm):
 
 
 @router.get("/api/resources/{resource_id}/tree")
-def get_resource_tree(request: Request, resource_id: str, path: str = ""):
-    caller = require_role(request, ["admin", "teacher"])
-    resource_path = _get_resource_path(caller, resource_id)
-    target = _safe_path(resource_path, *_split_rel(path)) if path else resource_path
-    if not os.path.exists(target):
-        raise HTTPException(status_code=404, detail="路径不存在")
-    meta = _read_resource_meta(resource_path)
-    items = _walk_resource_tree(target) if os.path.isdir(target) else []
-    return {"status": "success", "tree": items, "meta": meta}
+def get_resource_tree(resource_id: str, path: str = ""):
+    """公开端点：无需登录即可浏览资源文件树（只读）"""
+    # 从所有老师的资源目录里查找
+    if not os.path.exists(RESOURCE_BASE):
+        raise HTTPException(status_code=404, detail="资源不存在")
+    for teacher_dir in os.listdir(RESOURCE_BASE):
+        if not teacher_dir.endswith("_resource"):
+            continue
+        resource_path = os.path.join(RESOURCE_BASE, teacher_dir, resource_id)
+        if os.path.isdir(resource_path):
+            target = _safe_path(resource_path, *_split_rel(path)) if path else resource_path
+            if not os.path.exists(target):
+                raise HTTPException(status_code=404, detail="路径不存在")
+            meta = _read_resource_meta(resource_path)
+            items = _walk_resource_tree(target) if os.path.isdir(target) else []
+            return {"status": "success", "tree": items, "meta": meta}
+    raise HTTPException(status_code=404, detail="资源不存在")
 
 
 @router.post("/api/resources/{resource_id}/tree/upload")
