@@ -103,6 +103,45 @@ async def upload_resource(
     }
 
 
+@router.post("/api/resources/upload/tree")
+async def upload_resource_tree(
+    request: Request,
+    path: str = Form(""),
+    category: str = Form("reference"),
+    file: UploadFile = File(...),
+):
+    """文件夹上传：支持子目录路径"""
+    caller = require_role(request, ["admin", "teacher"])
+    res_dir = _get_teacher_resource_dir(caller["username"])
+    os.makedirs(res_dir, exist_ok=True)
+
+    # 按 path 构建目标目录
+    if path:
+        target_dir = os.path.join(res_dir, *path.strip("/").split("/"))
+    else:
+        target_dir = res_dir
+    os.makedirs(target_dir, exist_ok=True)
+
+    safe_name = (file.filename or "unnamed").replace("\\", "/").split("/")[-1].lstrip(".")
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="文件名无效")
+
+    content = await file.read()
+    if len(content) > 200 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="文件过大，最大 200MB")
+
+    with open(os.path.join(target_dir, safe_name), "wb") as f:
+        f.write(content)
+
+    # 更新分类索引（用相对路径作为 key）
+    rel_key = f"{path}/{safe_name}" if path else safe_name
+    idx = _read_index(res_dir)
+    idx[rel_key] = category if category in ("reference", "download") else "reference"
+    _write_index(res_dir, idx)
+
+    return {"status": "success", "message": f"[{rel_key}] 已上传"}
+
+
 @router.delete("/api/resources/{teacher}/{filename}")
 def delete_resource(teacher: str, filename: str, request: Request):
     """删除资源文件"""
