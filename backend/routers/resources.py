@@ -183,7 +183,10 @@ def download_resource_zip(resource_id: str, path: str = ""):
                 else:
                     zf.write(target, base_name)
             buf.seek(0)
-            headers = {"Content-Disposition": f'attachment; filename="{base_name}.zip"'}
+            # 中文文件名需用 RFC 5987 的 filename*=UTF-8 编码，否则 header 报 UnicodeEncodeError
+            import urllib.parse
+            encoded_name = urllib.parse.quote(base_name)
+            headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}.zip"}
             return StreamingResponse(buf, media_type="application/zip", headers=headers)
     raise HTTPException(status_code=404, detail="资源不存在")
 
