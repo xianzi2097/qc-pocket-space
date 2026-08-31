@@ -134,8 +134,6 @@ async def upload_resource_tree(request: Request, resource_id: str, path: str = "
     if not safe_name:
         raise HTTPException(status_code=400, detail="文件名无效")
     content = await file.read()
-    if len(content) > 200 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="文件过大，最大 200MB")
     with open(os.path.join(target_dir, safe_name), "wb") as f:
         f.write(content)
     return {"status": "success", "message": f"文件 [{safe_name}] 已上传", "name": safe_name}
