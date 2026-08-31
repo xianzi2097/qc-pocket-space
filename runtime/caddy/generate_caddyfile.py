@@ -48,11 +48,10 @@ def main():
     else:
         site_domain_list = site_domain
 
-    # 按需生成 Judge0 代理块
+    # Judge0: reverse proxy to remote instance (handle_path strips prefix)
     judge0_block = ""
     if judge0_upstream:
         judge0_block = f"""
-    # 0.2 判题机 Judge0：/judge0/* 反向代理到远程 Judge0 实例（handle_path 自动去掉前缀）
     handle_path /judge0/* {{
         reverse_proxy {judge0_upstream}
     }}"""
