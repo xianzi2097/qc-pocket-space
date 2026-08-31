@@ -29,6 +29,14 @@ def main():
     fastapi_port = sys.argv[3] if len(sys.argv) > 3 else "8000"
     caddy_port = sys.argv[4] if len(sys.argv) > 4 else ""
 
+    # Judge0 判题机上游地址
+    #   local 模式：i3 局域网本机（Docker 2358）
+    #   server 模式：frpc 隧道 → i3 的 Judge0
+    if mode == "server":
+        judge0_upstream = "38.76.216.46:10654"
+    else:
+        judge0_upstream = "192.168.2.158:2358"
+
     # Caddy 地址：本地模式用 `:端口`（纯HTTP），域名模式用 `域名:端口`
     if mode == "local":
         port = caddy_port if caddy_port else "80"
@@ -60,6 +68,11 @@ def main():
     # 0.后端大脑：把所有 /api/ 开头的流量，拦截下来交给 FastAPI
     handle /api/* {{
         reverse_proxy localhost:{fastapi_port}
+    }}
+
+    # 0.2 判题机 Judge0：/judge0/* 反向代理到远程 Judge0 实例
+    handle /judge0/* {{
+        reverse_proxy {judge0_upstream}
     }}
 
     # 0.1 宣传落地页
