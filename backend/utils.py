@@ -56,9 +56,11 @@ def _atomic_write_file(fp: str, content: str):
 # ==========================================
 TRASH_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "trash"))
 COURSE_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "courses"))
+RESOURCE_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "resources"))
 COURSE_SITES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "course_vitepress_dist"))
 os.makedirs(TRASH_DIR, exist_ok=True)
 os.makedirs(COURSE_BASE, exist_ok=True)
+os.makedirs(RESOURCE_BASE, exist_ok=True)
 
 # ==========================================
 # Token 认证
