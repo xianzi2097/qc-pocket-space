@@ -135,7 +135,7 @@ def list_materials(course_name: str, teacher: str = ""):
         fp = os.path.join(course_path, name)
         if not os.path.isdir(fp) or name.startswith("."):
             continue
-        url = f"/share/{teacher_key}_course/{course_name}/{name}/"
+        url = f"/courses/{teacher_key}_course/{course_name}/{name}/"
         if course_type == "scratch":
             sb3_files = [f for f in os.listdir(fp) if f.endswith(".sb3")]
             items.append({
@@ -213,7 +213,7 @@ async def upload_file(
         f.write(content)
     return {
         "status": "success", "message": f"文件 [{safe_name}] 已上传",
-        "path": f"/share/{caller['username']}_course/{course_name}/{lesson_name}/"
+            "path": f"/courses/{caller['username']}_course/{course_name}/{lesson_name}/"
     }
 
 
@@ -365,7 +365,7 @@ async def save_sb3(
         f.write(content)
     return {
         "status": "success", "message": f"{filename} 已保存",
-        "path": f"/share/{caller['username']}_course/{course_name}/{lesson_name}/"
+        "path": f"/courses/{caller['username']}_course/{course_name}/{lesson_name}/"
     }
 
 

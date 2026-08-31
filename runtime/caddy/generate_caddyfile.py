@@ -111,9 +111,15 @@ def main():
         file_server
     }}
 
-    # 3. 核心素材共享（data/courses/）—— 只读：学生浏览/下载课件；写走网页后台上传（/api）
-    handle_path /share/* {{
+    # 3. 课件文件（data/courses/）—— 只读：学生浏览/下载课件；写走网页后台上传（/api）
+    handle_path /courses/* {{
         root * "{data_path}/courses"
+        file_server browse
+    }}
+
+    # 3.1 资源文件（data/resources/）—— 软件安装包、参考资料等
+    handle_path /resources/* {{
+        root * "{data_path}/resources"
         file_server browse
     }}
 
