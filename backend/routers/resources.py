@@ -39,7 +39,7 @@ def _get_resource_path(caller: dict, resource_id: str) -> str:
 
 # ── 文件树（复用课程逻辑）─────────────────────────────────
 
-def _walk_resource_tree(dirpath: str) -> list:
+def _walk_resource_tree(dirpath: str, rel_prefix: str = "") -> list:
     items = []
     try:
         names = os.listdir(dirpath)
@@ -55,10 +55,12 @@ def _walk_resource_tree(dirpath: str) -> list:
     )
     for d in dirs:
         sub = os.path.join(dirpath, d)
-        items.append({"name": d, "type": "folder", "size": os.stat(sub).st_size, "children": _walk_resource_tree(sub)})
+        rel = f"{rel_prefix}/{d}" if rel_prefix else d
+        items.append({"name": d, "type": "folder", "size": os.stat(sub).st_size, "path": rel, "children": _walk_resource_tree(sub, rel)})
     for f in files:
         fp = os.path.join(dirpath, f)
-        items.append({"name": f, "type": "file", "size": os.stat(fp).st_size})
+        rel = f"{rel_prefix}/{f}" if rel_prefix else f
+        items.append({"name": f, "type": "file", "size": os.stat(fp).st_size, "path": rel})
     return items
 
 
@@ -90,12 +92,15 @@ def list_resources(teacher: str = "", category: str = ""):
             cat = meta.get("category", "reference")
             if category and cat != category:
                 continue
+            # 顶层课件/文件数量（不含 resource.json）
+            material_count = len([n for n in os.listdir(rpath) if not n.startswith(".") and n not in ("resource.json", "_order.json")])
             items.append({
                 "id": rid, "name": meta.get("name") or rid,
                 "category": cat,
                 "description": meta.get("description", ""),
                 "teacher": teacher_name,
                 "url": f"/resources/{teacher_name}_resource/{rid}/",
+                "material_count": material_count,
                 "created_at": meta.get("created_at", ""),
             })
     return {"status": "success", "resources": items}
