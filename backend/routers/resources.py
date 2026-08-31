@@ -8,11 +8,19 @@ from utils import (
     get_db, get_current_user, require_role,
     _safe_path, _get_teacher_key,
     _move_to_trash, _gen_unique_course_id,
-    _read_course_meta, _write_course_meta, _natural_sort_key, _split_rel,
+    _read_course_meta, _write_course_meta, _natural_sort_key,
     RESOURCE_BASE
 )
 
 router = APIRouter()
+
+
+def _split_rel(rel: str) -> list:
+    """把相对路径拆成安全的路径段，过滤 . / .. """
+    rel = (rel or "").strip().strip("/\\")
+    if not rel:
+        return []
+    return [p for p in rel.replace("\\", "/").split("/") if p not in (".", "..")]
 
 
 # ── 路径工具 ──────────────────────────────────────────────
