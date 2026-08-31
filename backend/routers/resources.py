@@ -56,7 +56,7 @@ def _walk_resource_tree(dirpath: str, rel_prefix: str = "") -> list:
     for d in dirs:
         sub = os.path.join(dirpath, d)
         rel = f"{rel_prefix}/{d}" if rel_prefix else d
-        items.append({"name": d, "type": "folder", "size": os.stat(sub).st_size, "path": rel, "children": _walk_resource_tree(sub, rel)})
+        items.append({"name": d, "type": "dir", "size": os.stat(sub).st_size, "path": rel, "children": _walk_resource_tree(sub, rel)})
     for f in files:
         fp = os.path.join(dirpath, f)
         rel = f"{rel_prefix}/{f}" if rel_prefix else f
