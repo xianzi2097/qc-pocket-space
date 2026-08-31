@@ -117,12 +117,6 @@ def main():
         file_server browse
     }}
 
-    # 5. 电子教室路由
-    handle_path /classroom/* {{
-        root * "{site_path}/classroom"
-        file_server
-    }}
-
     # 6. Scratch 在线编辑器前端
     handle_path /Scratch/* {{
         root * "{site_path}/scratch_dist"
