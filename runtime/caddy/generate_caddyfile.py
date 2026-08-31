@@ -70,8 +70,8 @@ def main():
         reverse_proxy localhost:{fastapi_port}
     }}
 
-    # 0.2 判题机 Judge0：/judge0/* 反向代理到远程 Judge0 实例
-    handle /judge0/* {{
+    # 0.2 判题机 Judge0：/judge0/* 反向代理到远程 Judge0 实例（handle_path 自动去掉前缀）
+    handle_path /judge0/* {{
         reverse_proxy {judge0_upstream}
     }}
 
