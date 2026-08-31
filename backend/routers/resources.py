@@ -65,7 +65,7 @@ def _walk_resource_tree(dirpath: str) -> list:
 # ── CRUD ──────────────────────────────────────────────────
 
 @router.get("/api/resources")
-def list_resources(teacher: str = ""):
+def list_resources(teacher: str = "", category: str = ""):
     if teacher:
         teacher_dirs = [_get_teacher_resource_dir(teacher)]
     else:
@@ -87,9 +87,12 @@ def list_resources(teacher: str = ""):
             if not os.path.isdir(rpath):
                 continue
             meta = _read_course_meta(rpath)
+            cat = meta.get("category", "reference")
+            if category and cat != category:
+                continue
             items.append({
                 "id": rid, "name": meta.get("name") or rid,
-                "category": meta.get("category", "reference"),
+                "category": cat,
                 "description": meta.get("description", ""),
                 "teacher": teacher_name,
                 "url": f"/resources/{teacher_name}_resource/{rid}/",
