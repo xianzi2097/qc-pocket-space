@@ -625,6 +625,13 @@ class CourseCreateForm(BaseModel):
 class RenameForm(BaseModel):
     new_name: str
 
+class ResourceCreateForm(BaseModel):
+    teacher: str
+    name: str = ""
+    category: str = "reference"
+    description: str = ""
+
+
 class CourseUpdateForm(BaseModel):
     name: str
     description: str = ""

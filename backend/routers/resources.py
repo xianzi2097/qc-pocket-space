@@ -9,7 +9,7 @@ from utils import (
     _safe_path, _get_teacher_key,
     _move_to_trash, _gen_unique_course_id,
     _read_resource_meta, _write_resource_meta, _natural_sort_key,
-    RESOURCE_BASE
+    ResourceCreateForm, RESOURCE_BASE
 )
 
 router = APIRouter()
@@ -102,8 +102,10 @@ def list_resources(teacher: str = "", category: str = ""):
 
 
 @router.post("/api/resources")
-def create_resource(request: Request, name: str = "", category: str = "reference"):
+def create_resource(request: Request, form: ResourceCreateForm):
     caller = require_role(request, ["admin", "teacher"])
+    name = form.name.strip()
+    category = form.category
     res_dir = _get_teacher_resource_dir(caller["username"])
     os.makedirs(res_dir, exist_ok=True)
     for existing in os.listdir(res_dir):
@@ -114,9 +116,9 @@ def create_resource(request: Request, name: str = "", category: str = "reference
     resource_path = _safe_path(res_dir, resource_id)
     os.makedirs(resource_path)
     meta = {
-        "id": resource_id, "name": name.strip() or "未命名资源",
+        "id": resource_id, "name": name or "未命名资源",
         "category": category if category in ("reference", "download") else "reference",
-        "description": "", "teacher": caller["username"],
+        "description": form.description, "teacher": caller["username"],
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
     _write_resource_meta(resource_path, meta)
