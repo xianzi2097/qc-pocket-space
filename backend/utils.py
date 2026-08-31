@@ -132,6 +132,14 @@ def _safe_path(base: str, *parts: str) -> str:
         raise HTTPException(status_code=403, detail="路径不安全")
     return fp
 
+
+def _valid_new_name(new_name: str) -> str:
+    """校验并清洗重命名目标：非空、不含路径分隔符"""
+    new_name = (new_name or "").strip()
+    if not new_name or "/" in new_name or "\\" in new_name:
+        raise HTTPException(status_code=400, detail="名称无效（不能为空或含 / \\）")
+    return new_name
+
 def get_user_dir(user: UserModel) -> str:
     return os.path.join(USERS_DIR, user.role + "s", str(user.id))
 
