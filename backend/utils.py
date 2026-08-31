@@ -452,6 +452,25 @@ def _read_course_meta(course_path: str) -> dict:
 def _write_course_meta(course_path: str, meta: dict) -> None:
     _atomic_save(os.path.join(course_path, "course.json"), meta)
 
+
+# ── 资源 meta（resource.json，语义区分课程） ──
+
+def _read_resource_meta(resource_path: str) -> dict:
+    meta_path = os.path.join(resource_path, "resource.json")
+    meta = {}
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            meta = {}
+    return meta
+
+
+def _write_resource_meta(resource_path: str, meta: dict) -> None:
+    _atomic_save(os.path.join(resource_path, "resource.json"), meta)
+
+
 # ==========================================
 # 消息工具
 # ==========================================

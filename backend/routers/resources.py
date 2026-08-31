@@ -8,7 +8,7 @@ from utils import (
     get_db, get_current_user, require_role,
     _safe_path, _get_teacher_key,
     _move_to_trash, _gen_unique_course_id,
-    _read_course_meta, _write_course_meta, _natural_sort_key,
+    _read_resource_meta, _write_resource_meta, _natural_sort_key,
     RESOURCE_BASE
 )
 
@@ -50,7 +50,7 @@ def _walk_resource_tree(dirpath: str) -> list:
         key=_natural_sort_key,
     )
     files = sorted(
-        (n for n in names if os.path.isfile(os.path.join(dirpath, n)) and not n.startswith(".")),
+        (n for n in names if os.path.isfile(os.path.join(dirpath, n)) and not n.startswith(".") and n not in ("resource.json", "_order.json")),
         key=_natural_sort_key,
     )
     for d in dirs:
@@ -86,7 +86,7 @@ def list_resources(teacher: str = "", category: str = ""):
             rpath = os.path.join(tdir, rid)
             if not os.path.isdir(rpath):
                 continue
-            meta = _read_course_meta(rpath)
+            meta = _read_resource_meta(rpath)
             cat = meta.get("category", "reference")
             if category and cat != category:
                 continue
@@ -108,7 +108,7 @@ def create_resource(request: Request, name: str = "", category: str = "reference
     os.makedirs(res_dir, exist_ok=True)
     for existing in os.listdir(res_dir):
         ep = os.path.join(res_dir, existing)
-        if os.path.isdir(ep) and _read_course_meta(ep).get("name") == name:
+        if os.path.isdir(ep) and _read_resource_meta(ep).get("name") == name:
             raise HTTPException(status_code=400, detail="资源已存在")
     resource_id = _gen_unique_course_id()
     resource_path = _safe_path(res_dir, resource_id)
@@ -119,7 +119,7 @@ def create_resource(request: Request, name: str = "", category: str = "reference
         "description": "", "teacher": caller["username"],
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
-    _write_course_meta(resource_path, meta)
+    _write_resource_meta(resource_path, meta)
     return {"status": "success", "message": f"资源 [{name}] 已创建", "resource": {"id": resource_id, "name": meta["name"], "category": meta["category"]}}
 
 
@@ -130,7 +130,7 @@ def get_resource_tree(request: Request, resource_id: str, path: str = ""):
     target = _safe_path(resource_path, *_split_rel(path)) if path else resource_path
     if not os.path.exists(target):
         raise HTTPException(status_code=404, detail="路径不存在")
-    meta = _read_course_meta(resource_path)
+    meta = _read_resource_meta(resource_path)
     items = _walk_resource_tree(target) if os.path.isdir(target) else []
     return {"status": "success", "tree": items, "meta": meta}
 
@@ -195,12 +195,12 @@ def delete_resource_entry(request: Request, resource_id: str, path: str = ""):
 def update_resource(request: Request, resource_id: str, name: str = "", category: str = ""):
     caller = require_role(request, ["admin", "teacher"])
     resource_path = _get_resource_path(caller, resource_id)
-    meta = _read_course_meta(resource_path)
+    meta = _read_resource_meta(resource_path)
     if name:
         meta["name"] = name.strip()
     if category and category in ("reference", "download"):
         meta["category"] = category
-    _write_course_meta(resource_path, meta)
+    _write_resource_meta(resource_path, meta)
     return {"status": "success", "resource": meta}
 
 
