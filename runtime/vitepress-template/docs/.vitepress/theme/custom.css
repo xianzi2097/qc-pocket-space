@@ -620,19 +620,16 @@ html.dark .VPHomeFeatures .VPFeature .icon {
 }
 
 /* ============================================================
-   VitePress 侧边栏：跟随主页 w-60 (15rem) 的 rem 缩放
-   主页侧边栏随 html font-size 变化：95%→228px, 125%→300px, 150%→360px
-   用 !important 硬覆盖 VitePress 动态注入的 272px/240px
+   VitePress 侧边栏背景色：跟随主页主题色相，明度更高（更浅）
+   主页侧边栏 L=0.982，VitePress L=0.992 → 更浅的同色相底色
    ============================================================ */
-.Layout .VPSidebar {
-  width: 228px !important;   /* 15rem × 95% */
+:root {
+  --seed-hue: 95;
+  --vp-sidebar-bg-color: oklch(0.992 0.015 var(--seed-hue)) !important;
 }
-@media (min-width: 1920px) {
-  .Layout .VPSidebar { width: 300px !important; }  /* 15rem × 125% */
-}
-@media (min-width: 2560px) {
-  .Layout .VPSidebar { width: 360px !important; }  /* 15rem × 150% */
-}
+[data-theme="green"]  { --seed-hue: 155; }
+[data-theme="blue"]   { --seed-hue: 220; }
+[data-theme="custom"] { --seed-hue: var(--custom-hue); }
 
 /* ============================================================
    Phase 1：≥1440px 取消「居中最大布局」补偿
