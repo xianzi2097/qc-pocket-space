@@ -6,7 +6,7 @@ import shutil
 import zipfile
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from utils import (
     get_db, get_current_user, require_role,
     _safe_path, _get_teacher_key,
@@ -155,7 +155,7 @@ def get_resource_tree(resource_id: str, path: str = ""):
 
 @router.get("/api/resources/{resource_id}/download")
 def download_resource_zip(resource_id: str, path: str = ""):
-    """打包下载资源（目录/子目录均可），排除 resource.json、_order.json 等元数据"""
+    """下载资源：目标目录只有一个文件时直接返回该文件，否则实时打包 zip"""
     if not os.path.exists(RESOURCE_BASE):
         raise HTTPException(status_code=404, detail="资源不存在")
     for teacher_dir in os.listdir(RESOURCE_BASE):
@@ -166,24 +166,43 @@ def download_resource_zip(resource_id: str, path: str = ""):
             target = _safe_path(resource_path, *_split_rel(path)) if path else resource_path
             if not os.path.exists(target):
                 raise HTTPException(status_code=404, detail="路径不存在")
-            # zip 内相对路径的根名（文件夹名或文件名）
+
+            def _visible_files(d):
+                out = []
+                for root, dirs, files in os.walk(d):
+                    dirs[:] = [x for x in dirs if not x.startswith(".")]
+                    for fn in files:
+                        if fn.startswith(".") or fn in ("resource.json", "_order.json"):
+                            continue
+                        out.append(os.path.join(root, fn))
+                return out
+
+            # 单文件：目标本身是文件，或目录里恰好只有 1 个可见文件且无子文件夹
+            single = None
+            if os.path.isfile(target):
+                single = target
+            elif os.path.isdir(target):
+                names = [n for n in os.listdir(target) if not n.startswith(".") and n not in ("resource.json", "_order.json")]
+                subdirs = [n for n in names if os.path.isdir(os.path.join(target, n))]
+                if len(names) == 1 and not subdirs:
+                    single = os.path.join(target, names[0])
+            if single is not None:
+                import urllib.parse
+                fname = os.path.basename(single)
+                headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(fname)}"}
+                return FileResponse(single, headers=headers)
+
+            # 多文件：实时打包 zip（不落盘）
             base_name = os.path.basename(target.rstrip("/\\"))
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
                 if os.path.isdir(target):
-                    for root, dirs, files in os.walk(target):
-                        # 排除隐藏文件和元数据
-                        dirs[:] = [d for d in dirs if not d.startswith(".")]
-                        for fn in files:
-                            if fn.startswith(".") or fn in ("resource.json", "_order.json"):
-                                continue
-                            full = os.path.join(root, fn)
-                            rel = os.path.relpath(full, target)
-                            zf.write(full, os.path.join(base_name, rel))
+                    for full in _visible_files(target):
+                        rel = os.path.relpath(full, target)
+                        zf.write(full, os.path.join(base_name, rel))
                 else:
                     zf.write(target, base_name)
             buf.seek(0)
-            # 中文文件名需用 RFC 5987 的 filename*=UTF-8 编码，否则 header 报 UnicodeEncodeError
             import urllib.parse
             encoded_name = urllib.parse.quote(base_name)
             headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}.zip"}
