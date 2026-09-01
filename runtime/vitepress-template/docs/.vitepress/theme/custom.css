@@ -631,6 +631,33 @@ html.dark .VPHomeFeatures .VPFeature .icon {
 [data-theme="blue"]   { --seed-hue: 220; }
 [data-theme="custom"] { --seed-hue: var(--custom-hue); }
 
+/* ============================================================
+   Phase 1：≥1440px 取消「居中最大布局」补偿（嵌入主页专用）
+   ============================================================ */
+@media (min-width: 1440px) {
+  /* 1) Sidebar 内边距 */
+  .Layout .VPSidebar {
+    padding-left: 2rem;
+  }
+
+  /* 2) 内容区：左侧预留 sidebar 宽度 */
+  .Layout .VPContent.has-sidebar {
+    padding-left: 228px;
+  }
+}
+
+/* ≥1920px 内容区同步 */
+@media (min-width: 1920px) {
+  .Layout .VPContent.has-sidebar {
+    padding-left: 300px;
+  }
+}
+/* ≥2560px 内容区同步 */
+@media (min-width: 2560px) {
+  .Layout .VPContent.has-sidebar {
+    padding-left: 360px;
+  }
+}
 
 /* 正文内容区加宽（覆盖默认 688px，iframe 嵌入时视口达不到 1440，必须在外面） */
 .Layout .VPDoc.has-aside .content-container {
