@@ -620,12 +620,11 @@ html.dark .VPHomeFeatures .VPFeature .icon {
 }
 
 /* ============================================================
-   VitePress 侧边栏背景色：跟随主页主题色相，明度更高（更浅）
-   主页侧边栏 L=0.982，VitePress L=0.992 → 更浅的同色相底色
+   VitePress 侧边栏背景色：接近白色，只带一点点色相
    ============================================================ */
 :root {
   --seed-hue: 95;
-  --vp-sidebar-bg-color: oklch(0.992 0.015 var(--seed-hue)) !important;
+  --vp-sidebar-bg-color: oklch(0.997 0.008 var(--seed-hue)) !important;
 }
 [data-theme="green"]  { --seed-hue: 155; }
 [data-theme="blue"]   { --seed-hue: 220; }
