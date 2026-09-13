@@ -4,6 +4,9 @@
    Adapted by: Arin
    ============================================================ */
 
+/* ── 隐藏顶部导航栏（主页侧边栏已提供导航） ── */
+.VPNav { display: none !important; }
+
 /* ---------- Color Palette ---------- */
 :root {
   --spring-green-dark: #2f845e;
