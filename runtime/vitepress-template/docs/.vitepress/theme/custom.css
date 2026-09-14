@@ -620,11 +620,17 @@ html.dark .VPHomeFeatures .VPFeature .icon {
 }
 
 /* ============================================================
-   VitePress 侧边栏背景色：接近白色，只带一点点色相
+   侧边栏背景色：与主页 header 用同一套公式
+   主页：--page-bg            = oklch(0.988 0.003 var(--seed-hue))
+         --bookshelf-header-bg = color-mix(in oklch, --page-bg 88%, transparent)
+   88% 的 --page-bg 叠在 --page-bg 上结果就是 --page-bg，所以这里直接用 --page-bg
+   主题色相：seamless.ts 把主页的 data-theme / --custom-hue 注入 iframe
    ============================================================ */
 :root {
   --seed-hue: 95;
-  --vp-sidebar-bg-color: oklch(0.997 0.008 var(--seed-hue)) !important;
+  --codenova-page-bg: oklch(0.988 0.003 var(--seed-hue));
+  --vp-nav-bg-color: var(--codenova-page-bg);
+  --vp-sidebar-bg-color: var(--codenova-page-bg) !important;
 }
 [data-theme="green"]  { --seed-hue: 155; }
 [data-theme="blue"]   { --seed-hue: 220; }
@@ -643,6 +649,6 @@ html.dark .VPHomeFeatures .VPFeature .icon {
 /* VPContent padding-left 全部由 seamless.ts JS 控制，CSS 不硬编码 */
 
 /* 正文内容区加宽（覆盖默认 688px，iframe 嵌入时视口达不到 1440，必须在外面） */
-.Layout .VPDoc.has-aside .content-container {
-  max-width: 820px !important;
+.VPDoc.has-aside .content-container {
+  max-width: 860px !important;
 }
