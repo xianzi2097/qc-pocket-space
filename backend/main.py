@@ -73,7 +73,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 
-from routers import auth, users, messages, notes, classes, sessions, courses, resources, trash
+from routers import auth, users, messages, notes, classes, sessions, courses, resources, trash, activity
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(messages.router)
@@ -83,3 +83,4 @@ app.include_router(sessions.router)
 app.include_router(courses.router)
 app.include_router(resources.router)
 app.include_router(trash.router)
+app.include_router(activity.router)
