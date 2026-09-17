@@ -129,6 +129,11 @@ def main():
         file_server
     }}
 
+}}
+
+# ================= 千问模型（朋友SSH隧道，子域名） =================
+qwen.codenova.cn {{
+    reverse_proxy localhost:25553
 }}"""
 
     # 写出最终的 Caddyfile（覆盖旧的）
