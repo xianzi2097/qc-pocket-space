@@ -12,6 +12,7 @@ DEFAULTS = {
     "theme": "",
     "customHue": "",
     "fontSize": 16,
+    "sidebarExpanded": True,
 }
 
 
@@ -49,6 +50,7 @@ class SettingsForm(BaseModel):
     theme: str | None = None
     customHue: str | None = None
     fontSize: int | None = None
+    sidebarExpanded: bool | None = None
 
 
 @router.put("/api/user/settings")
@@ -62,6 +64,8 @@ def update_settings(request: Request, form: SettingsForm):
         settings["customHue"] = form.customHue
     if form.fontSize is not None:
         settings["fontSize"] = max(12, min(28, form.fontSize))
+    if form.sidebarExpanded is not None:
+        settings["sidebarExpanded"] = bool(form.sidebarExpanded)
 
     fp = _settings_path(caller["username"])
     os.makedirs(os.path.dirname(fp), exist_ok=True)
