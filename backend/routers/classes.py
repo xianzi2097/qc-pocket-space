@@ -8,7 +8,7 @@ from models import UserModel, SessionLocal, USERS_DIR
 from utils import (
     get_db, get_current_user, require_role, _ensure_user,
     _load_classes, _save_classes, _get_classes_path, _resolve_user_dir,
-    ClassForm, StudentForm, _atomic_save
+    ClassForm, StudentForm, _atomic_save, _file_lock, _valid_new_name, _safe_path
 )
 
 router = APIRouter()
@@ -51,73 +51,87 @@ def list_classes(request: Request, db: Session = Depends(get_db)):
 @router.post("/api/classes")
 def create_class(request: Request, form: ClassForm):
     caller = require_role(request, ["teacher"])
-    classes = _load_classes(caller["username"])
-    if any(c["name"] == form.name for c in classes):
-        raise HTTPException(status_code=400, detail="班级已存在")
-    classes.append({"name": form.name, "schedule": form.schedule, "students": []})
-    _save_classes(caller["username"], classes)
+    # 读→改→写整体上锁：fp 与 _load/_save_classes 内部同一路径算法
+    fp = _get_classes_path(caller["username"])
+    with _file_lock(fp):
+        classes = _load_classes(caller["username"])
+        if any(c["name"] == form.name for c in classes):
+            raise HTTPException(status_code=400, detail="班级已存在")
+        classes.append({"name": form.name, "schedule": form.schedule, "students": []})
+        _save_classes(caller["username"], classes)
     return {"status": "success", "message": f"班级 [{form.name}] 已创建"}
 
 
 @router.put("/api/classes/{class_name}")
 def update_class(request: Request, class_name: str, form: ClassForm):
     caller = require_role(request, ["teacher"])
-    if form.name == class_name:
-        # 没改名，只改 schedule
+    # 读→改→写整体上锁：fp 与 _load/_save_classes 内部同一路径算法
+    fp = _get_classes_path(caller["username"])
+    with _file_lock(fp):
+        if form.name == class_name:
+            # 没改名，只改 schedule
+            classes = _load_classes(caller["username"])
+            for c in classes:
+                if c["name"] == class_name:
+                    c["schedule"] = form.schedule
+                    _save_classes(caller["username"], classes)
+                    return {"status": "success"}
+            raise HTTPException(status_code=404, detail="班级不存在")
+
+        # 改名：新名先过名字校验（不含 / \），防拼进 sessions 路径
+        new_name = _valid_new_name(form.name)
         classes = _load_classes(caller["username"])
+        if any(c["name"] == new_name for c in classes):
+            raise HTTPException(status_code=400, detail="目标班级名已存在")
+
         for c in classes:
             if c["name"] == class_name:
+                c["name"] = new_name
                 c["schedule"] = form.schedule
                 _save_classes(caller["username"], classes)
-                return {"status": "success"}
+                # 同步重命名 sessions 目录：old/new 都过 _safe_path，不越出 sessions 根
+                user_dir = _resolve_user_dir(caller["username"])
+                if user_dir:
+                    sessions_root = os.path.join(user_dir, "sessions")
+                    old_sessions = _safe_path(sessions_root, class_name)
+                    new_sessions = _safe_path(sessions_root, new_name)
+                    if os.path.isdir(old_sessions):
+                        os.rename(old_sessions, new_sessions)
+                return {"status": "success", "message": f"班级 [{class_name}] 已改名为 [{new_name}]"}
         raise HTTPException(status_code=404, detail="班级不存在")
-
-    classes = _load_classes(caller["username"])
-    if any(c["name"] == form.name for c in classes):
-        raise HTTPException(status_code=400, detail="目标班级名已存在")
-
-    for c in classes:
-        if c["name"] == class_name:
-            c["name"] = form.name
-            c["schedule"] = form.schedule
-            _save_classes(caller["username"], classes)
-            # 同步重命名 sessions 目录
-            user_dir = _resolve_user_dir(caller["username"])
-            if user_dir:
-                old_sessions = os.path.join(user_dir, "sessions", class_name)
-                new_sessions = os.path.join(user_dir, "sessions", form.name)
-                if os.path.isdir(old_sessions):
-                    os.rename(old_sessions, new_sessions)
-            return {"status": "success", "message": f"班级 [{class_name}] 已改名为 [{form.name}]"}
-    raise HTTPException(status_code=404, detail="班级不存在")
 
 
 @router.delete("/api/classes/{class_name}")
 def delete_class(request: Request, class_name: str):
     caller = require_role(request, ["teacher"])
     from utils import TRASH_DIR, _move_to_trash
-    classes = _load_classes(caller["username"])
-    deleted = None
-    for c in classes:
-        if c["name"] == class_name:
-            deleted = c
-            break
-    if not deleted:
-        raise HTTPException(status_code=404, detail="班级不存在")
-    tmp = os.path.join(TRASH_DIR, f"__tmp_{caller['username']}_{class_name}.json")
-    os.makedirs(TRASH_DIR, exist_ok=True)
-    _atomic_save(tmp, {"class_data": deleted})
-    try:
-        _move_to_trash(tmp, "class", caller["username"], class_name)
-    except Exception:
-        if os.path.exists(tmp):
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
-        raise HTTPException(status_code=500, detail="移动到回收站失败，班级未删除")
-    classes = [c for c in classes if c["name"] != class_name]
-    _save_classes(caller["username"], classes)
+    # 读→改→写整体上锁：fp 与 _load/_save_classes 内部同一路径算法
+    fp = _get_classes_path(caller["username"])
+    with _file_lock(fp):
+        classes = _load_classes(caller["username"])
+        deleted = None
+        for c in classes:
+            if c["name"] == class_name:
+                deleted = c
+                break
+        if not deleted:
+            raise HTTPException(status_code=404, detail="班级不存在")
+        # 回收站临时文件名拼 class_name → 过名字校验不含 / \（返回值不采用：过滤比对须用原始名）
+        _valid_new_name(class_name)
+        tmp = os.path.join(TRASH_DIR, f"__tmp_{caller['username']}_{class_name}.json")
+        os.makedirs(TRASH_DIR, exist_ok=True)
+        _atomic_save(tmp, {"class_data": deleted})
+        try:
+            _move_to_trash(tmp, "class", caller["username"], class_name)
+        except Exception:
+            if os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+            raise HTTPException(status_code=500, detail="移动到回收站失败，班级未删除")
+        classes = [c for c in classes if c["name"] != class_name]
+        _save_classes(caller["username"], classes)
     return {"status": "success", "message": f"班级 [{class_name}] 已移到回收站"}
 
 
@@ -126,28 +140,31 @@ def add_student(request: Request, class_name: str, form: StudentForm, db: Sessio
     caller = require_role(request, ["teacher"])
     db_local = SessionLocal()
     try:
-        classes = _load_classes(caller["username"])
-        for c in classes:
-            if c["name"] == class_name:
-                if form.existing_id:
-                    user_id = int(form.existing_id)
-                    user = db_local.query(UserModel).filter(UserModel.id == user_id).first()
-                    if not user:
-                        raise HTTPException(status_code=404, detail="学生不存在")
-                else:
-                    avatar_name = f"avatar_{str(random.randint(1, 78)).zfill(2)}.jpg"
-                    new_user = _ensure_user(
-                        db_local, form.name, "student", avatar_name,
-                        {"teacher": caller["username"]}
-                    )
-                    user_id = new_user.id
-                entry = {"user_id": user_id, "name": form.name}
-                if form.schedule:
-                    entry["schedule"] = form.schedule
-                c["students"].append(entry)
-                _save_classes(caller["username"], classes)
-                return {"status": "success", "user_id": user_id}
-        raise HTTPException(status_code=404, detail="班级不存在")
+        # 读→改→写整体上锁：fp 与 _load/_save_classes 内部同一路径算法
+        fp = _get_classes_path(caller["username"])
+        with _file_lock(fp):
+            classes = _load_classes(caller["username"])
+            for c in classes:
+                if c["name"] == class_name:
+                    if form.existing_id:
+                        user_id = int(form.existing_id)
+                        user = db_local.query(UserModel).filter(UserModel.id == user_id).first()
+                        if not user:
+                            raise HTTPException(status_code=404, detail="学生不存在")
+                    else:
+                        avatar_name = f"avatar_{str(random.randint(1, 78)).zfill(2)}.jpg"
+                        new_user = _ensure_user(
+                            db_local, form.name, "student", avatar_name,
+                            {"teacher": caller["username"]}
+                        )
+                        user_id = new_user.id
+                    entry = {"user_id": user_id, "name": form.name}
+                    if form.schedule:
+                        entry["schedule"] = form.schedule
+                    c["students"].append(entry)
+                    _save_classes(caller["username"], classes)
+                    return {"status": "success", "user_id": user_id}
+            raise HTTPException(status_code=404, detail="班级不存在")
     finally:
         db_local.close()
 
@@ -217,14 +234,17 @@ def remove_student(request: Request, class_name: str, student_id: str):
     caller = require_role(request, ["teacher"])
     if not student_id.isdigit():
         raise HTTPException(status_code=400, detail="无效的学生ID")
-    classes = _load_classes(caller["username"])
-    target_id = int(student_id)
-    for c in classes:
-        if c["name"] == class_name:
-            c["students"] = [s for s in c["students"] if s.get("user_id") != target_id]
-            _save_classes(caller["username"], classes)
-            return {"status": "success"}
-    raise HTTPException(status_code=404, detail="班级不存在")
+    # 读→改→写整体上锁：fp 与 _load/_save_classes 内部同一路径算法
+    fp = _get_classes_path(caller["username"])
+    with _file_lock(fp):
+        classes = _load_classes(caller["username"])
+        target_id = int(student_id)
+        for c in classes:
+            if c["name"] == class_name:
+                c["students"] = [s for s in c["students"] if s.get("user_id") != target_id]
+                _save_classes(caller["username"], classes)
+                return {"status": "success"}
+        raise HTTPException(status_code=404, detail="班级不存在")
 
 
 from pydantic import BaseModel as _BaseModel
@@ -238,17 +258,20 @@ def update_student_schedule(request: Request, class_name: str, student_id: str, 
     caller = require_role(request, ["teacher"])
     if not student_id.isdigit():
         raise HTTPException(status_code=400, detail="无效的学生ID")
-    classes = _load_classes(caller["username"])
-    target_id = int(student_id)
-    for c in classes:
-        if c["name"] == class_name:
-            for s in c.get("students", []):
-                if s.get("user_id") == target_id:
-                    if form.schedule:
-                        s["schedule"] = form.schedule
-                    else:
-                        s.pop("schedule", None)  # 删除个人设置，恢复跟随班级
-                    _save_classes(caller["username"], classes)
-                    return {"status": "success"}
-            raise HTTPException(status_code=404, detail="学生在班级中未找到")
-    raise HTTPException(status_code=404, detail="班级不存在")
+    # 读→改→写整体上锁：fp 与 _load/_save_classes 内部同一路径算法
+    fp = _get_classes_path(caller["username"])
+    with _file_lock(fp):
+        classes = _load_classes(caller["username"])
+        target_id = int(student_id)
+        for c in classes:
+            if c["name"] == class_name:
+                for s in c.get("students", []):
+                    if s.get("user_id") == target_id:
+                        if form.schedule:
+                            s["schedule"] = form.schedule
+                        else:
+                            s.pop("schedule", None)  # 删除个人设置，恢复跟随班级
+                        _save_classes(caller["username"], classes)
+                        return {"status": "success"}
+                raise HTTPException(status_code=404, detail="学生在班级中未找到")
+        raise HTTPException(status_code=404, detail="班级不存在")

@@ -3,7 +3,7 @@ import os
 import glob as _glob
 import shutil
 from fastapi import APIRouter, Depends, HTTPException, Request
-from utils import get_db, get_current_user, _safe_path, NotebookForm, NoteSaveForm, _atomic_write_file
+from utils import get_db, get_current_user, _safe_path, _valid_new_name, NotebookForm, NoteSaveForm, _atomic_write_file
 
 router = APIRouter()
 
@@ -79,7 +79,11 @@ def rename_notebook(request: Request, name: str, new_name: str = ""):
 @router.get("/api/notes")
 def list_notes(request: Request, notebook: str = ""):
     caller = get_current_user(request)
-    base = os.path.join(_get_notes_base(caller["username"]), notebook)
+    # notebook 先过名字校验（非空时不含 / \），再过 _safe_path 防 ".." 越出 notes 目录
+    base = _get_notes_base(caller["username"])
+    if notebook:
+        _valid_new_name(notebook)
+        base = _safe_path(base, notebook)
     if not os.path.exists(base):
         return {"status": "success", "notes": []}
     files = sorted(_glob.glob(os.path.join(base, "*.md")), key=os.path.basename)
@@ -109,7 +113,9 @@ def save_note(request: Request, form: NoteSaveForm, notebook: str = ""):
         raise HTTPException(status_code=400, detail="请指定笔记本")
     if not form.filename.endswith(".md"):
         form.filename += ".md"
-    base = os.path.join(_get_notes_base(caller["username"]), notebook)
+    # notebook 先过名字校验再拼 base（否则下面 _safe_path 的 base 已含未校验输入，形同虚设）
+    _valid_new_name(notebook)
+    base = _safe_path(_get_notes_base(caller["username"]), notebook)
     os.makedirs(base, exist_ok=True)
     fp = _safe_path(base, form.filename)
     _atomic_write_file(fp, form.content)

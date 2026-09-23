@@ -3,7 +3,7 @@ import os
 import json
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from utils import get_current_user, _resolve_user_dir, _atomic_save
+from utils import get_current_user, _resolve_user_dir, _atomic_save, _file_lock
 
 router = APIRouter()
 
@@ -56,19 +56,21 @@ class SettingsForm(BaseModel):
 @router.put("/api/user/settings")
 def update_settings(request: Request, form: SettingsForm):
     caller = get_current_user(request)
-    settings = _load_settings(caller["username"])
-
-    if form.theme is not None:
-        settings["theme"] = form.theme
-    if form.customHue is not None:
-        settings["customHue"] = form.customHue
-    if form.fontSize is not None:
-        settings["fontSize"] = max(12, min(28, form.fontSize))
-    if form.sidebarExpanded is not None:
-        settings["sidebarExpanded"] = bool(form.sidebarExpanded)
-
     fp = _settings_path(caller["username"])
-    os.makedirs(os.path.dirname(fp), exist_ok=True)
-    _atomic_save(fp, settings)
+    # 读-改-写整体持锁：防两个 PUT 并发时互相覆盖
+    with _file_lock(fp):
+        settings = _load_settings(caller["username"])
+
+        if form.theme is not None:
+            settings["theme"] = form.theme
+        if form.customHue is not None:
+            settings["customHue"] = form.customHue
+        if form.fontSize is not None:
+            settings["fontSize"] = max(12, min(28, form.fontSize))
+        if form.sidebarExpanded is not None:
+            settings["sidebarExpanded"] = bool(form.sidebarExpanded)
+
+        os.makedirs(os.path.dirname(fp), exist_ok=True)
+        _atomic_save(fp, settings)
 
     return {"status": "success", "settings": settings}

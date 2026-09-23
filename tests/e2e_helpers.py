@@ -152,6 +152,15 @@ def save_attendance(teacher_token: str, class_name: str, date: str,
     return resp.json()
 
 
+def feature_course(teacher_token: str, course_id: str, featured: bool = True) -> dict:
+    """设/取消精选：课程广场「课程」tab 只显示精选课程"""
+    resp = httpx.put(f"{API_BASE}/courses/{course_id}/featured",
+                     headers=_auth_header(teacher_token),
+                     json={"featured": featured}, timeout=5)
+    assert resp.status_code == 200, f"设置精选失败: {resp.text}"
+    return resp.json()
+
+
 def delete_user(username: str):
     """删除用户（admin 权限）"""
     token = _admin_token()
@@ -189,18 +198,28 @@ def cleanup_e2e_users():
 # ============================================================
 
 def login(page: Page, username: str, password: str = "111111"):
-    """首页 → 个人中心卡片 → 登录表单 → 填写提交"""
+    """首页 → 侧栏登录按钮 → 登录弹窗 → 填写提交"""
     page.goto(BASE_URL, wait_until="domcontentloaded", timeout=10000)
     page.wait_for_timeout(1000)
-    # 点"个人中心"卡片上的登录按钮
-    login_btn = page.get_by_role("button").filter(has_text="登录").first
-    login_btn.wait_for(state="visible", timeout=5000)
+    # 登录入口两种形态：折叠侧栏=图标按钮(data-tip='登录')；改密等场景会话未失效时先清本地会话
+    login_btn = page.locator("button[data-tip='登录']")
+    if login_btn.count() == 0:
+        # token 改密后不失效，清 user/auth_token 强制登出（sidebarRail 保留，侧栏可能为展开态）
+        page.evaluate("() => ['auth_token','token','user'].forEach(k => localStorage.removeItem(k))")
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_timeout(1000)
+        login_btn = page.locator("button[data-tip='登录']")
+        if login_btn.count() == 0:
+            # 展开态侧栏：入口是带「登录」文字的按钮（无 data-tip）
+            login_btn = page.get_by_role("button").filter(has_text="登录").first
     login_btn.click()
-    page.wait_for_timeout(500)
-    # 填写登录表单
-    page.get_by_placeholder("用户名").fill(username)
-    page.get_by_placeholder("密码").fill(password)
-    page.get_by_role("button", name="登录").filter(has_text="登录").last.click()
+    # 弹窗内两个输入框（用户名/密码）无 placeholder，按顺序定位
+    inputs = page.locator("input")
+    inputs.nth(0).wait_for(state="visible", timeout=5000)
+    inputs.nth(0).fill(username)
+    inputs.nth(1).fill(password)
+    # 提交按钮文案是「进入」
+    page.get_by_role("button").filter(has_text="进入").last.click()
     page.wait_for_timeout(2000)
 
 

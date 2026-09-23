@@ -8,7 +8,8 @@ from models import TrashModel, SessionLocal
 from utils import (
     get_db, get_current_user, require_role, restore_from_trash,
     _list_trash_items, _move_to_trash, _load_classes, _save_classes,
-    _get_teacher_course_dir, _safe_path, TRASH_DIR
+    _get_teacher_course_dir, _safe_path, TRASH_DIR,
+    _get_classes_path, _file_lock
 )
 
 router = APIRouter()
@@ -90,9 +91,12 @@ def restore_trash_item(request: Request, folder_name: str):
         restored = data.get("class_data")
         if not restored:
             raise HTTPException(status_code=404, detail="回收站数据损坏")
-        classes = _load_classes(caller["username"])
-        classes.append(restored)
-        _save_classes(caller["username"], classes)
+        # 读→改→写整体上锁：fp 与 _load/_save_classes 内部同一路径算法
+        fp = _get_classes_path(caller["username"])
+        with _file_lock(fp):
+            classes = _load_classes(caller["username"])
+            classes.append(restored)
+            _save_classes(caller["username"], classes)
     elif meta["type"] == "course":
         base = _get_teacher_course_dir(meta["owner"])
         target = os.path.join(base, os.path.basename(meta["original_path"]))
@@ -109,7 +113,8 @@ def restore_trash_item(request: Request, folder_name: str):
 
 @router.delete("/api/trash/items/{folder_name}")
 def permanent_delete_item(request: Request, folder_name: str):
-    require_role(request, ["admin", "teacher"])
+    # 永久删除仅 admin（与 DB 版 DELETE /api/trash/{id} 一致；老师可看列表/恢复，不可彻底删）
+    require_role(request, ["admin"])
     folder_path = os.path.join(TRASH_DIR, folder_name)
     if not os.path.exists(folder_path):
         raise HTTPException(status_code=404, detail="回收站中未找到该项目")

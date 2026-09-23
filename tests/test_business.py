@@ -5,7 +5,7 @@
 数据目录 (data/) 为测试数据，可随意读写。
 
 运行方式：
-  cd C:\Arin - cabin\QC-PocketSpace\qc-pocket-space\tests
+  cd C:\Arin - cabin\CodeNova-Workspace\qc-pocket-space\tests
   venv\Scripts\python.exe -m pytest test_business.py -v
 """
 import sys

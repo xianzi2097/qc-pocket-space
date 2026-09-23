@@ -5,7 +5,7 @@
 
 - 备份范围：整个 data/（数据库 + users/ + courses/ + trash/），不是只有 qingcheng.db
 - 数据库用 sqlite3 官方 backup API 生成一致快照（自动包含 WAL 里尚未合并的写入）
-- 备份位置：data 同级 backups/（例如 QC-PocketSpace/backups/）
+- 备份位置：data 同级 backups/（例如 CodeNova-Workspace/backups/）
 - 保留策略：最近 14 份，最旧自动清理（覆盖约半个月）
 - 触发：后台线程每 10 分钟检查一次，距上次备份 >= 间隔才备份（默认 24h=1 天，可配）
 
@@ -37,7 +37,7 @@ from datetime import datetime
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_ROOT = os.path.abspath(os.path.join(BACKEND_DIR, "..", "..", "data"))
 DB_PATH = os.path.join(DATA_ROOT, "qingcheng.db")
-# data 同级 backups/（例如 QC-PocketSpace/backups/）
+# data 同级 backups/（例如 CodeNova-Workspace/backups/）
 BACKUP_ROOT = os.path.abspath(os.path.join(BACKEND_DIR, "..", "..", "backups"))
 
 # ── 策略（可按机构调整） ──

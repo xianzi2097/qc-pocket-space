@@ -1,7 +1,7 @@
 """
 测试老师种子脚本（专门给「老师 → 班级 → 学生 → 记录」链路测试用）
 =============================================================
-用法：在 QC-PocketSpace 根目录运行
+用法：在 CodeNova-Workspace 根目录运行
     python labs_dev/tests/seed_test_teacher.py
 
 造的数据（幂等，可重复跑）：

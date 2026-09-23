@@ -5,11 +5,13 @@ import sys
 import json
 import shutil
 
-sys.path.insert(0, r"c:\Arin - cabin\QC-PocketSpace\labs_dev\qx-launcher")
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(TESTS_DIR))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, "labs_dev", "qx-launcher"))
 from app.backup_core import restore_from_folder  # noqa: E402
 
-ROOT = r"c:\Arin - cabin\QC-PocketSpace\qc-pocket-space\tests\_frestore_test"
-SRC_DATA = r"c:\Arin - cabin\QC-PocketSpace\data"
+ROOT = os.path.join(TESTS_DIR, "_frestore_test")
+SRC_DATA = os.path.join(PROJECT_ROOT, "data")
 assert "PySide6" not in sys.modules
 
 def make_backup_folder(dest, wrap):

@@ -4,8 +4,10 @@ import re
 import json
 import hashlib
 import secrets
+import threading
 import time
 import shutil
+from collections import defaultdict
 from datetime import datetime
 from fastapi import HTTPException, Request, Depends
 from pydantic import BaseModel
@@ -33,23 +35,66 @@ def verify_password(password: str, stored: str) -> bool:
 # ==========================================
 # 原子写入
 # ==========================================
+# 单进程多线程：每路径一把可重入锁，串行化同文件的「读→改→写」和写临时文件。
+# （RLock：持锁做 RMW 时再调 _atomic_save 不会自锁死）
+_LOCKS: dict[str, threading.RLock] = defaultdict(threading.RLock)
+_LOCKS_GUARD = threading.Lock()
+
+
+def _file_lock(fp: str) -> threading.RLock:
+    """返回路径对应的进程内锁；调用方可 `with _file_lock(fp):` 包住读-改-写。"""
+    key = os.path.abspath(fp)
+    # defaultdict 的建锁不是线程安全的，双重检查 + 短锁
+    lock = _LOCKS.get(key)
+    if lock is None:
+        with _LOCKS_GUARD:
+            lock = _LOCKS.get(key)
+            if lock is None:
+                lock = threading.RLock()
+                _LOCKS[key] = lock
+    return lock
+
+
+def _tmp_name(fp: str) -> str:
+    """临时文件名带 pid+tid，即使有旁路写入也不会抢同一个 .tmp。"""
+    return f"{fp}.{os.getpid()}.{threading.get_ident()}.tmp"
+
+
 def _atomic_save(fp: str, data):
-    """原子写入 JSON：先写临时文件再 rename，断电/崩溃不会损坏原文件。"""
-    tmp = fp + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, fp)
+    """原子写入 JSON：先写临时文件再 rename，断电/崩溃不会损坏原文件；
+    同路径进程内互斥，防两线程写坏同一个 .tmp。"""
+    with _file_lock(fp):
+        tmp = _tmp_name(fp)
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, fp)
+        finally:
+            if os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+
 
 def _atomic_write_file(fp: str, content: str):
     """原子写入文本文件：先写临时文件再 rename，断电/崩溃不会损坏原文件。"""
-    tmp = fp + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(content)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, fp)
+    with _file_lock(fp):
+        tmp = _tmp_name(fp)
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, fp)
+        finally:
+            if os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
 
 # ==========================================
 # 路径常量
@@ -337,8 +382,12 @@ def _save_classes(teacher_username: str, classes: list):
 def _get_session_path(username: str, class_name: str, month: str) -> str:
     user_dir = _resolve_user_dir(username)
     if not user_dir:
-        return os.path.join(USERS_DIR, "teachers", username, "sessions", class_name, f"{month}.json")
-    return os.path.join(user_dir, "sessions", class_name, f"{month}.json")
+        root = os.path.join(USERS_DIR, "teachers", username, "sessions")
+    else:
+        root = os.path.join(user_dir, "sessions")
+    # class_name、month 均来自用户输入（month = form.date[:7] 也可含 ../）→ 统一过 _safe_path
+    # base 取 sessions 目录本身：class_name=".." 时会越出 base 直接 403
+    return _safe_path(root, class_name, f"{month}.json")
 
 def _load_sessions(username: str, class_name: str, month: str) -> list:
     fp = _get_session_path(username, class_name, month)
@@ -496,7 +545,8 @@ def _find_msg_file(username: str, folder: str | None, msg_id: str) -> str | None
     if not os.path.exists(base):
         return None
     if folder:
-        path = os.path.join(base, folder, f"{msg_id}.json")
+        # folder 来自查询参数（mark_read 透传）→ 过 _safe_path，防 ../ 定位/回写消息目录之外的 JSON
+        path = _safe_path(base, folder, f"{msg_id}.json")
         return path if os.path.exists(path) else None
     for fd in os.listdir(base):
         path = os.path.join(base, fd, f"{msg_id}.json")

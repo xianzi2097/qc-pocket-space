@@ -17,7 +17,7 @@ from e2e_helpers import (
     BASE_URL, timestamp, cleanup_e2e_users,
     create_test_teacher, create_test_student,
     create_class, add_student_to_class, get_user_id,
-    send_message, create_course, save_attendance,
+    send_message, create_course, feature_course, save_attendance,
     login, teacher_nav, student_nav, get_page_text,
     api_login,
 )
@@ -74,7 +74,13 @@ class TestStudentE2E:
         add_student_to_class(teacher["token"], cls_name, student["username"], sid)
         # 发一条消息给学生
         send_message(teacher["token"], student["username"], "E2E测试：作业通知", "请完成第三章练习")
-        return {"teacher": teacher, "student": student, "class": cls_name}
+        # 创建一门精选课程（课程广场「课程」tab 只显示精选）
+        course_name = f"E2E广场课_{ts}"
+        resp = create_course(teacher["token"], teacher["username"], course_name)
+        cid = (resp.get("course") or {}).get("id")
+        assert cid, f"课程创建失败: {resp}"
+        feature_course(teacher["token"], cid)
+        return {"teacher": teacher, "student": student, "class": cls_name, "course": course_name}
 
     # ─── 2.1 登录 + 仪表板 ───
 
@@ -181,18 +187,23 @@ class TestStudentE2E:
     # ─── 2.4 课程广场 ───
 
     def test_04_学生浏览课程广场(self, page: Page, student_data):
-        """学生应能看到老师列表、课程列表和课件"""
+        """学生应能进入课程广场并看到精选课程"""
         s = student_data["student"]
         t = student_data["teacher"]
+        course_name = student_data["course"]
         login(page, s["username"], s["password"])
         page.wait_for_timeout(500)
 
-        # 切换到"课程"模块
-        page.get_by_role("button").filter(has_text="课程").first.click()
-        page.wait_for_timeout(1000)
+        # 学生仪表板无「课程」tab，先回站点首页
+        page.get_by_role("button").filter(has_text="首页").first.click()
+        page.wait_for_timeout(800)
 
-        # 验证能看到老师列表
-        expect(page.get_by_text(t["username"])).to_be_visible()
+        # 站点首页点「课程」进入课程广场
+        page.get_by_role("button").filter(has_text="课程").first.click()
+        page.wait_for_timeout(1500)
+
+        # 验证精选课程卡片可见（新版广场展示课程书架，不再展示老师列表）
+        expect(page.get_by_text(course_name).first).to_be_visible()
 
     # ─── 2.5 修改密码 ───
 
@@ -422,19 +433,19 @@ class TestTeacherE2E:
 
         login(page, t["username"], t["password"])
 
-        # 导航到课件管理
-        teacher_nav(page, "课件管理")
+        # 导航到文件管理（原「课件管理」tab 已改名）
+        teacher_nav(page, "文件管理")
 
-        # 验证看到"课件管理"
+        # 验证看到"文件管理"
         page.wait_for_timeout(800)
-        expect(page.get_by_text("课件管理").first).to_be_visible()
+        expect(page.get_by_text("文件管理").first).to_be_visible()
 
         # 点"新建课程"
         page.get_by_role("button").filter(has_text="新建课程").first.click()
         page.wait_for_timeout(500)
 
         # 填课程名称
-        page.get_by_placeholder("如：Scratch-周六早-初级班").fill(course_name)
+        page.get_by_placeholder("输入课程名称").fill(course_name)
 
         # 选类型（可以用 API 跳过，但这里用 UI 验证）
         # 点"创建"
@@ -451,7 +462,7 @@ class TestTeacherE2E:
         t = teacher_data["teacher"]
         login(page, t["username"], t["password"])
 
-        tabs = ["数据看板", "学生管理", "发送消息", "课堂记录", "课件管理"]
+        tabs = ["数据看板", "学生管理", "发送消息", "课堂记录", "文件管理"]
 
         for tab in tabs:
             teacher_nav(page, tab)
@@ -570,11 +581,11 @@ class TestTeacherFullFlow:
         ts = flow_data["ts"]
         course_name = f"流程课程_{ts}"
 
-        teacher_nav(logged_in_page, "课件管理")
+        teacher_nav(logged_in_page, "文件管理")
 
         logged_in_page.get_by_role("button").filter(has_text="新建课程").first.click()
         logged_in_page.wait_for_timeout(500)
-        logged_in_page.get_by_placeholder("如：Scratch-周六早-初级班").fill(course_name)
+        logged_in_page.get_by_placeholder("输入课程名称").fill(course_name)
         logged_in_page.get_by_role("button").filter(has_text="创建").last.click()
         logged_in_page.wait_for_timeout(1000)
 

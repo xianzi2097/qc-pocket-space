@@ -1,7 +1,7 @@
 """
 开发环境测试数据注入脚本
 ========================
-用法：在 QC-PocketSpace 根目录运行
+用法：在 CodeNova-Workspace 根目录运行
     python labs_dev/tests/seed_dev_data.py
 
 功能：插入测试老师、学生、班级、课程（不含后端代码）

@@ -7,6 +7,7 @@ from models import UserModel, SessionLocal, USERS_DIR
 from utils import (
     get_db, get_current_user, require_role,
     _resolve_user_dir, _load_sessions, _save_sessions,
+    _get_session_path, _file_lock, _safe_path,
     SessionForm
 )
 
@@ -17,19 +18,22 @@ router = APIRouter()
 def save_session(request: Request, class_name: str, form: SessionForm):
     caller = require_role(request, ["teacher"])
     month = form.date[:7]
-    sessions = _load_sessions(caller["username"], class_name, month)
-    new_record = {
-        "date": form.date,
-        "students": [s.model_dump() for s in form.students]
-    }
-    for i, s in enumerate(sessions):
-        if s["date"] == form.date:
-            sessions[i] = new_record
-            break
-    else:
-        sessions.append(new_record)
-    sessions.sort(key=lambda x: x["date"], reverse=True)
-    _save_sessions(caller["username"], class_name, month, sessions)
+    # 读→改→写整体上锁：fp 由 _get_session_path 计算，与 _load/_save_sessions 内部同一路径算法
+    fp = _get_session_path(caller["username"], class_name, month)
+    with _file_lock(fp):
+        sessions = _load_sessions(caller["username"], class_name, month)
+        new_record = {
+            "date": form.date,
+            "students": [s.model_dump() for s in form.students]
+        }
+        for i, s in enumerate(sessions):
+            if s["date"] == form.date:
+                sessions[i] = new_record
+                break
+        else:
+            sessions.append(new_record)
+        sessions.sort(key=lambda x: x["date"], reverse=True)
+        _save_sessions(caller["username"], class_name, month, sessions)
     return {"status": "success", "message": f"{form.date} 课堂记录已保存"}
 
 
@@ -41,7 +45,8 @@ def list_sessions(request: Request, class_name: str, month: str = ""):
     user_dir = _resolve_user_dir(caller["username"])
     if not user_dir:
         return {"status": "success", "sessions": []}
-    sessions_dir = os.path.join(user_dir, "sessions", class_name)
+    # class_name 来自 URL → 过 _safe_path，防 ../ 越出 sessions 目录
+    sessions_dir = _safe_path(os.path.join(user_dir, "sessions"), class_name)
     if not os.path.exists(sessions_dir):
         return {"status": "success", "sessions": []}
     all_sessions = []
@@ -123,9 +128,12 @@ def get_session(request: Request, class_name: str, date: str):
 def delete_session(request: Request, class_name: str, date: str):
     caller = require_role(request, ["teacher"])
     month = date[:7]
-    sessions = _load_sessions(caller["username"], class_name, month)
-    filtered = [s for s in sessions if s["date"] != date]
-    if len(filtered) == len(sessions):
-        raise HTTPException(status_code=404, detail=f"{date} 没有课堂记录")
-    _save_sessions(caller["username"], class_name, month, filtered)
+    # 读→改→写整体上锁：fp 由 _get_session_path 计算，与 _load/_save_sessions 内部同一路径算法
+    fp = _get_session_path(caller["username"], class_name, month)
+    with _file_lock(fp):
+        sessions = _load_sessions(caller["username"], class_name, month)
+        filtered = [s for s in sessions if s["date"] != date]
+        if len(filtered) == len(sessions):
+            raise HTTPException(status_code=404, detail=f"{date} 没有课堂记录")
+        _save_sessions(caller["username"], class_name, month, filtered)
     return {"status": "success", "message": f"{date} 课堂记录已删除"}

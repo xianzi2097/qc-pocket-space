@@ -9,7 +9,7 @@ from models import UserModel
 from utils import (
     get_db, get_current_user, require_role,
     _safe_path, _get_msgs_dir, _write_msg, _find_msg_file,
-    SendMessageForm, _atomic_save
+    SendMessageForm, _atomic_save, _file_lock
 )
 
 router = APIRouter()
@@ -61,7 +61,8 @@ def list_folders(request: Request):
 @router.get("/api/messages/inbox")
 def inbox(request: Request, folder: str = ""):
     caller = get_current_user(request)
-    dir_path = os.path.join(_get_msgs_dir(caller["username"]), folder)
+    # folder 来自查询参数 → 过 _safe_path，防 ../ 越出消息根目录
+    dir_path = _safe_path(_get_msgs_dir(caller["username"]), folder)
     if not os.path.exists(dir_path):
         return {"status": "success", "messages": []}
     msgs = []
@@ -84,10 +85,12 @@ def mark_read(request: Request, msg_id: str, folder: str = ""):
     fp = _find_msg_file(caller["username"], folder, msg_id)
     if not fp:
         raise HTTPException(status_code=404, detail="消息不存在")
-    with open(fp, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    data["is_read"] = True
-    _atomic_save(fp, data)
+    # 读-改-写整体持锁：防并发 mark_read / 改消息字段时互相覆盖
+    with _file_lock(fp):
+        with open(fp, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["is_read"] = True
+        _atomic_save(fp, data)
     return {"status": "success"}
 
 
@@ -96,7 +99,8 @@ def create_folder(request: Request, folder: str = ""):
     caller = get_current_user(request)
     if not folder or folder == "收件箱":
         raise HTTPException(status_code=400, detail="文件夹名无效")
-    dir_path = os.path.join(_get_msgs_dir(caller["username"]), folder)
+    # folder 来自查询参数 → 过 _safe_path，防 ../ 在消息根目录之外建目录
+    dir_path = _safe_path(_get_msgs_dir(caller["username"]), folder)
     if os.path.exists(dir_path):
         raise HTTPException(status_code=400, detail="文件夹已存在")
     os.makedirs(dir_path, exist_ok=True)
@@ -151,7 +155,8 @@ def move_message(request: Request, msg_id: str, folder: str = ""):
     src_fp = _find_msg_file(caller["username"], None, msg_id)
     if not src_fp:
         raise HTTPException(status_code=404, detail="消息不存在")
-    dst_dir = os.path.join(_get_msgs_dir(caller["username"]), folder)
+    # folder 来自查询参数 → 过 _safe_path，防 ../ 把消息移出消息根目录
+    dst_dir = _safe_path(_get_msgs_dir(caller["username"]), folder)
     os.makedirs(dst_dir, exist_ok=True)
     os.rename(src_fp, os.path.join(dst_dir, f"{msg_id}.json"))
     return {"status": "success", "message": f"已移至 [{folder}]"}

@@ -5,7 +5,7 @@
 合并了原 test_security.py + test_security_fixes.py。
 
 运行方式：
-  cd C:\Arin - cabin\QC-PocketSpace\qc-pocket-space\tests
+  cd C:\Arin - cabin\CodeNova-Workspace\qc-pocket-space\tests
   venv\Scripts\python.exe -m pytest test_security.py -v
 """
 import sys
