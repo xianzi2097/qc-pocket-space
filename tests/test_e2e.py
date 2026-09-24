@@ -1,14 +1,17 @@
-"""
+r"""
 E2E 浏览器测试 — Playwright（学生端 + 教师端全覆盖）
 ==================================================
 模拟真实用户操作：打开浏览器 → 登录 → 操作 → 验证结果。
 
 运行前先启动后端（qx-launcher → 🟢 启动服务）。
+注意：本套件含少量故意失败登录（改密后验旧密码），服务器失败计数跨轮累积不清零，
+      连续多轮跑请中途重启服务；429 时登录助手会自动等待重试兜底。CI 每轮全新服务无此问题。
 
 运行：
   cd qc-pocket-space/tests
   venv\Scripts\python.exe -m pytest test_e2e.py -v -s
 """
+import re
 import time
 import pytest
 from playwright.sync_api import sync_playwright, Page, expect
@@ -39,6 +42,11 @@ def browser():
 def page(browser):
     """每个测试方法一个新页面（独立登录状态）"""
     ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    # 拦截一切非 localhost 请求：dashboard 引用的 Google Fonts 走系统代理(Clash)，
+    # 出口节点间歇性挂起会把 domcontentloaded 拖过 goto 超时 → e2e 每轮随机红一条。
+    # 测试只访问本地，外部资源一律 abort（字体回退系统字体，不影响功能断言）。
+    ctx.route(re.compile(r"^https?://(?!localhost|127\.0\.0\.1)"),
+              lambda route: route.abort())
     pg = ctx.new_page()
     yield pg
     ctx.close()
@@ -408,6 +416,9 @@ class TestTeacherE2E:
         # 验证学生选项在 select 中（通过选中它来验证）
         student_select = page.get_by_role("combobox").first
         expect(student_select).to_be_visible()
+        # 班级学生列表是异步拉取的：等目标选项真正挂上再选，
+        # 否则慢机上 select_option 会先于数据到达 → 偶发找不到选项
+        student_select.locator("option", has_text=s["username"]).wait_for(state="attached", timeout=10000)
         student_select.select_option(label=s["username"])
 
         # 填主题和正文，使发送按钮变为可用

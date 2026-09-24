@@ -1,0 +1,2 @@
+# git 钩子必须保持 LF 行尾——CRLF 会让 sh 报 `$'\r': command not found`，钩子直接报废
+hooks/* text eol=lf

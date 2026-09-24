@@ -1,0 +1,27 @@
+#!/bin/sh
+# ============================================================
+# pre-push 钩子 —— 推送前跑快测（单元 + 业务 + 安全，约 10 秒）
+#
+# 启用（每个克隆一次性）：git config core.hooksPath hooks
+# 紧急绕过（明知故犯）：  git push --no-verify
+# 失败即拦：exit code 非 0 时 push 中止，先修再推
+# ============================================================
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+unset PYTHONPATH   # 防本机环境串味（钩子环境要和 CI 一致）
+
+PY="tests/venv/Scripts/python.exe"
+if [ ! -f "$PY" ]; then
+  echo "✗ 找不到 $PY —— 测试环境还没建，无法验证这次 push："
+  echo "    python -m venv tests/venv"
+  echo "    tests/venv/Scripts/pip install -r backend/requirements.txt -r tests/requirements.txt"
+  echo "  （或临时绕过：git push --no-verify —— 风险自负）"
+  exit 1
+fi
+
+echo "⏳ pre-push：跑快测（单元+业务+安全，不含 e2e）..."
+NO_PROXY="localhost,127.0.0.1,::1" "$PY" -m pytest tests/ \
+  --ignore=tests/test_e2e.py --ignore=tests/venv \
+  -q --tb=short
+echo "✅ 快测全绿，放行 push"

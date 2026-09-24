@@ -4,6 +4,7 @@ E2E 测试辅助工具
 封装与后端 API 交互、浏览器操作等公共逻辑。
 用 httpx 调用后端 API 注入测试数据，用 Playwright 操作浏览器。
 """
+import re
 import time
 import httpx
 from typing import Optional
@@ -20,10 +21,14 @@ ADMIN_PASS = "111111"
 # ============================================================
 
 def _admin_token() -> str:
-    """获取 admin token（每次新获取，避免过期）"""
-    resp = httpx.post(f"{API_BASE}/login", json={
-        "username": ADMIN_USER, "password": ADMIN_PASS
-    }, timeout=5)
+    """获取 admin token（每次新获取，避免过期）；429=限流时按提示等待后重试一次。
+    背景：服务器失败计数在进程内跨轮累积，长命服务器连续跑多轮 e2e 会触发封禁。"""
+    payload = {"username": ADMIN_USER, "password": ADMIN_PASS}
+    resp = httpx.post(f"{API_BASE}/login", json=payload, timeout=5)
+    if resp.status_code == 429:
+        m = re.search(r"(\d+)\s*秒", str(resp.json().get("detail", "")))
+        time.sleep(min(int(m.group(1)) if m else 30, 65) + 1)
+        resp = httpx.post(f"{API_BASE}/login", json=payload, timeout=5)
     assert resp.status_code == 200, f"admin 登录失败: {resp.text}"
     return resp.json()["token"]
 
@@ -33,10 +38,13 @@ def _auth_header(token: str) -> dict:
 
 
 def api_login(username: str, password: str) -> Optional[dict]:
-    """登录并返回完整响应 json，失败返回 None"""
-    resp = httpx.post(f"{API_BASE}/login", json={
-        "username": username, "password": password
-    }, timeout=5)
+    """登录并返回完整响应 json，密码错误返回 None（429 先等封禁过期重试，避免误判成密码错）"""
+    payload = {"username": username, "password": password}
+    resp = httpx.post(f"{API_BASE}/login", json=payload, timeout=5)
+    if resp.status_code == 429:
+        m = re.search(r"(\d+)\s*秒", str(resp.json().get("detail", "")))
+        time.sleep(min(int(m.group(1)) if m else 30, 65) + 1)
+        resp = httpx.post(f"{API_BASE}/login", json=payload, timeout=5)
     if resp.status_code == 200:
         return resp.json()
     return None

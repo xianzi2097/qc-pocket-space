@@ -1,4 +1,4 @@
-"""
+r"""
 后端业务流程测试
 ================
 覆盖所有 API 模块的 CRUD 完整流程、边界情况、并发安全。
@@ -893,6 +893,41 @@ class Test并发:
         _delete_user("conc_msg_s")
         for i in range(3):
             _delete_user(f"conc_msg_t{i}")
+
+    def test_并发保存课堂记录不丢数据(self):
+        """RMW 持锁回归：两线程同时保存同班不同日期，两条都必须在（防双击/双标签页覆盖丢记录）"""
+        token = _create_user("conc_sess_t", "teacher")
+        cls_name = "并发班"
+        barrier = threading.Barrier(2)
+        results = []
+        errors = []
+
+        def save(date):
+            try:
+                barrier.wait(timeout=10)  # 两线程同时起跑，最大化重叠窗口
+                resp = client.post(f"/api/sessions/{cls_name}", headers=auth(token),
+                                   json={"date": date,
+                                         "students": [{"name": "并发学生", "status": "present"}]})
+                results.append(resp.status_code)
+            except Exception as e:
+                errors.append(f"{date}: {e}")
+
+        threads = [threading.Thread(target=save, args=(d,))
+                   for d in ("2026-09-15", "2026-09-16")]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == [], f"并发错误: {errors}"
+        assert all(s == 200 for s in results), f"保存失败: {results}"
+
+        resp = client.get(f"/api/sessions/{cls_name}?month=2026-09", headers=auth(token))
+        dates = [s["date"] for s in resp.json()["sessions"]]
+        assert "2026-09-15" in dates and "2026-09-16" in dates, \
+            f"丢记录！RMW 锁可能失效，实际只剩: {dates}"
+
+        _delete_user("conc_sess_t")
 
 
 # ============================================================
