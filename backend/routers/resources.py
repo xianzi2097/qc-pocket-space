@@ -11,19 +11,12 @@ from utils import (
     get_db, get_current_user, require_role,
     _safe_path, _get_teacher_key,
     _move_to_trash, _gen_unique_course_id,
-    _read_resource_meta, _write_resource_meta, _natural_sort_key,
+    _read_resource_meta, _write_resource_meta, _natural_sort_key, _read_order_file,
     ResourceCreateForm, RESOURCE_BASE
 )
+from file_tree import RESOURCE_META, reorder_entry, split_rel as _split_rel, walk_tree
 
 router = APIRouter()
-
-
-def _split_rel(rel: str) -> list:
-    """把相对路径拆成安全的路径段，过滤 . / .. """
-    rel = (rel or "").strip().strip("/\\")
-    if not rel:
-        return []
-    return [p for p in rel.replace("\\", "/").split("/") if p not in (".", "..")]
 
 
 # ── 路径工具 ──────────────────────────────────────────────
@@ -40,31 +33,7 @@ def _get_resource_path(caller: dict, resource_id: str) -> str:
     return path
 
 
-# ── 文件树（复用课程逻辑）─────────────────────────────────
-
-def _walk_resource_tree(dirpath: str, rel_prefix: str = "") -> list:
-    items = []
-    try:
-        names = os.listdir(dirpath)
-    except OSError:
-        return items
-    dirs = sorted(
-        (n for n in names if os.path.isdir(os.path.join(dirpath, n)) and not n.startswith(".")),
-        key=_natural_sort_key,
-    )
-    files = sorted(
-        (n for n in names if os.path.isfile(os.path.join(dirpath, n)) and not n.startswith(".") and n not in ("resource.json", "_order.json")),
-        key=_natural_sort_key,
-    )
-    for d in dirs:
-        sub = os.path.join(dirpath, d)
-        rel = f"{rel_prefix}/{d}" if rel_prefix else d
-        items.append({"name": d, "type": "dir", "size": os.stat(sub).st_size, "path": rel, "children": _walk_resource_tree(sub, rel)})
-    for f in files:
-        fp = os.path.join(dirpath, f)
-        rel = f"{rel_prefix}/{f}" if rel_prefix else f
-        items.append({"name": f, "type": "file", "size": os.stat(fp).st_size, "path": rel})
-    return items
+# ── 文件树（walk 逻辑在 file_tree.py，与课程共用；资料=文件夹置顶+path字段）──
 
 
 # ── CRUD ──────────────────────────────────────────────────
@@ -148,9 +117,21 @@ def get_resource_tree(resource_id: str, path: str = ""):
             if not os.path.exists(target):
                 raise HTTPException(status_code=404, detail="路径不存在")
             meta = _read_resource_meta(resource_path)
-            items = _walk_resource_tree(target) if os.path.isdir(target) else []
+            # _order.json 从资源根读；rel_prefix=path，保证 order key 与 reorder 写入的 key 同为根相对
+            order_map = _read_order_file(resource_path)
+            items = walk_tree(target, order_map, path.strip("/"),
+                              meta_files=RESOURCE_META, dirs_first=True,
+                              with_path=True, with_dir_size=True) if os.path.isdir(target) else []
             return {"status": "success", "tree": items, "meta": meta}
     raise HTTPException(status_code=404, detail="资源不存在")
+
+
+@router.post("/api/resources/{resource_id}/tree/reorder")
+async def reorder_resource_tree_entry(request: Request, resource_id: str, name: str, dir: str = "", direction: str = "up", target: str = ""):
+    """调整同级条目顺序（与课程同一套逻辑，写 _order.json）：up/down 逐格移动，swap + target 直接拖拽定位"""
+    caller = require_role(request, ["admin", "teacher"])
+    resource_path = _get_resource_path(caller, resource_id)
+    return reorder_entry(resource_path, name, dir, direction, target, meta_files=RESOURCE_META)
 
 
 @router.get("/api/resources/{resource_id}/download")

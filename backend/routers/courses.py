@@ -9,9 +9,9 @@ from utils import (
     _safe_path, _get_teacher_course_dir, _get_teacher_key,
     _move_to_trash, _gen_unique_course_id, _resolve_course_format,
     _read_course_meta, _write_course_meta, _natural_sort_key, _read_order_file,
-    _atomic_save, _file_lock,
     CourseCreateForm, CourseUpdateForm, RenameForm, FeaturedToggleForm
 )
+from file_tree import COURSE_META, reorder_entry, split_rel as _split_rel, walk_tree
 
 router = APIRouter()
 
@@ -373,36 +373,7 @@ async def save_sb3(
 # ==========================================
 # 文件树（资源管理器）：后台所有课程统一使用，支持任意层级嵌套
 # ==========================================
-def _split_rel(rel: str) -> list:
-    """把相对路径拆成安全的路径段，过滤 . / .. """
-    rel = (rel or "").strip().strip("/\\")
-    if not rel:
-        return []
-    return [p for p in rel.replace("\\", "/").split("/") if p not in (".", "..")]
-
-
-def _walk_tree(path: str, order_map: dict = None, rel_prefix: str = "") -> list:
-    entries = []
-    try:
-        all_names = [n for n in os.listdir(path)
-                     if not n.startswith(".") and n not in ("course.json", "_order.json")]
-    except OSError:
-        return entries
-    # 排序：_order.json 优先，fallback 自然排序
-    custom_order = (order_map or {}).get(rel_prefix)
-    if custom_order:
-        order_index = {name: i for i, name in enumerate(custom_order)}
-        all_names.sort(key=lambda n: order_index.get(n, 9999))
-    else:
-        all_names.sort(key=_natural_sort_key)
-    for name in all_names:
-        fp = os.path.join(path, name)
-        child_rel = f"{rel_prefix}/{name}" if rel_prefix else name
-        if os.path.isdir(fp):
-            entries.append({"name": name, "type": "dir", "children": _walk_tree(fp, order_map, child_rel)})
-        elif os.path.isfile(fp):
-            entries.append({"name": name, "type": "file", "size": os.path.getsize(fp)})
-    return entries
+# walk_tree 统一在 file_tree.py（与资料共用，防再次分叉）
 
 
 @router.get("/api/courses/{course_id}/tree")
@@ -410,7 +381,7 @@ def get_course_tree(request: Request, course_id: str):
     caller = require_role(request, ["admin", "teacher"])
     course_path = _get_course_path(caller, course_id)
     order_map = _read_order_file(course_path)
-    return {"status": "success", "tree": _walk_tree(course_path, order_map)}
+    return {"status": "success", "tree": walk_tree(course_path, order_map, meta_files=COURSE_META)}
 
 
 @router.post("/api/courses/{course_id}/tree/reorder")
@@ -418,48 +389,7 @@ async def reorder_tree_entry(request: Request, course_id: str, name: str, dir: s
     """调整同级条目顺序：direction=up/down 逐格移动，direction=swap + target 直接拖拽定位"""
     caller = require_role(request, ["admin", "teacher"])
     course_path = _get_course_path(caller, course_id)
-    if direction not in ("up", "down", "swap"):
-        raise HTTPException(status_code=400, detail="direction 必须是 up、down 或 swap")
-    # 找到父目录在课程内的相对路径
-    dir_path = _safe_path(course_path, *_split_rel(dir)) if dir else course_path
-    if not os.path.isdir(dir_path):
-        raise HTTPException(status_code=404, detail="目录不存在")
-    rel_key = dir.strip("/")  # _order.json 的 key，空字符串 = 根目录
-    order_path = os.path.join(course_path, "_order.json")
-    # 读 order_map → 改 → 写 整体上锁（fp 与 _read_order_file 内部路径一致），防并发 reorder 互相覆盖
-    with _file_lock(order_path):
-        order_map = _read_order_file(course_path)
-        # 获取当前同级条目列表
-        siblings = [n for n in os.listdir(dir_path)
-                    if not n.startswith(".") and n not in ("course.json", "_order.json")]
-        current_order = order_map.get(rel_key, siblings)
-        # 保留当前 order 中存在且磁盘上也存在的条目，追加磁盘上有但 order 中没有的
-        existing_set = set(siblings)
-        ordered = [n for n in current_order if n in existing_set]
-        ordered.extend(n for n in siblings if n not in ordered)
-        if name not in ordered:
-            raise HTTPException(status_code=404, detail=f"未找到 {name}")
-        if direction == "swap" and target:
-            # 拖拽排序：把 name 移到 target 的位置
-            if target not in ordered:
-                raise HTTPException(status_code=404, detail=f"未找到 {target}")
-            old_idx = ordered.index(name)
-            new_idx = ordered.index(target)
-            if old_idx == new_idx:
-                return {"status": "success", "message": "位置未变"}
-            # arrayMove 语义：移除 old_idx 插入到 new_idx
-            item = ordered.pop(old_idx)
-            ordered.insert(new_idx, item)
-        else:
-            idx = ordered.index(name)
-            new_idx = idx - 1 if direction == "up" else idx + 1
-            if new_idx < 0 or new_idx >= len(ordered):
-                return {"status": "success", "message": "已在边界，无需调整"}
-            ordered[idx], ordered[new_idx] = ordered[new_idx], ordered[idx]
-        # 写回 _order.json：_atomic_save 原子写，替换原来的裸 open(w)
-        order_map[rel_key] = ordered
-        _atomic_save(order_path, order_map)
-    return {"status": "success", "message": f"{name} 已调整顺序", "order": ordered}
+    return reorder_entry(course_path, name, dir, direction, target, meta_files=COURSE_META)
 
 
 @router.post("/api/courses/{course_id}/tree/folder")
