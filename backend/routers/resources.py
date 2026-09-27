@@ -12,7 +12,7 @@ from utils import (
     _safe_path, _get_teacher_key,
     _move_to_trash, _gen_unique_course_id,
     _read_resource_meta, _write_resource_meta, _natural_sort_key, _read_order_file,
-    ResourceCreateForm, RESOURCE_BASE
+    ResourceCreateForm, ResourceUpdateForm, RESOURCE_BASE
 )
 from file_tree import RESOURCE_META, reorder_entry, split_rel as _split_rel, walk_tree
 
@@ -74,6 +74,8 @@ def list_resources(teacher: str = "", category: str = ""):
                 "url": f"/resources/{teacher_name}_resource/{rid}/",
                 "material_count": material_count,
                 "created_at": meta.get("created_at", ""),
+                "tags": meta.get("tags") or [],
+                "format": meta.get("format") or "folder",
             })
     return {"status": "success", "resources": items}
 
@@ -96,6 +98,7 @@ def create_resource(request: Request, form: ResourceCreateForm):
         "id": resource_id, "name": name or "未命名资源",
         "category": category if category in ("reference", "download") else "reference",
         "description": form.description, "teacher": caller["username"],
+        "tags": form.tags, "format": form.format or "folder",
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
     _write_resource_meta(resource_path, meta)
@@ -248,16 +251,26 @@ def delete_resource_entry(request: Request, resource_id: str, path: str = ""):
 
 
 @router.put("/api/resources/{resource_id}")
-def update_resource(request: Request, resource_id: str, name: str = "", category: str = ""):
+def update_resource(request: Request, resource_id: str, form: ResourceUpdateForm):
     caller = require_role(request, ["admin", "teacher"])
     resource_path = _get_resource_path(caller, resource_id)
+    name = form.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="名称不能为空")
+    # 重名校验（排除自身）
+    res_dir = _get_teacher_resource_dir(caller["username"])
+    for existing in os.listdir(res_dir):
+        ep = os.path.join(res_dir, existing)
+        if existing != resource_id and os.path.isdir(ep) and _read_resource_meta(ep).get("name") == name:
+            raise HTTPException(status_code=400, detail="资源已存在")
     meta = _read_resource_meta(resource_path)
-    if name:
-        meta["name"] = name.strip()
-    if category and category in ("reference", "download"):
-        meta["category"] = category
+    meta["name"] = name
+    meta["description"] = form.description
+    meta["tags"] = form.tags
+    if form.format:
+        meta["format"] = form.format
     _write_resource_meta(resource_path, meta)
-    return {"status": "success", "resource": meta}
+    return {"status": "success", "message": "资源信息已更新", "resource": meta}
 
 
 @router.delete("/api/resources/{resource_id}")

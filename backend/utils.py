@@ -600,6 +600,23 @@ def _list_trash_items(owner: str = "") -> list:
                     total_size += os.path.getsize(os.path.join(dirpath, fn))
                 except OSError:
                     pass
+        # 课程/资源：从内层业务 meta 补充可读名称（回收站弹窗展示用）
+        if meta.get("type") in ("course", "resource"):
+            for fn in sorted(os.listdir(folder_path)):
+                inner = os.path.join(folder_path, fn)
+                if not os.path.isdir(inner):
+                    continue
+                for mf in ("course.json", "resource.json"):
+                    mp = os.path.join(inner, mf)
+                    if os.path.exists(mp):
+                        try:
+                            with open(mp, "r", encoding="utf-8") as f:
+                                meta["name"] = json.load(f).get("name") or fn
+                        except (json.JSONDecodeError, OSError):
+                            meta["name"] = fn
+                        break
+                if "name" in meta:
+                    break
         meta["_folder"] = folder_name
         meta["_size"] = total_size
         items.append(meta)
@@ -680,6 +697,15 @@ class ResourceCreateForm(BaseModel):
     name: str = ""
     category: str = "reference"
     description: str = ""
+    tags: list[str] = []
+    format: str = "folder"
+
+
+class ResourceUpdateForm(BaseModel):
+    name: str
+    description: str = ""
+    tags: list[str] = []
+    format: str = ""
 
 
 class CourseUpdateForm(BaseModel):

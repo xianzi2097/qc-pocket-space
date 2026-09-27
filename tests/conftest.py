@@ -55,6 +55,38 @@ def _clean_test_course_dirs():
         print(f"\n  🧹 conftest: 清理了 {cleaned} 个测试课程目录")
 
 
+def _clean_test_resource_dirs():
+    """清理测试产生的资源目录（biz_*, e2e_* 前缀的老师资源目录）"""
+    data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
+    resources_dir = os.path.join(data_dir, "resources")
+    if not os.path.isdir(resources_dir):
+        return
+    cleaned = 0
+    for name in os.listdir(resources_dir):
+        if name.endswith("_resource") and any(name.startswith(p) for p in ("biz_", "e2e_", "conc_", "sec_")):
+            import shutil
+            shutil.rmtree(os.path.join(resources_dir, name), ignore_errors=True)
+            cleaned += 1
+    if cleaned:
+        print(f"\n  🧹 conftest: 清理了 {cleaned} 个测试资源目录")
+
+
+def _clean_test_file_trash():
+    """清理文件版回收站中的测试残留（课程/资源回收目录，形如 course__biz_xxx__ts）"""
+    data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
+    trash_dir = os.path.join(data_dir, "trash")
+    if not os.path.isdir(trash_dir):
+        return
+    cleaned = 0
+    for name in os.listdir(trash_dir):
+        if any(f"__{p}" in name for p in ("biz_", "e2e_", "conc_", "sec_")):
+            import shutil
+            shutil.rmtree(os.path.join(trash_dir, name), ignore_errors=True)
+            cleaned += 1
+    if cleaned:
+        print(f"\n  🧹 conftest: 清理了 {cleaned} 个文件回收站目录")
+
+
 def _ensure_admin():
     """确保 admin 存在（测试可能删了它）"""
     db = SessionLocal()
@@ -77,7 +109,11 @@ def session_cleanup():
     """Session 开始前清理残留，结束后再清理一次"""
     _clean_test_trash()
     _clean_test_course_dirs()
+    _clean_test_resource_dirs()
+    _clean_test_file_trash()
     _ensure_admin()
     yield
     _clean_test_trash()
     _clean_test_course_dirs()
+    _clean_test_resource_dirs()
+    _clean_test_file_trash()

@@ -9,6 +9,7 @@ from utils import (
     get_db, get_current_user, require_role, restore_from_trash,
     _list_trash_items, _move_to_trash, _load_classes, _save_classes,
     _get_teacher_course_dir, _safe_path, TRASH_DIR,
+    RESOURCE_BASE, _get_teacher_key,
     _get_classes_path, _file_lock
 )
 
@@ -97,14 +98,25 @@ def restore_trash_item(request: Request, folder_name: str):
             classes = _load_classes(caller["username"])
             classes.append(restored)
             _save_classes(caller["username"], classes)
-    elif meta["type"] == "course":
-        base = _get_teacher_course_dir(meta["owner"])
-        target = os.path.join(base, os.path.basename(meta["original_path"]))
-        shutil.move(folder_path, target)
-        trash_meta = os.path.join(target, ".trash.json")
-        if os.path.exists(trash_meta):
-            os.remove(trash_meta)
-        return {"status": "success", "message": "课程已恢复"}
+    elif meta["type"] in ("course", "resource"):
+        if meta["type"] == "course":
+            base = _get_teacher_course_dir(meta["owner"])
+            msg = "课程已恢复"
+        else:
+            base = os.path.join(RESOURCE_BASE, f"{_get_teacher_key(meta['owner'])}_resource")
+            msg = "资源已恢复"
+        os.makedirs(base, exist_ok=True)
+        item_name = os.path.basename(meta["original_path"].rstrip("/\\"))
+        target = os.path.join(base, item_name)
+        if os.path.exists(target):
+            raise HTTPException(status_code=400, detail="原位置已存在同名项目")
+        # 回收站外壳 = {item_name}/（真实数据） + .trash.json；只把内层数据目录移回去
+        inner = os.path.join(folder_path, item_name)
+        if not os.path.isdir(inner):
+            raise HTTPException(status_code=400, detail="回收站数据损坏")
+        shutil.move(inner, target)
+        shutil.rmtree(folder_path, ignore_errors=True)
+        return {"status": "success", "message": msg}
     else:
         raise HTTPException(status_code=400, detail="不支持的回收站类型")
     shutil.rmtree(folder_path)
