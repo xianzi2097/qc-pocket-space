@@ -1,6 +1,9 @@
 """用户设置路由 — 存在用户目录的 settings.json"""
 import os
 import json
+import time
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from utils import get_current_user, _resolve_user_dir, _atomic_save, _file_lock
@@ -13,6 +16,7 @@ DEFAULTS = {
     "customHue": "",
     "fontSize": 16,
     "sidebarExpanded": True,
+    "recentOpens": [],
 }
 
 
@@ -74,3 +78,37 @@ def update_settings(request: Request, form: SettingsForm):
         _atomic_save(fp, settings)
 
     return {"status": "success", "settings": settings}
+
+
+class RecentOpenForm(BaseModel):
+    kind: Literal["section", "course"]
+    id: str
+    label: str
+    teacher: str | None = None
+    type: str | None = None
+
+
+@router.post("/api/user/recent-opens")
+def add_recent_open(request: Request, form: RecentOpenForm):
+    """记录一次「最近打开」—— 读-改-写整体持锁，同 kind+id 去重置顶，上限 6 条。游客无账号 → 401"""
+    caller = get_current_user(request)
+    fp = _settings_path(caller["username"])
+    entry = {
+        "kind": form.kind,
+        "id": form.id[:100],
+        "label": form.label[:200],
+        "teacher": form.teacher,
+        "type": form.type,
+        "ts": int(time.time() * 1000),
+    }
+    with _file_lock(fp):
+        settings = _load_settings(caller["username"])
+        rest = [
+            x for x in settings.get("recentOpens", [])
+            if not (isinstance(x, dict) and x.get("kind") == form.kind and x.get("id") == form.id)
+        ]
+        settings["recentOpens"] = ([entry] + rest)[:6]
+        os.makedirs(os.path.dirname(fp), exist_ok=True)
+        _atomic_save(fp, settings)
+
+    return {"status": "success"}
