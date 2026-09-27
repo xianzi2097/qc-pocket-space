@@ -82,7 +82,7 @@ class TestStudentE2E:
         add_student_to_class(teacher["token"], cls_name, student["username"], sid)
         # 发一条消息给学生
         send_message(teacher["token"], student["username"], "E2E测试：作业通知", "请完成第三章练习")
-        # 创建一门精选课程（课程广场「课程」tab 只显示精选）
+        # 创建一门课程并打上「课程」标记（课程广场「课程」tab 只显示标记过的）
         course_name = f"E2E广场课_{ts}"
         resp = create_course(teacher["token"], teacher["username"], course_name)
         cid = (resp.get("course") or {}).get("id")
@@ -195,7 +195,7 @@ class TestStudentE2E:
     # ─── 2.4 课程广场 ───
 
     def test_04_学生浏览课程广场(self, page: Page, student_data):
-        """学生应能进入课程广场并看到精选课程"""
+        """学生应能进入课程广场并看到打标课程"""
         s = student_data["student"]
         t = student_data["teacher"]
         course_name = student_data["course"]
@@ -210,7 +210,7 @@ class TestStudentE2E:
         page.get_by_role("button").filter(has_text="课程").first.click()
         page.wait_for_timeout(1500)
 
-        # 验证精选课程卡片可见（新版广场展示课程书架，不再展示老师列表）
+        # 验证课程卡片可见（新版广场展示课程书架，不再展示老师列表）
         expect(page.get_by_text(course_name).first).to_be_visible()
 
     # ─── 2.5 修改密码 ───

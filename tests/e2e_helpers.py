@@ -161,11 +161,11 @@ def save_attendance(teacher_token: str, class_name: str, date: str,
 
 
 def feature_course(teacher_token: str, course_id: str, featured: bool = True) -> dict:
-    """设/取消精选：课程广场「课程」tab 只显示精选课程"""
+    """设置/取消「课程」标记：课程广场「课程」tab 只显示标记过的课程"""
     resp = httpx.put(f"{API_BASE}/courses/{course_id}/featured",
                      headers=_auth_header(teacher_token),
                      json={"featured": featured}, timeout=5)
-    assert resp.status_code == 200, f"设置精选失败: {resp.text}"
+    assert resp.status_code == 200, f"设置课程标记失败: {resp.text}"
     return resp.json()
 
 
