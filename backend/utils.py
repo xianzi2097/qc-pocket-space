@@ -716,5 +716,5 @@ class CourseUpdateForm(BaseModel):
     format: str = ""
 
 class FeaturedToggleForm(BaseModel):
-    featured: bool  # true=精选（显示在「精选课程」栏目），false=普通（显示在「在线课程」）
+    featured: bool  # true=课程（显示在主页侧边栏「课程」），false=书架
 

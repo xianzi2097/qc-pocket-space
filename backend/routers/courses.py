@@ -49,7 +49,7 @@ def list_courses(teacher: str = ""):
             "tags": meta.get("tags", []),
             "material_count": len(materials),
             "publish": meta.get("publish", {"status": "idle"}),
-            "featured": bool(meta.get("featured", False)),  # 精选课程（显示在「精选课程」栏目）
+            "featured": bool(meta.get("featured", False)),  # true=课程（主页侧边栏「课程」），false=书架
             "teacher_key": _get_teacher_key(teacher),  # 课程归属老师（仅展示用，URL 不再含老师层）
         })
     return {"status": "success", "courses": courses}
@@ -263,7 +263,7 @@ def update_course(request: Request, course_id: str, form: CourseUpdateForm):
 
 @router.put("/api/courses/{course_id}/featured")
 def set_course_featured(request: Request, course_id: str, form: FeaturedToggleForm):
-    """设置/取消精选：精选课程显示在主页「精选课程」栏目，从「在线课程」列表隐藏"""
+    """设置/取消「课程」标记：标记的显示在主页侧边栏「课程」，未标记的收在「书架」"""
     caller = require_role(request, ["admin", "teacher"])
     base = _get_teacher_course_dir(caller["username"])
     course_path = _safe_path(base, course_id)
@@ -272,7 +272,7 @@ def set_course_featured(request: Request, course_id: str, form: FeaturedToggleFo
     meta = _read_course_meta(course_path)
     meta["featured"] = form.featured
     _write_course_meta(course_path, meta)
-    return {"status": "success", "message": "已设为精选" if form.featured else "已取消精选"}
+    return {"status": "success", "message": "已加入「课程」" if form.featured else "已移回书架"}
 
 
 @router.post("/api/courses/{course_name}/rename")
