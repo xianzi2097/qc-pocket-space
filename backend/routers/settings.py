@@ -10,12 +10,12 @@ from utils import get_current_user, _resolve_user_dir, _atomic_save, _file_lock
 
 router = APIRouter()
 
-# 默认设置
+# 默认设置（sidebarExpanded 默认收起：首次进入是图标栏，用户手动展开后记住）
 DEFAULTS = {
     "theme": "",
     "customHue": "",
     "fontSize": 16,
-    "sidebarExpanded": True,
+    "sidebarExpanded": False,
     "recentOpens": [],
 }
 
