@@ -9,6 +9,7 @@ import time
 import shutil
 from collections import defaultdict
 from datetime import datetime
+from typing import Literal
 from fastapi import HTTPException, Request, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -716,5 +717,9 @@ class CourseUpdateForm(BaseModel):
     format: str = ""
 
 class FeaturedToggleForm(BaseModel):
-    featured: bool  # true=课程（显示在主页侧边栏「课程」），false=书架
+    featured: bool  # 旧接口兼容：true=课程，false=书架（新代码用 ShelfUpdateForm）
+
+
+class ShelfUpdateForm(BaseModel):
+    shelf: Literal["books", "courses"]  # books=书架（收纳），courses=课程（老师正在教）
 

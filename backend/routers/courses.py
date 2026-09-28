@@ -9,11 +9,20 @@ from utils import (
     _safe_path, _get_teacher_course_dir, _get_teacher_key,
     _move_to_trash, _gen_unique_course_id, _resolve_course_format,
     _read_course_meta, _write_course_meta, _natural_sort_key, _read_order_file,
-    CourseCreateForm, CourseUpdateForm, RenameForm, FeaturedToggleForm
+    CourseCreateForm, CourseUpdateForm, RenameForm, FeaturedToggleForm, ShelfUpdateForm
 )
 from file_tree import COURSE_META, reorder_entry, split_rel as _split_rel, walk_tree
 
 router = APIRouter()
+
+
+def _course_shelf(meta: dict) -> str:
+    """课程所在书架：'courses'=课程（老师正在教），'books'=书架（收纳）
+    兼容旧 course.json：只有 featured 布尔字段的历史数据按 featured 映射"""
+    shelf = meta.get("shelf")
+    if shelf in ("books", "courses"):
+        return shelf
+    return "courses" if meta.get("featured") else "books"
 
 
 def _get_course_path(caller: dict, course_id: str) -> str:
@@ -49,7 +58,8 @@ def list_courses(teacher: str = ""):
             "tags": meta.get("tags", []),
             "material_count": len(materials),
             "publish": meta.get("publish", {"status": "idle"}),
-            "featured": bool(meta.get("featured", False)),  # true=课程（主页侧边栏「课程」），false=书架
+            "shelf": _course_shelf(meta),  # books=书架，courses=课程
+            "featured": _course_shelf(meta) == "courses",  # 旧字段保留，兼容旧前端缓存
             "teacher_key": _get_teacher_key(teacher),  # 课程归属老师（仅展示用，URL 不再含老师层）
         })
     return {"status": "success", "courses": courses}
@@ -261,18 +271,28 @@ def update_course(request: Request, course_id: str, form: CourseUpdateForm):
     return {"status": "success", "message": "课程信息已更新"}
 
 
+def _apply_shelf(course_path: str, shelf: str) -> dict:
+    """写入书架字段：新键 shelf + 旧键 featured 同步（旧数据/旧前端兼容）"""
+    meta = _read_course_meta(course_path)
+    meta["shelf"] = shelf
+    meta["featured"] = shelf == "courses"
+    _write_course_meta(course_path, meta)
+    return {"status": "success", "shelf": shelf,
+            "message": "已加入「课程」" if shelf == "courses" else "已移回书架"}
+
+
+@router.put("/api/courses/{course_id}/shelf")
+def set_course_shelf(request: Request, course_id: str, form: ShelfUpdateForm):
+    """移动课程所在书架：courses=课程（主页侧边栏），books=书架（收纳）"""
+    caller = require_role(request, ["admin", "teacher"])
+    return _apply_shelf(_get_course_path(caller, course_id), form.shelf)
+
+
 @router.put("/api/courses/{course_id}/featured")
 def set_course_featured(request: Request, course_id: str, form: FeaturedToggleForm):
-    """设置/取消「课程」标记：标记的显示在主页侧边栏「课程」，未标记的收在「书架」"""
+    """旧接口兼容（featured 布尔 → 书架语义），新代码用 /shelf"""
     caller = require_role(request, ["admin", "teacher"])
-    base = _get_teacher_course_dir(caller["username"])
-    course_path = _safe_path(base, course_id)
-    if not os.path.exists(course_path):
-        raise HTTPException(status_code=404, detail="课程不存在")
-    meta = _read_course_meta(course_path)
-    meta["featured"] = form.featured
-    _write_course_meta(course_path, meta)
-    return {"status": "success", "message": "已加入「课程」" if form.featured else "已移回书架"}
+    return _apply_shelf(_get_course_path(caller, course_id), "courses" if form.featured else "books")
 
 
 @router.post("/api/courses/{course_name}/rename")
