@@ -10,49 +10,56 @@
     <meta property="og:title" content="CodeNova | 少儿编程教学平台" />
     <meta property="og:description" content="少儿编程教学平台，专为培训机构打造，局域网零部署，开箱即用。" />
     <meta property="og:type" content="website" />
-    <script type="module" crossorigin src="/assets/index-CsXhapCb.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-D0SS4iIb.css">
+    <script type="module" crossorigin src="/assets/index-Cxxu8Yqs.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BcLkpQpt.css">
   </head>
   <body>
     <div id="root">
+      <!-- 统一载入动画 v1（CodeNova 暖底橙球）· 三处同步修改：
+           ① 本文件 #splash-loader
+           ② labs_dev/scratch-gui.4.0.43/src/playground/index.ejs #cloud-loading
+           ③ labs_dev/scratch-gui.4.0.43/src/components/loader/loader.css
+           改一处请同步另外两处 -->
       <div id="splash-loader" style="
         position: fixed; inset: 0; z-index: 99999;
         display: flex; flex-direction: column;
         justify-content: center; align-items: center;
-        background: #0f172a; color: #fff;
-        font-family: system-ui, sans-serif;
+        background: #faf9f5; color: #16181d;
+        font-family: system-ui, 'Microsoft YaHei', sans-serif;
       ">
         <style>
           .sp-ball {
-            position: relative; width: 120px; height: 90px; margin: 0 auto;
+            position: relative; width: 7.5rem; height: 5.625rem; margin: 0 auto;
           }
           .sp-ball:before, .sp-ball:after {
             content: ''; position: absolute;
           }
           .sp-ball:before {
-            bottom: 30px; left: 50px;
-            height: 30px; width: 30px;
-            border-radius: 50%; background: #2a9d8f;
+            bottom: 1.875rem; left: 3.125rem;
+            height: 1.875rem; width: 1.875rem;
+            border-radius: 50%; background: #f97316;
             animation: sp-bounce .5s ease-in-out infinite alternate;
           }
           .sp-ball:after {
-            right: 0; top: 0; height: 7px; width: 45px;
-            border-radius: 4px;
-            box-shadow: 0 5px 0 #f2f2f2, -35px 50px 0 #f2f2f2, -70px 95px 0 #f2f2f2;
+            right: 0; top: 0; height: 0.4375rem; width: 2.8125rem;
+            border-radius: 0.25rem;
+            box-shadow: 0 5px 0 #e7e3d9, -35px 50px 0 #e7e3d9, -70px 95px 0 #e7e3d9;
             animation: sp-step 1s ease-in-out infinite;
           }
           @keyframes sp-bounce {
             0% { transform: scale(1,.7); }
             40% { transform: scale(.8,1.2); }
             60% { transform: scale(1,1); }
-            100% { bottom: 140px; }
+            100% { bottom: 8.75rem; }
           }
           @keyframes sp-step {
-            0% { box-shadow: 0 10px 0 #0000, 0 10px 0 #f2f2f2, -35px 50px 0 #f2f2f2, -70px 90px 0 #f2f2f2; }
-            100% { box-shadow: 0 10px 0 #f2f2f2, -35px 50px 0 #f2f2f2, -70px 90px 0 #f2f2f2, -70px 90px 0 #0000; }
+            0% { box-shadow: 0 10px 0 #0000, 0 10px 0 #e7e3d9, -35px 50px 0 #e7e3d9, -70px 90px 0 #e7e3d9; }
+            100% { box-shadow: 0 10px 0 #e7e3d9, -35px 50px 0 #e7e3d9, -70px 90px 0 #e7e3d9, -70px 90px 0 #0000; }
           }
+          .sp-title { margin-top: 1.5rem; font-size: 1.5rem; font-weight: 700; }
         </style>
         <div class="sp-ball"></div>
+        <div class="sp-title">CodeNova 加载中</div>
       </div>
     </div>
   </body>

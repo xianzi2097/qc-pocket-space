@@ -21,27 +21,32 @@
                 flex-direction: column;
                 justify-content: center;
                 align-items: center;
-                background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-                color: #fff;
-                font-family: &quot;Segoe UI&quot;, system-ui, sans-serif;
+                background: #faf9f5;
+                color: #16181d;
+                font-family: system-ui, &quot;Microsoft YaHei&quot;, sans-serif;
             "
         >
+            <!-- 统一载入动画 v1（CodeNova 暖底橙球）· 三处同步修改：
+                 ① labs_dev/qx-dashboard-ts/index.html #splash-loader
+                 ② 本文件 #cloud-loading
+                 ③ labs_dev/scratch-gui.4.0.43/src/components/loader/loader.css
+                 改一处请同步另外两处 -->
             <style>
                 .qc-loader {
                     position: relative;
-                    width: 120px;
-                    height: 90px;
+                    width: 7.5rem;
+                    height: 5.625rem;
                     margin: 0 auto;
                 }
                 .qc-loader:before {
                     content: "";
                     position: absolute;
-                    bottom: 30px;
-                    left: 50px;
-                    height: 30px;
-                    width: 30px;
+                    bottom: 1.875rem;
+                    left: 3.125rem;
+                    height: 1.875rem;
+                    width: 1.875rem;
                     border-radius: 50%;
-                    background: #2a9d8f;
+                    background: #f97316;
                     animation: qc-bounce 0.5s ease-in-out infinite alternate;
                 }
                 .qc-loader:after {
@@ -49,14 +54,19 @@
                     position: absolute;
                     right: 0;
                     top: 0;
-                    height: 7px;
-                    width: 45px;
-                    border-radius: 4px;
+                    height: 0.4375rem;
+                    width: 2.8125rem;
+                    border-radius: 0.25rem;
                     box-shadow:
-                        0 5px 0 #f2f2f2,
-                        -35px 50px 0 #f2f2f2,
-                        -70px 95px 0 #f2f2f2;
+                        0 5px 0 #e7e3d9,
+                        -35px 50px 0 #e7e3d9,
+                        -70px 95px 0 #e7e3d9;
                     animation: qc-step 1s ease-in-out infinite;
+                }
+                .qc-title {
+                    margin-top: 1.5rem;
+                    font-size: 1.5rem;
+                    font-weight: 700;
                 }
                 @keyframes qc-bounce {
                     0% {
@@ -69,27 +79,28 @@
                         transform: scale(1, 1);
                     }
                     100% {
-                        bottom: 140px;
+                        bottom: 8.75rem;
                     }
                 }
                 @keyframes qc-step {
                     0% {
                         box-shadow:
                             0 10px 0 rgba(0, 0, 0, 0),
-                            0 10px 0 #f2f2f2,
-                            -35px 50px 0 #f2f2f2,
-                            -70px 90px 0 #f2f2f2;
+                            0 10px 0 #e7e3d9,
+                            -35px 50px 0 #e7e3d9,
+                            -70px 90px 0 #e7e3d9;
                     }
                     100% {
                         box-shadow:
-                            0 10px 0 #f2f2f2,
-                            -35px 50px 0 #f2f2f2,
-                            -70px 90px 0 #f2f2f2,
+                            0 10px 0 #e7e3d9,
+                            -35px 50px 0 #e7e3d9,
+                            -70px 90px 0 #e7e3d9,
                             -70px 90px 0 rgba(0, 0, 0, 0);
                     }
                 }
             </style>
             <div class="qc-loader"></div>
+            <div class="qc-title" id="cloud-loading-text">CodeNova 加载中</div>
         </div>
     </body>
 </html>
