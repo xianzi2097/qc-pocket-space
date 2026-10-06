@@ -20,7 +20,7 @@ def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _teacher(client, admin_token, username="t_cls", password="abcd1234"):
+def _teacher(client, admin_token, username="cls_t_cls", password="abcd1234"):
     resp = client.post(
         "/api/accounts",
         json={"username": username, "password": password, "role": "teacher"},
@@ -31,7 +31,7 @@ def _teacher(client, admin_token, username="t_cls", password="abcd1234"):
     return token.json()["data"]["token"]
 
 
-def _student_token(client, admin_token, username="stu_cls"):
+def _student_token(client, admin_token, username="cls_stu_cls"):
     client.post("/api/accounts",
                 json={"username": username, "password": "abcd1234", "role": "student"},
                 headers=_auth(admin_token))
@@ -55,8 +55,8 @@ def test_list_requires_login(client):
 
 def test_list_visibility_scoped(client, login):
     admin = login()
-    t_a = _teacher(client, admin["token"], "t_vis_a")
-    t_b = _teacher(client, admin["token"], "t_vis_b")
+    t_a = _teacher(client, admin["token"], "cls_t_vis_a")
+    t_b = _teacher(client, admin["token"], "cls_t_vis_b")
     _create_class(client, t_a, "A班")
     _create_class(client, t_b, "B班")
 
@@ -70,10 +70,10 @@ def test_list_visibility_scoped(client, login):
 
 def test_list_has_student_count_and_owner(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_cnt")
+    t = _teacher(client, admin["token"], "cls_t_cnt")
     created = _create_class(client, t, "计数班").json()["data"]
     client.post(f"/api/classes/{created['id']}/students",
-                json={"username": "stu_cnt1", "password": "abcd1234"},
+                json={"username": "cls_stu_cnt1", "password": "abcd1234"},
                 headers=_auth(t))
 
     items = client.get("/api/classes", headers=_auth(t)).json()["data"]["items"]
@@ -84,10 +84,10 @@ def test_list_has_student_count_and_owner(client, login):
 
 def test_student_sees_member_classes_only(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_who")
+    t = _teacher(client, admin["token"], "cls_t_who")
     in_cls = _create_class(client, t, "在的班").json()["data"]
     _create_class(client, t, "没我的班")
-    stu_token = _student_token(client, admin["token"], "stu_who")
+    stu_token = _student_token(client, admin["token"], "cls_stu_who")
     client.post(f"/api/classes/{in_cls['id']}/students",
                 json={"account_id": client.get("/api/auth/me", headers=_auth(stu_token)).json()["data"]["id"]},
                 headers=_auth(t))
@@ -100,7 +100,7 @@ def test_student_sees_member_classes_only(client, login):
 
 def test_create_requires_teacher_or_admin(client, login):
     admin = login()
-    stu_token = _student_token(client, admin["token"], "stu_mk")
+    stu_token = _student_token(client, admin["token"], "cls_stu_mk")
     resp = _create_class(client, stu_token, "学生班")
     assert resp.status_code == 403 and resp.json()["code"] == 2005
 
@@ -112,7 +112,7 @@ def test_admin_can_create(client, login):
 
 def test_create_lands_in_db(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_land")
+    t = _teacher(client, admin["token"], "cls_t_land")
     schedule = {"mon": "18:00"}
     resp = _create_class(client, t, "落库班", schedule=schedule)
     assert resp.json()["code"] == 0
@@ -131,7 +131,7 @@ def test_create_lands_in_db(client, login):
 
 def test_duplicate_name_same_owner_409(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_dup")
+    t = _teacher(client, admin["token"], "cls_t_dup")
     assert _create_class(client, t, "重名班").json()["code"] == 0
     again = _create_class(client, t, "重名班")
     assert again.status_code == 409 and again.json()["code"] == 4001
@@ -139,8 +139,8 @@ def test_duplicate_name_same_owner_409(client, login):
 
 def test_same_name_different_owners_ok(client, login):
     admin = login()
-    t1 = _teacher(client, admin["token"], "t_s1")
-    t2 = _teacher(client, admin["token"], "t_s2")
+    t1 = _teacher(client, admin["token"], "cls_t_s1")
+    t2 = _teacher(client, admin["token"], "cls_t_s2")
     assert _create_class(client, t1, "同名班").json()["code"] == 0
     assert _create_class(client, t2, "同名班").json()["code"] == 0   # 重名按老师隔离
 
@@ -161,23 +161,23 @@ def test_detail_requires_login(client, login):
 
 def test_detail_shows_students_for_member(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_det")
+    t = _teacher(client, admin["token"], "cls_t_det")
     cls = _create_class(client, t, "成员班").json()["data"]
     stu_id = client.post("/api/accounts",
-                         json={"username": "stu_det", "password": "abcd1234", "role": "student"},
+                         json={"username": "cls_stu_det", "password": "abcd1234", "role": "student"},
                          headers=_auth(admin["token"])).json()["data"]["id"]
     client.post(f"/api/classes/{cls['id']}/students", json={"account_id": stu_id}, headers=_auth(t))
 
     detail = client.get(f"/api/classes/{cls['id']}", headers=_auth(t)).json()["data"]
     assert detail["name"] == "成员班"
-    assert [s["username"] for s in detail["students"]] == ["stu_det"]
+    assert [s["username"] for s in detail["students"]] == ["cls_stu_det"]
     assert detail["students"][0]["schedule_override"] is None
 
 
 def test_detail_outsider_403(client, login):
     admin = login()
-    t1 = _teacher(client, admin["token"], "t_o1")
-    t2 = _teacher(client, admin["token"], "t_o2")
+    t1 = _teacher(client, admin["token"], "cls_t_o1")
+    t2 = _teacher(client, admin["token"], "cls_t_o2")
     cls = _create_class(client, t1, "别人的班").json()["data"]
     resp = client.get(f"/api/classes/{cls['id']}", headers=_auth(t2))
     assert resp.status_code == 403 and resp.json()["code"] == 2005
@@ -192,7 +192,7 @@ def test_detail_missing_404(client, login):
 
 def test_patch_rename_by_owner(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_ren")
+    t = _teacher(client, admin["token"], "cls_t_ren")
     cls = _create_class(client, t, "旧名字").json()["data"]
     resp = client.patch(f"/api/classes/{cls['id']}", json={"name": "新名字"}, headers=_auth(t))
     assert resp.json()["code"] == 0 and resp.json()["data"]["name"] == "新名字"
@@ -206,7 +206,7 @@ def test_patch_rename_by_owner(client, login):
 
 def test_patch_rename_duplicate_409(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_rd")
+    t = _teacher(client, admin["token"], "cls_t_rd")
     _create_class(client, t, "班甲")
     cls_b = _create_class(client, t, "班乙").json()["data"]
     resp = client.patch(f"/api/classes/{cls_b['id']}", json={"name": "班甲"}, headers=_auth(t))
@@ -215,8 +215,8 @@ def test_patch_rename_duplicate_409(client, login):
 
 def test_patch_by_non_owner_403(client, login):
     admin = login()
-    t1 = _teacher(client, admin["token"], "t_p1")
-    t2 = _teacher(client, admin["token"], "t_p2")
+    t1 = _teacher(client, admin["token"], "cls_t_p1")
+    t2 = _teacher(client, admin["token"], "cls_t_p2")
     cls = _create_class(client, t1, "受保护班").json()["data"]
     resp = client.patch(f"/api/classes/{cls['id']}", json={"name": "被改了"}, headers=_auth(t2))
     assert resp.status_code == 403 and resp.json()["code"] == 2005
@@ -224,7 +224,7 @@ def test_patch_by_non_owner_403(client, login):
 
 def test_patch_schedule_stored(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_sch")
+    t = _teacher(client, admin["token"], "cls_t_sch")
     cls = _create_class(client, t, "排课班").json()["data"]
     schedule = {"wed": "19:00", "sat": "10:00"}
     resp = client.patch(f"/api/classes/{cls['id']}", json={"schedule": schedule}, headers=_auth(t))
@@ -241,10 +241,10 @@ def test_patch_schedule_stored(client, login):
 
 def test_delete_by_owner_goes_to_trash(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_del")
+    t = _teacher(client, admin["token"], "cls_t_del")
     cls = _create_class(client, t, "待删班").json()["data"]
     stu_id = client.post("/api/accounts",
-                         json={"username": "stu_delcls", "password": "abcd1234", "role": "student"},
+                         json={"username": "cls_stu_delcls", "password": "abcd1234", "role": "student"},
                          headers=_auth(admin["token"])).json()["data"]["id"]
     client.post(f"/api/classes/{cls['id']}/students", json={"account_id": stu_id}, headers=_auth(t))
 
@@ -263,9 +263,9 @@ def test_delete_by_owner_goes_to_trash(client, login):
 
 def test_delete_permissions(client, login):
     admin = login()
-    t1 = _teacher(client, admin["token"], "t_d1")
-    t2 = _teacher(client, admin["token"], "t_d2")
-    stu_token = _student_token(client, admin["token"], "stu_del")
+    t1 = _teacher(client, admin["token"], "cls_t_d1")
+    t2 = _teacher(client, admin["token"], "cls_t_d2")
+    stu_token = _student_token(client, admin["token"], "cls_stu_del")
     cls = _create_class(client, t1, "权限班").json()["data"]
 
     other = client.delete(f"/api/classes/{cls['id']}", headers=_auth(t2))
@@ -282,10 +282,10 @@ def test_delete_permissions(client, login):
 
 def test_add_existing_student(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_add")
+    t = _teacher(client, admin["token"], "cls_t_add")
     cls = _create_class(client, t, "挂接班").json()["data"]
     stu_id = client.post("/api/accounts",
-                         json={"username": "stu_exist", "password": "abcd1234", "role": "student"},
+                         json={"username": "cls_stu_exist", "password": "abcd1234", "role": "student"},
                          headers=_auth(admin["token"])).json()["data"]["id"]
 
     resp = client.post(f"/api/classes/{cls['id']}/students", json={"account_id": stu_id}, headers=_auth(t))
@@ -303,17 +303,17 @@ def test_add_existing_student(client, login):
 
 def test_add_creates_new_student_account(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_new")
+    t = _teacher(client, admin["token"], "cls_t_new")
     cls = _create_class(client, t, "新建班").json()["data"]
 
     resp = client.post(f"/api/classes/{cls['id']}/students",
-                       json={"username": "stu_brandnew", "password": "abcd1234", "display_name": "新同学"},
+                       json={"username": "cls_stu_brandnew", "password": "abcd1234", "display_name": "新同学"},
                        headers=_auth(t))
     assert resp.json()["code"] == 0, resp.text
 
     db = SessionLocal()
     try:
-        acc = db.query(Account).filter(Account.username == "stu_brandnew").first()
+        acc = db.query(Account).filter(Account.username == "cls_stu_brandnew").first()
         assert acc is not None and acc.role == "student" and acc.status == "active"
         assert db.query(ClassMember).filter(ClassMember.class_id == cls["id"],
                                             ClassMember.account_id == acc.id).count() == 1
@@ -322,15 +322,15 @@ def test_add_creates_new_student_account(client, login):
 
     # 新账号能登录
     assert client.post("/api/auth/login",
-                       json={"username": "stu_brandnew", "password": "abcd1234"}).status_code == 200
+                       json={"username": "cls_stu_brandnew", "password": "abcd1234"}).status_code == 200
 
 
 def test_add_duplicate_409(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_dd")
+    t = _teacher(client, admin["token"], "cls_t_dd")
     cls = _create_class(client, t, "重复班").json()["data"]
     stu_id = client.post("/api/accounts",
-                         json={"username": "stu_dd", "password": "abcd1234", "role": "student"},
+                         json={"username": "cls_stu_dd", "password": "abcd1234", "role": "student"},
                          headers=_auth(admin["token"])).json()["data"]["id"]
 
     assert client.post(f"/api/classes/{cls['id']}/students",
@@ -342,10 +342,10 @@ def test_add_duplicate_409(client, login):
 
 def test_add_teacher_account_rejected(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_role")
+    t = _teacher(client, admin["token"], "cls_t_role")
     cls = _create_class(client, t, "角色班").json()["data"]
     t2_id = client.post("/api/accounts",
-                        json={"username": "t_victim", "password": "abcd1234", "role": "teacher"},
+                        json={"username": "cls_t_victim", "password": "abcd1234", "role": "teacher"},
                         headers=_auth(admin["token"])).json()["data"]["id"]
 
     resp = client.post(f"/api/classes/{cls['id']}/students", json={"account_id": t2_id}, headers=_auth(t))
@@ -354,8 +354,8 @@ def test_add_teacher_account_rejected(client, login):
 
 def test_add_by_non_owner_403(client, login):
     admin = login()
-    t1 = _teacher(client, admin["token"], "t_a1")
-    t2 = _teacher(client, admin["token"], "t_a2")
+    t1 = _teacher(client, admin["token"], "cls_t_a1")
+    t2 = _teacher(client, admin["token"], "cls_t_a2")
     cls = _create_class(client, t1, "私有班").json()["data"]
     resp = client.post(f"/api/classes/{cls['id']}/students",
                        json={"username": "anyone_new", "password": "abcd1234"}, headers=_auth(t2))
@@ -366,10 +366,10 @@ def test_add_by_non_owner_403(client, login):
 
 def test_student_schedule_override_and_reset(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_ps")
+    t = _teacher(client, admin["token"], "cls_t_ps")
     cls = _create_class(client, t, "课表班").json()["data"]
     stu_id = client.post("/api/accounts",
-                         json={"username": "stu_sch", "password": "abcd1234", "role": "student"},
+                         json={"username": "cls_stu_sch", "password": "abcd1234", "role": "student"},
                          headers=_auth(admin["token"])).json()["data"]["id"]
     client.post(f"/api/classes/{cls['id']}/students", json={"account_id": stu_id}, headers=_auth(t))
 
@@ -400,10 +400,10 @@ def test_student_schedule_override_and_reset(client, login):
 
 def test_remove_student_keeps_account(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_rm")
+    t = _teacher(client, admin["token"], "cls_t_rm")
     cls = _create_class(client, t, "移出班").json()["data"]
     stu_id = client.post("/api/accounts",
-                         json={"username": "stu_rm", "password": "abcd1234", "role": "student"},
+                         json={"username": "cls_stu_rm", "password": "abcd1234", "role": "student"},
                          headers=_auth(admin["token"])).json()["data"]["id"]
     client.post(f"/api/classes/{cls['id']}/students", json={"account_id": stu_id}, headers=_auth(t))
 
@@ -422,10 +422,10 @@ def test_remove_student_keeps_account(client, login):
 
 def test_remove_non_member_404(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_nm")
+    t = _teacher(client, admin["token"], "cls_t_nm")
     cls = _create_class(client, t, "空班").json()["data"]
     stu_id = client.post("/api/accounts",
-                         json={"username": "stu_nm", "password": "abcd1234", "role": "student"},
+                         json={"username": "cls_stu_nm", "password": "abcd1234", "role": "student"},
                          headers=_auth(admin["token"])).json()["data"]["id"]
 
     resp = client.delete(f"/api/classes/{cls['id']}/students/{stu_id}", headers=_auth(t))
@@ -436,7 +436,7 @@ def test_remove_non_member_404(client, login):
 
 def test_students_list_requires_teacher(client, login):
     admin = login()
-    stu_token = _student_token(client, admin["token"], "stu_nl")
+    stu_token = _student_token(client, admin["token"], "cls_stu_nl")
     resp = client.get("/api/students", headers=_auth(stu_token))
     assert resp.status_code == 403 and resp.json()["code"] == 2005
 
@@ -446,22 +446,22 @@ def test_students_list_requires_teacher(client, login):
 
 def test_students_list_with_classes(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_sl")
+    t = _teacher(client, admin["token"], "cls_t_sl")
     cls = _create_class(client, t, "归属班").json()["data"]
     stu_id = client.post("/api/accounts",
-                         json={"username": "stu_belongs", "password": "abcd1234", "role": "student"},
+                         json={"username": "cls_stu_belongs", "password": "abcd1234", "role": "student"},
                          headers=_auth(admin["token"])).json()["data"]["id"]
     client.post(f"/api/classes/{cls['id']}/students", json={"account_id": stu_id}, headers=_auth(t))
 
     items = client.get("/api/students", headers=_auth(t)).json()["data"]["items"]
-    row = next(s for s in items if s["username"] == "stu_belongs")
+    row = next(s for s in items if s["username"] == "cls_stu_belongs")
     assert [c["name"] for c in row["classes"]] == ["归属班"]
 
 
 def test_students_search_q(client, login):
     admin = login()
-    t = _teacher(client, admin["token"], "t_q")
-    _teacher(client, admin["token"], "t_q2")
+    t = _teacher(client, admin["token"], "cls_t_q")
+    _teacher(client, admin["token"], "cls_t_q2")
     for name in ("张三丰", "李四"):
         client.post("/api/accounts",
                     json={"username": name, "password": "abcd1234", "role": "student"},

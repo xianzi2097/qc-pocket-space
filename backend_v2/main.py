@@ -27,7 +27,7 @@ from app import config
 from app.db import SessionLocal, init_db
 from app.envelope import install_error_handlers, ok
 from app.models import Account, new_id
-from app.routers import accounts, auth
+from app.routers import accounts, auth, classes
 from app.security import hash_password
 
 logging.basicConfig(
@@ -89,6 +89,7 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["127.0.0.1"])
 app.include_router(auth.router)
 app.include_router(accounts.router)
 app.include_router(accounts.presets_router)
+app.include_router(classes.router)
 
 
 @app.get("/api/health", tags=["health"])
