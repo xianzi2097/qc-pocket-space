@@ -1,0 +1,132 @@
+# backend_v2 — CodeNova 后端 V2
+
+> ⚠️ **本文件是 V2 的文件夹地图。每完成一个 M 阶段（M1~M5）必须同步更新**——阶段进度、新增文件、该阶段做了什么、测试数量。
+> 接口规范：[docs/backend-v2-api-spec.md](../docs/backend-v2-api-spec.md) · 现状盘点：[docs/backend-refactor-requirements.md](../docs/backend-refactor-requirements.md)
+
+## 这是什么
+
+少儿编程教学平台的**全新后端**。与 V1（`../backend/`）并排存在、互不干扰：
+
+| | V1（在跑） | V2（开发中） |
+|---|---|---|
+| 端口 | 8000 | 8001 |
+| 数据 | `data/qingcheng.db` + 散落的 JSON | `data_v2/codenova_v2.db`（结构化数据全入库，与 data/ **平级**） |
+| 接口 | 91 个（动词式 URL） | 78 个（RESTful + 统一信封） |
+| 状态 | **不动，继续对外服务** | 本月开发完 → 前端一起改 → 一次性切换 |
+
+## 阶段进度
+
+| 阶段 | 内容 | 状态 | 完成日期 |
+|---|---|---|---|
+| **M0 地基** | 信封/错误码、15 张表、会话鉴权、限流、路径安全、测试基架 | ✅ 完成 | 2026-10-04 |
+| M1 账号与班级 | 规范 §3.2 账号 + §3.3 班级与学生 | 🚧 **账号域完成**，班级域待做 | 2026-10-06（账号域） |
+| M2 课程与文件 | 规范 §3.4 课程 + §3.5 文件树 + §3.6 资料 | ⏸ 未开始 | |
+| M3 内容与沟通 | 规范 §3.7 站内信 + §3.8 笔记 + §3.9 课堂记录 + §3.10 设置 | ⏸ 未开始 | |
+| M4 收口 | 回收站合并、backup/build 平移、横切能力逐项核对 | ⏸ 未开始 | |
+| M5 切流 | 前端按新规范改造、手测、停 V1 起 V2 | ⏸ 未开始 | |
+
+测试用例：**117 个**（最近自动同步：2026-10-06）
+
+## 文件地图
+
+### 顶层
+
+| 文件 | 一句话职责 | 阶段 |
+|---|---|---|
+| `main.py` | 总装配：启动三件事（建目录→建表→种 admin）+ 挂错误处理/中间件/路由 | M0 |
+| `requirements.txt` | 运行依赖（版本与 V1 一致，避免环境差异） | M0 |
+| `requirements-dev.txt` | 测试依赖（pytest + httpx） | M0 |
+| `tools/sync_readme.py` | **README 自动同步**：改测试数、给新文件补地图占位行；`hooks/pre-commit` 每次提交 backend_v2 变更时自动调用 | 工具 |
+
+### `app/` — 零件
+
+| 文件 | 一句话职责 | 阶段 |
+|---|---|---|
+| `config.py` | 全局参数表头：路径、token 有效期、上传限额…改一次全局生效 | M0 |
+| `db.py` | 数据库连接：engine / get_db / init_db，开 WAL + 外键 | M0 |
+| `models.py` | **15 张表**结构（账号、班级、课程、笔记、回收站…）+ new_id | M0 |
+| `envelope.py` | 统一信封 `{code,msg,data}` + 错误码分域 + 4 个异常兜底 | M0 |
+| `security.py` | 门禁：PBKDF2 密码、会话表 token、角色依赖、梯度限流 | M0 |
+| `files.py` | 路径安全：拦穿越/绝对路径/盘符/非法字符/超长 | M0 |
+| `routers/auth.py` | 认证 4 接口：登录/登出/me/改密（**接口写法模板**） | M0 |
+| `routers/classes.py` | 班级与学生 | M1 |
+| `routers/accounts.py` | 账号管理 | M1 |
+| `routers/courses.py` | 课程与课件 | M2 |
+| `routers/files.py` | 文件树（课程/资料共用） | M2 |
+| `routers/resources.py` | 资料与软件下载 | M2 |
+| `routers/messages.py` | 站内信 | M3 |
+| `routers/notes.py` | 笔记本与笔记 | M3 |
+| `routers/class_records.py` | 课堂记录 | M3 |
+| `routers/settings.py` | 用户设置 | M3 |
+| `routers/trash.py` | 统一回收站 | M4 |
+
+> 后面的行是**预登记**：文件还不存在，做到那阶段才建。
+
+### `tests/` — 验收单（测试先行：先写用例，再写实现）
+
+| 文件 | 验什么 | 用例数 |
+|---|---|---|
+| `conftest.py` | 测试基架：临时库、TestClient、login 助手、限流清零 | — |
+| `test_envelope.py` | 信封格式、404/401/参数错误的 code | 5 |
+| `test_auth.py` | 登录/登出/me/过期/改密踢人/梯度限流 | 12 |
+| `test_files.py` | 路径安全：合法放行、攻击全拦（参数化） | 16 |
+| `test_api_naming.py` | **命名闸门**：扫描全部路由，不合规范 §1.6/§1.7 就红 | 7 |
+| `test_docs_sync.py` | **文档闸门**：本 README 的文件地图/测试数/阶段表是否同步 | 4 |
+| `test_accounts.py` | **账号域验收单**（§3.2）：公开列表裁剪 / 创建权限矩阵 / 详情裁剪 / 改资料 / 软删+踢下线 / 头像上传 / 批量注册 / 管理员重置密码 / 预设头像 | 41 |
+| `test_classes.py` | **班级与学生验收单**（§3.3）：可见范围 / 建班重名隔离 / 改名排课 / 删班进回收站 / 加学生挂接或新建 / 课表覆盖 / 移出不删号 / 跨班搜索（**实现待写，当前红**） | 31 |
+## 一次请求的流转
+
+```
+POST /api/auth/login
+   → main.py 路由匹配
+   → envelope.py 参数校验（缺参就地返回 1001）
+   → routers/auth.py 四步：解析参数 → 鉴权 → 业务 → return ok(...)
+        ├ security.py 限流 / 验密码 / 发 token
+        ├ db.py       开数据库会话
+        └ models.py   操作 accounts、auth_sessions 表
+   → envelope.py 包成 {"code":0,...}（出错则 ApiError → 兜底处理器）
+   → 客户端
+```
+
+## 怎么跑
+
+```powershell
+# 启动服务（8001；V1 的 8000 不受影响）
+cd qc-pocket-space\backend_v2
+& "..\tests\venv\Scripts\python.exe" -m uvicorn main:app --port 8001
+
+# 跑测试（约 3 秒，用独立临时库，不碰真实数据）
+& "..\tests\venv\Scripts\python.exe" -m pytest tests -q
+```
+
+接口文档（启动后）：`http://127.0.0.1:8001/docs`
+
+## 📌 更新规则（改动后"顺便"更新，不是回头补）
+
+> **自动化链路（2026-10-06 起）**：
+> `git commit`（backend_v2 有变更）→ `hooks/pre-commit` 自动跑
+> `tools/sync_readme.py`（改测试数、给新文件补地图占位行）→ 再跑文档+命名闸门
+> → 有 `⚠ 待补职责描述` 占位或闸门不过 → **提交被拒**，补完描述再提交。
+>
+> 手动跑：`python tools/sync_readme.py`
+> 机器管：测试数、文件是否登记、阶段表完整性；**人/AI 管**：职责描述、阶段进展、"本阶段做了什么"
+
+1. **阶段进度表**：状态改 ✅、填完成日期
+2. **文件地图**：脚本会补占位行，**把 `⚠ 待补职责描述` 换成一句话职责**
+3. **本阶段做了什么**：在下方追加一节（见 M0 示例）——讲清改了哪些、为什么、测试怎么证明它活着
+4. **测试用例数**：脚本自动改写，跑 `pytest tests -q` 确认全绿
+
+### M1a 账号域做了什么（2026-10-06）
+
+- **范围**：规范 §3.2 的 7 个接口（`routers/accounts.py`，新增 `get_optional_account` 支持"公开但带 token 则升级视图"）。
+- **新业务规则**（机制全部复用 M0）：创建权限矩阵（admin 建老师/学生、teacher 只能建学生、禁建 admin）、重名 409/3001、软删进 `trash` 表 + 清会话踢下线、头像仅学生本人 ≤2MB 落盘、公开列表字段裁剪。
+- **验证**：27 条验收单先行（先红后绿），全部双断言（HTTP + 库/磁盘落地）；**命名闸门抓到我一次违规**（路径参数写成 `{account_id}` → 改 `{accountId}`，§1.6 生效）。
+
+### M0 做了什么（示例格式，供后续阶段参照）
+
+- **范围**：只打地基，没有任何业务功能。15 张表**全部提前建好**（D7：上线前允许推翻），M1~M4 主要往 `routers/` 加文件、往 `tests/` 加用例，地基不动。
+- **验证**：33 用例全过；8001 实跑冒烟（health/登录/me/401 信封/OpenAPI）；确认测试不碰 V1 数据。
+- **对 V1 的两处升级**：密码 sha256 → PBKDF2 20 万轮；token 内存表 → 会话表（重启不丢、可踢下线）。
+- **2026-10-06 补充（API 命名整改）**：审过规范全部 76 行接口——`/api/auth/password` 改为 `PATCH`（已实现代码+测试同步）、`/courses/{id}/shelf` 改为 `PUT`、两处 `/search` 并入列表 query 过滤、砍掉 `save-sb3` 旧入口，接口总数 91→**73**。命名约定写入规范 §1.6（路径 camelCase / 查询 snake_case / 全复数），14 类动作型端点保留并登记理由于 §1.7。
+- **2026-10-06 补充（两道机器闸门）**：命名漂移与文档失同步不再靠人眼——`test_api_naming.py` 扫描全部路由对表规范 §1.6/§1.7，`test_docs_sync.py` 校验本 README 的文件地图/测试数/阶段表。新增接口的正确顺序：改规范 §3 → 白名单加一行 → 写实现 → 测试转绿。
+- **2026-10-06 补充（账号域补 4 个功能，用户拍板"三个都要"）**：`POST /api/accounts/batch` 批量注册（启动器导入，默认密码 123456、已存在跳过）、`POST /api/accounts/{id}/password` 管理员重置密码（重置即踢会话）、预设头像体系（`GET /api/avatars/presets` 清单 + `PUT .../avatar/preset` 选择，8 个 SVG 随代码走）、取头像**永不 404**（缺文件回落 `avatar_01.svg`）。规范 §3.2 由 7 行扩到 11 行，接口总数 73→77。

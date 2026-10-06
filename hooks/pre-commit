@@ -1,0 +1,37 @@
+#!/bin/sh
+# pre-commit：backend_v2 有变更时，顺便同步 README 并跑两道闸门，不绿不许提交
+# 装置：仓库已设 core.hooksPath=hooks（本文件随仓库版本化）
+set -e
+
+# 中文输出防乱码（Windows 控制台默认 GBK）
+export PYTHONIOENCODING=utf-8
+export PYTHONUTF8=1
+
+# 只在 backend_v2 有暂存变更时介入
+if ! git diff --cached --name-only -- backend_v2 | grep -q .; then
+  exit 0
+fi
+
+# 解释器：优先仓库自带测试 venv（Windows 部署环境），否则系统 python
+if [ -f "tests/venv/Scripts/python.exe" ]; then
+  PY="tests/venv/Scripts/python.exe"
+elif command -v python >/dev/null 2>&1; then
+  PY="python"
+else
+  echo "[pre-commit] 未找到 Python，跳过 README 同步" >&2
+  exit 0
+fi
+
+echo "[pre-commit] backend_v2 有变更 → 同步 README 并跑闸门检查"
+
+# ① 机械同步（测试数 + 文件地图缺项占位）
+"$PY" backend_v2/tools/sync_readme.py
+git add backend_v2/README.md
+
+# ② 闸门：文档同步 + 命名规范，任一不过则拒绝提交
+if ! "$PY" -m pytest backend_v2/tests/test_docs_sync.py backend_v2/tests/test_api_naming.py -q --tb=line; then
+  echo "[pre-commit] 闸门未过：按上面提示补 README 职责描述 / 修正命名后重试" >&2
+  exit 1
+fi
+
+echo "[pre-commit] OK"
