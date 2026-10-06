@@ -83,6 +83,17 @@
         .hero-bg {
             position: absolute; inset: 0; overflow: hidden;
         }
+        .hero-bg::before {
+            content: ''; position: absolute; inset: 0;
+            background: url('assets/hero-bg.png') center / cover no-repeat;
+            opacity: 0.5;
+        }
+        .hero-bg::after {
+            content: ''; position: absolute; inset: 0;
+            background:
+                radial-gradient(ellipse 60% 55% at 50% 55%, rgba(2,6,23,0.55) 0%, transparent 100%),
+                linear-gradient(180deg, rgba(2,6,23,0.35) 0%, transparent 30%, transparent 70%, rgba(2,6,23,0.6) 100%);
+        }
         .hero-glow {
             position: absolute; top: -20%; left: 50%; transform: translateX(-50%);
             width: 600px; height: 600px; border-radius: 50%;
