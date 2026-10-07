@@ -9,7 +9,7 @@
     get_current_account                token 换账号；过期/停用自动报 401
   接口鉴权（写在接口第一行）
     require_roles("teacher")           角色白名单；admin 不隐式通吃，逐接口声明
-    account_self / account_public      本人看全字段 / 公开只看昵称头像（规范 §1.5）
+    account_self / account_public      本人看全字段 / 公开只看账号名头像（规范 §1.5）
   登录梯度限流（按真实 IP，存库、重启不清零）
     check_login_allowed                查是否在锁定期，锁了报 429
     record_login_failure               记一次失败：5 次锁 30s / 10 次 5min /
@@ -193,7 +193,6 @@ def account_self(account: Account) -> dict:
         "id": account.id,
         "username": account.username,
         "role": account.role,
-        "display_name": account.display_name,
         "avatar_path": account.avatar_path,
         "descriptors": account.descriptors,
         "status": account.status,
@@ -207,7 +206,6 @@ def account_public(account: Account) -> dict:
         "id": account.id,
         "username": account.username,
         "role": account.role,
-        "display_name": account.display_name,
         "avatar_path": account.avatar_path,
     }
 

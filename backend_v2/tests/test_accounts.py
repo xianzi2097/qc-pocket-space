@@ -1,10 +1,10 @@
 """验收单：账号域（规范 §3.2 + §4 权限矩阵）
 
 覆盖：
-  · 公开列表字段裁剪（未登录只见昵称/头像/角色，不见描述符与状态）
+  · 公开列表字段裁剪（未登录只见账号名/头像/角色，不见描述符与状态）
   · 创建：admin 建老师/学生、teacher 只能建学生、非法 role、重名、弱密码
   · 详情：需登录；本人/管理员看全字段，他人只看基本字段
-  · 改资料：本人改昵称；描述符必须是 JSON；status 仅 admin；不能改别人
+  · 改资料：本人改登录名；描述符必须是 JSON；status 仅 admin；不能改别人
   · 停用（软删）：仅 admin、不能删自己、进回收站表、会话全部失效
   · 头像：仅学生本人、≤2MB、必须是图片、磁盘落盘 + 库字段同步、公开可取
 """
@@ -19,10 +19,8 @@ def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _create(client, token, username, role, password="abcd1234", display=""):
+def _create(client, token, username, role, password="abcd1234"):
     body = {"username": username, "password": password, "role": role}
-    if display:
-        body["display_name"] = display
     return client.post("/api/accounts", json=body, headers=_auth(token))
 
 
@@ -41,7 +39,7 @@ def test_public_list_is_trimmed(client):
     assert body["code"] == 0
     assert isinstance(body["data"]["items"], list) and body["data"]["total"] >= 1
 
-    allowed = {"id", "username", "role", "display_name", "avatar_path"}
+    allowed = {"id", "username", "role", "avatar_path"}
     for item in body["data"]["items"]:
         assert set(item.keys()) <= allowed, f"公开列表泄漏字段：{set(item.keys()) - allowed}"
     # 默认 admin 在列且是 active
@@ -75,10 +73,10 @@ def test_create_requires_login(client):
 
 def test_admin_creates_teacher_and_can_login(client, login):
     admin_token = login()["token"]
-    resp = _create(client, admin_token, "t_alpha", "teacher", password="abcd1234", display="张老师")
+    resp = _create(client, admin_token, "t_alpha", "teacher", password="abcd1234")
     assert resp.status_code == 200 and resp.json()["code"] == 0, resp.text
     account = resp.json()["data"]
-    assert account["role"] == "teacher" and account["display_name"] == "张老师"
+    assert account["role"] == "teacher" and account["username"] == "t_alpha"
     assert "password" not in account and "password_hash" not in account
 
     # 落地断言：库里真有这行
@@ -170,23 +168,6 @@ def test_detail_unknown_id_404(client, login):
 
 # ---------------- 改资料 ----------------
 
-def test_patch_own_display_name(client, login):
-    data = login()
-    resp = client.patch(
-        f"/api/accounts/{data['account']['id']}",
-        json={"display_name": "改过的名字"},
-        headers=_auth(data["token"]),
-    )
-    assert resp.json()["code"] == 0 and resp.json()["data"]["display_name"] == "改过的名字"
-
-    db = SessionLocal()
-    try:
-        row = db.get(Account, data["account"]["id"])
-        assert row.display_name == "改过的名字"
-    finally:
-        db.close()
-
-
 def test_patch_others_forbidden(client, login):
     admin_token = login()["token"]
     victim_id = _make_student(client, admin_token, "stu_victim")
@@ -194,7 +175,7 @@ def test_patch_others_forbidden(client, login):
     _make_student(client, admin_token, "stu_attacker")
     attacker_token = client.post("/api/auth/login", json={"username": "stu_attacker", "password": "abcd1234"}).json()["data"]["token"]
 
-    resp = client.patch(f"/api/accounts/{victim_id}", json={"display_name": "hack"}, headers=_auth(attacker_token))
+    resp = client.patch(f"/api/accounts/{victim_id}", json={"username": "hack_name"}, headers=_auth(attacker_token))
     assert resp.status_code == 403 and resp.json()["code"] == 2005
 
 

@@ -53,7 +53,6 @@ def _ensure_admin() -> None:
                 username="admin",
                 password_hash=hash_password(DEFAULT_ADMIN_PASSWORD),
                 role="admin",
-                display_name="管理员",
             )
         )
         db.commit()

@@ -89,7 +89,7 @@
 | 接口 | 用途 |
 |---|---|
 | `POST /api/auth/login` | 登录 |
-| `GET /api/accounts` | 门户教师列表（**只返回 id/昵称/头像/角色**，不泄漏描述符等） |
+| `GET /api/accounts` | 门户教师列表（**只返回 id/账号名/头像/角色**，不泄漏描述符等） |
 | `GET /api/courses`、`GET /api/courses/{id}`、`GET /api/courses/{id}/lessons` | 课程广场 |
 | `GET /api/resources`、`GET /api/resources/{id}`、文件树只读、`GET /api/resources/{id}/download` | 资料浏览与软件下载 |
 
@@ -137,7 +137,7 @@ RESTful 的目的是**可预测**，不是纯度。以下 16 类接口使用动�
 -- 账号与会话
 accounts(
   id PK, username UNIQUE, password_hash, role(admin|teacher|student),
-  display_name, avatar_path, descriptors JSON,      -- 描述符（原 qc_descriptors）
+  avatar_path, descriptors JSON,                 -- 描述符（原 qc_descriptors）
   status(active|deleted), created_at
 )
 auth_sessions(
@@ -150,7 +150,7 @@ login_attempts(                                      -- 梯度限流计数
 -- 班级与学生
 classes(id PK, owner_id FK, name, schedule JSON, created_at)   -- schedule: 每周排课
 class_members(
-  class_id FK, account_id FK, schedule_override JSON, joined_at,
+  class_id FK, account_id FK, joined_at,
   UNIQUE(class_id, account_id)
 )
 
@@ -229,7 +229,7 @@ trash(
 | POST | `/api/accounts` | 创建账号（role=admin 判定：建老师需 admin，建学生需 admin/teacher） | admin / teacher |
 | POST | `/api/accounts/batch` | **批量注册**：`{role, password?, usernames[]}`，已存在的跳过不报错，返回 created/skipped 明细；`password` 缺省用默认密码 | admin |
 | GET | `/api/accounts/{accountId}` | 账号详情 | 登录（他人仅基本字段） |
-| PATCH | `/api/accounts/{accountId}` | 改**登录名**（2026-10-07 拍板：可改；本人限 teacher/admin，**学生一律不可改**，admin 可改任何人；重名 → 3001）/ 昵称 / 描述符 / 状态 | 本人 / admin |
+| PATCH | `/api/accounts/{accountId}` | 改**登录名**（2026-10-07 拍板：可改；本人限 teacher/admin，**学生一律不可改**，admin 可改任何人；重名 → 3001）/ 描述符 / 状态（**无昵称：显示名即账号名，2026-10-07 砍掉 display_name**） | 本人 / admin |
 | DELETE | `/api/accounts/{accountId}` | 停用账号（软删 → 回收站，admin 不可删自己） | admin |
 | POST | `/api/accounts/{accountId}/password` | **管理员重置密码**（≥6 位；重置后该账号全部会话失效，需重新登录） | admin |
 | POST | `/api/accounts/{accountId}/avatar` | 上传头像（**≤5MB**，仅学生；磁盘写入失败 → `507/9001`） | 本人 |
@@ -250,7 +250,7 @@ trash(
 | PATCH | `/api/classes/{id}` | 改名 / 改排课 | teacher（本人班） |
 | DELETE | `/api/classes/{id}` | 删班（进回收站） | teacher（本人班） |
 | POST | `/api/classes/{id}/students` | 加学生（已有账号挂接 / 新建） | teacher |
-| PATCH | `/api/classes/{id}/students/{accountId}` | 学生个人上课日（null=跟随班级） | teacher |
+| ~~PATCH~~ | ~~`/api/classes/{id}/students/{accountId}`~~ | ❌ **已砍**（2026-10-07：学生个人上课日暂不用，等真需要再加） | — |
 | DELETE | `/api/classes/{id}/students/{accountId}` | 移出班级（**不删账号**） | teacher |
 | GET | `/api/students?q=` | 全体学生列表；带 `q` 时跨班模糊搜索（搜索=列表的过滤条件，不设独立端点） | teacher |
 | ~~GET~~ | ~~`/api/students/search`~~ | ❌ 已并入上一行（2026-10-06 规范整改） | — |

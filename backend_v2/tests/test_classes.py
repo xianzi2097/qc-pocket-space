@@ -6,7 +6,6 @@
   · 改名/改排课：仅本人（或 admin），改名重名校验
   · 删班：仅本人/admin → 进回收站表、成员关系保留（恢复即可复原）
   · 加学生：挂接已有账号 / 现场新建账号、重复入班 409、只能加学生角色
-  · 学生课表：个人上课日覆盖（null=跟随班级）
   · 移出班级：删成员关系但**不删账号**
   · 学生列表：仅 teacher/admin，支持 ?q= 跨班搜索并带所属班级
 """
@@ -171,7 +170,6 @@ def test_detail_shows_students_for_member(client, login):
     detail = client.get(f"/api/classes/{cls['id']}", headers=_auth(t)).json()["data"]
     assert detail["name"] == "成员班"
     assert [s["username"] for s in detail["students"]] == ["cls_stu_det"]
-    assert detail["students"][0]["schedule_override"] is None
 
 
 def test_detail_outsider_403(client, login):
@@ -307,7 +305,7 @@ def test_add_creates_new_student_account(client, login):
     cls = _create_class(client, t, "新建班").json()["data"]
 
     resp = client.post(f"/api/classes/{cls['id']}/students",
-                       json={"username": "cls_stu_brandnew", "password": "abcd1234", "display_name": "新同学"},
+                       json={"username": "cls_stu_brandnew", "password": "abcd1234"},
                        headers=_auth(t))
     assert resp.json()["code"] == 0, resp.text
 
@@ -362,40 +360,7 @@ def test_add_by_non_owner_403(client, login):
     assert resp.status_code == 403 and resp.json()["code"] == 2005
 
 
-# ---------------- 课表覆盖 / 移出 ----------------
-
-def test_student_schedule_override_and_reset(client, login):
-    admin = login()
-    t = _teacher(client, admin["token"], "cls_t_ps")
-    cls = _create_class(client, t, "课表班").json()["data"]
-    stu_id = client.post("/api/accounts",
-                         json={"username": "cls_stu_sch", "password": "abcd1234", "role": "student"},
-                         headers=_auth(admin["token"])).json()["data"]["id"]
-    client.post(f"/api/classes/{cls['id']}/students", json={"account_id": stu_id}, headers=_auth(t))
-
-    override = {"sun": "09:00"}
-    resp = client.patch(f"/api/classes/{cls['id']}/students/{stu_id}",
-                        json={"schedule": override}, headers=_auth(t))
-    assert resp.json()["code"] == 0
-    db = SessionLocal()
-    try:
-        row = db.query(ClassMember).filter(ClassMember.class_id == cls["id"],
-                                            ClassMember.account_id == stu_id).first()
-        assert row.schedule_override == override
-    finally:
-        db.close()
-
-    # 传 null → 恢复跟随班级
-    reset = client.patch(f"/api/classes/{cls['id']}/students/{stu_id}",
-                         json={"schedule": None}, headers=_auth(t))
-    assert reset.json()["code"] == 0
-    db = SessionLocal()
-    try:
-        row = db.query(ClassMember).filter(ClassMember.class_id == cls["id"],
-                                            ClassMember.account_id == stu_id).first()
-        assert row.schedule_override is None
-    finally:
-        db.close()
+# ---------------- 移出 ----------------
 
 
 def test_remove_student_keeps_account(client, login):

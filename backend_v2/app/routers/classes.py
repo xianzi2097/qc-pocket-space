@@ -1,4 +1,4 @@
-"""班级与学生 —— 规范 §3.3（M1b · 9 个接口 + 1 个详情）
+"""班级与学生 —— 规范 §3.3（M1b · 8 个接口 + 1 个详情）
 
 可见范围（第一道门）
   teacher → 只见/只管自己的班；admin → 全部；student → 自己所在的班
@@ -8,14 +8,14 @@
   · 删班 = 删班级行 + 进回收站（trash 表留快照）；成员关系保留（恢复即复原）
   · 加学生二选一：挂接已有账号 / 现场新建学生号；重复入班 409；只能加学生角色
   · 移出班级只删关系，不删账号
-  · 学生课表 schedule_override：null = 跟随班级
   · 跨班搜学生并入 GET /api/students?q=（V1 的两个 search 端点合并）
+  · 学生个人上课日已砍（2026-10-07：V1 有此功能但暂不用，等真需要再写回）
 
 路径参数一律 camelCase（规范 §1.6），前缀 /api 由本 router 统一给。
 """
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
@@ -51,15 +51,7 @@ class ClassPatch(BaseModel):
 class StudentAdd(BaseModel):
     account_id: str | None = None         # 方式一：挂接已有账号
     username: str | None = Field(default=None, max_length=config.MAX_USERNAME_LEN)
-    password: str | None = None           # 方式二：现场建号时必填
-    display_name: str | None = Field(default=None, max_length=64)
-
-
-class StudentSchedule(BaseModel):
-    schedule: dict | None = None          # null = 恢复跟随班级
-
-
-# ---------------- 公共辅助 ----------------
+    password: str | None = None           # 方式二：现场建号时必填# ---------------- 公共辅助 ----------------
 
 def _load_class(db: DbSession, class_id: str) -> ClassRoom:
     cls = db.get(ClassRoom, class_id)
@@ -78,7 +70,7 @@ def _owner_names(db: DbSession, owner_ids: set[str]) -> dict[str, str]:
     if not owner_ids:
         return {}
     rows = db.scalars(select(Account).where(Account.id.in_(owner_ids))).all()
-    return {row.id: row.display_name or row.username for row in rows}
+    return {row.id: row.username for row in rows}
 
 
 def _class_dict(db: DbSession, cls: ClassRoom, owner_names: dict[str, str] | None = None,
@@ -184,7 +176,6 @@ def get_class(
     students = [
         {
             **account_public(acc),
-            "schedule_override": member.schedule_override,
             "joined_at": member.joined_at,
         }
         for member, acc in members
@@ -293,7 +284,6 @@ def _resolve_student(db: DbSession, body: StudentAdd) -> Account:
         username=username,
         password_hash=hash_password(body.password),
         role="student",
-        display_name=(body.display_name or "").strip() or username,
     )
     db.add(acc)
     db.flush()                                # 拿到 id，供下面写成员关系
@@ -329,33 +319,11 @@ def add_student(
         {
             "class_id": cls.id,
             "student": {"id": student.id, "username": student.username,
-                        "display_name": student.display_name, "avatar_path": student.avatar_path},
+                        "avatar_path": student.avatar_path},
             "joined_at": member.joined_at,
         },
         "学生已加入班级",
     )
-
-
-@router.patch("/classes/{classId}/students/{accountId}")
-def set_student_schedule(
-    classId: str,
-    accountId: str,
-    body: StudentSchedule,
-    db: DbSession = Depends(get_db),
-    account: Account = Depends(get_current_account),
-):
-    cls = _require_class_owner(db, classId, account)
-    member = db.scalar(
-        select(ClassMember).where(ClassMember.class_id == cls.id,
-                                  ClassMember.account_id == accountId)
-    )
-    if member is None:
-        raise ApiError(E_NOT_FOUND, "学生不在该班级", 404)     # 班在、人不在 → 通用 1004
-
-    member.schedule_override = body.schedule            # null = 恢复跟随班级
-    db.commit()
-    return ok({"class_id": cls.id, "account_id": accountId,
-               "schedule_override": member.schedule_override}, "课表已更新")
 
 
 @router.delete("/classes/{classId}/students/{accountId}")
@@ -392,8 +360,7 @@ def list_students(
     stmt = select(Account).where(Account.role == "student", Account.status == "active")
     if q and q.strip():
         like = q.strip()
-        stmt = stmt.where(or_(Account.username.contains(like),
-                              Account.display_name.contains(like)))
+        stmt = stmt.where(Account.username.contains(like))
     students = db.scalars(stmt.order_by(Account.username)).all()
 
     # 批量拿成员关系 → 映射到班级名（含"跨班"这个核心诉求）

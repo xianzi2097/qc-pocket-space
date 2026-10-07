@@ -46,7 +46,6 @@ class Account(Base):
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(16), index=True)  # admin|teacher|student
-    display_name: Mapped[str] = mapped_column(String(64), default="")
     avatar_path: Mapped[str] = mapped_column(String(255), default="avatar_00")
     descriptors: Mapped[str] = mapped_column(Text, default="{}")
     status: Mapped[str] = mapped_column(String(16), default="active")  # active|deleted
@@ -92,7 +91,6 @@ class ClassMember(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     class_id: Mapped[str] = mapped_column(String(12), index=True)
     account_id: Mapped[str] = mapped_column(String(12), index=True)
-    schedule_override: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # null=跟随班级
     joined_at: Mapped[str] = mapped_column(String(19), default=now_str)
 
     __table_args__ = (UniqueConstraint("class_id", "account_id", name="uq_member"),)

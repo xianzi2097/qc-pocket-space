@@ -5,7 +5,7 @@
   POST   /api/accounts            admin 建老师或学生；teacher 只能建学生；角色值仅 teacher/student
   POST   /api/accounts/batch      仅 admin 批量注册（已存在跳过；密码缺省用 DEFAULT_ACCOUNT_PASSWORD）
   GET    /api/accounts/{accountId}        需登录：本人/admin 看全字段，他人只看基本字段
-  PATCH  /api/accounts/{accountId}        本人改昵称/描述符；status 仅 admin；不能动别人
+  PATCH  /api/accounts/{accountId}        本人改登录名/描述符（学生不可改登录名）；status 仅 admin；不能动别人
   DELETE /api/accounts/{accountId}        仅 admin、不能删自己 → 软删（status=deleted + 进回收站 + 踢下线）
   POST   /api/accounts/{accountId}/password  仅 admin 重置密码（重置即清该账号全部会话）
   POST   /api/accounts/{accountId}/avatar    仅学生本人、≤5MB、必须是图片；磁盘满 → 507/9001
@@ -64,12 +64,10 @@ class AccountCreate(BaseModel):
     username: str = Field(min_length=1, max_length=config.MAX_USERNAME_LEN)
     password: str = Field(min_length=1)
     role: str = Field(min_length=1)
-    display_name: str = Field(default="", max_length=64)
 
 
 class AccountPatch(BaseModel):
     username: str | None = Field(default=None, min_length=1, max_length=config.MAX_USERNAME_LEN)
-    display_name: str | None = Field(default=None, max_length=64)
     descriptors: str | None = None
     status: str | None = None
 
@@ -138,7 +136,6 @@ def create_account(
         username=username,
         password_hash=hash_password(body.password),
         role=body.role,
-        display_name=body.display_name.strip() or username,
     )
     db.add(created)
     db.commit()
@@ -176,7 +173,6 @@ def batch_register(
                     username=username,
                     password_hash=hash_password(password),
                     role=body.role,
-                    display_name=username,
                 )
             )
             created.append(username)
@@ -232,9 +228,6 @@ def patch_account(
             raise ApiError(E_PARAM_INVALID, "状态只能是 active 或 deleted", 400)
         target.status = body.status
 
-    if body.display_name is not None:
-        target.display_name = body.display_name.strip()
-
     if body.descriptors is not None:
         try:
             json.loads(body.descriptors)
@@ -272,7 +265,6 @@ def delete_account(
                 "id": target.id,
                 "username": target.username,
                 "role": target.role,
-                "display_name": target.display_name,
                 "avatar_path": target.avatar_path,
                 "descriptors": target.descriptors,
                 "created_at": target.created_at,
