@@ -23,6 +23,8 @@
 | D10 | 回收站 | V1 的"用户=DB 版 + 内容=文件版"两套**合并**为一张 `trash` 表 + 磁盘目录 |
 | D11 | 全新功能域（作品分享 / 统计 / AI 等） | **不预留、不提前设计**（待定，拍板人：用户）。要做时按 §8.1 循环新增：§3 追加接口行 → 新表 → 新 router → 先写测试 → main.py 挂一行 → 更新 README。地基不含业务假设，天然可扩 |
 | D12 | 运行时 | **复用 V1 的 `qc-pocket-space/runtime/`（python/caddy/node/vitepress-template），不复制**。生产用 `runtime/python`（已实测含 V2 全部依赖），测试用 `tests/venv`（同为 Python 3.12.13，无漂移）。Caddy 在 M0~M4 完全不碰（V2 跑 8001 不进反代），M5 切流时用 `runtime/caddy/generate_caddyfile.py` 重新生成配置。vitepress 原样复用（M4 电子书发布调用同一模板） |
+| D13 | 课程与资料的关系（2026-10-07 拍板） | **词汇统一为"资产家族"，表分开**（`courses` / `resources` 不合表）。共享层已合一（文件树同一套 service、`file_order`、`trash`、打包下载、权限、路径安全）；各自独有列/接口留在各域（课程：publish/ebook/shelf/课件；资料：category/zip）。不做 `assets` 总表；前端如需"资产总览"用**读侧拼接**（查两表合并返回），不合并存储。 |
+| D14 | 课件代码保密（2026-10-07 拍板） | **服务端不按文件名拦截**（学生可下 `main.sb3`，维持 V1 现状），代码保密由魔改 Scratch 客户端按角色选择文件实现（学生→student.sb3/回退 main，教师→main）。后端保持格式不可知。附魔改 Scratch 集成事实（M5 改造清单）：① 保存 = 两次 upload（`save-sb3?file_type=` 砍掉后改 `files/upload` + `path=/课件/main.sb3`）；② 加载 = `fetch(folder+文件名)` 改走 `files/download?path=`；③ **F3 上传须自动创建路径中间层目录**（Scratch 只给完整路径不先建夹）；④ 双 sb3 约定仅存在于课程课件目录，资料域无此概念。 |
 
 ---
 
