@@ -47,7 +47,7 @@ class Account(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(16), index=True)  # admin|teacher|student
     display_name: Mapped[str] = mapped_column(String(64), default="")
-    avatar_path: Mapped[str] = mapped_column(String(255), default="preset/avatar_01.svg")
+    avatar_path: Mapped[str] = mapped_column(String(255), default="avatar_00")
     descriptors: Mapped[str] = mapped_column(Text, default="{}")
     status: Mapped[str] = mapped_column(String(16), default="active")  # active|deleted
     created_at: Mapped[str] = mapped_column(String(19), default=now_str)

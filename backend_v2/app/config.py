@@ -11,10 +11,9 @@
 │ MIN_PASSWORD_LEN     │ 6                          │ 密码最小长度               │
 │ DEFAULT_ACCOUNT_     │ 123456                     │ 批量注册的默认密码          │
 │   PASSWORD           │                            │                          │
-│ PRESET_AVATAR_DIR    │ <backend_v2>/assets/       │ 预设头像（随代码走，        │
-│                      │   avatars                  │  不进数据目录）            │
-│ DEFAULT_PRESET_      │ preset/avatar_01.svg       │ 没传过头像时的回落值        │
-│   AVATAR             │                            │                          │
+│ AVATAR_MAX_BYTES     │ 5 MB                       │ 头像上传上限（500人规模）    │
+│ AVATAR_MARKER        │ avatar_                    │ emoji 头像标记前缀          │
+│                      │                            │（清单在前端，后端只存标记）   │
 │ MAX_USERNAME_LEN     │ 64                         │ 用户名最大长度             │
 │ AVATAR_MAX_BYTES     │ 2 MB                       │ 头像上传上限               │
 │ UPLOAD_MAX_BYTES     │ 50 MB                      │ 课件/文件树上传上限         │
@@ -42,11 +41,11 @@ TOKEN_TTL_SECONDS = TOKEN_TTL_DAYS * 86400
 MIN_PASSWORD_LEN = 6
 DEFAULT_ACCOUNT_PASSWORD = "123456"   # 批量注册未指定密码时的默认值（≥6 位，建完提示改）
 MAX_USERNAME_LEN = 64
-AVATAR_MAX_BYTES = 2 * 1024 * 1024
+AVATAR_MAX_BYTES = 5 * 1024 * 1024    # 头像上传上限（按 500 人规模机构定，2026-10-06 用户拍板）
 UPLOAD_MAX_BYTES = 50 * 1024 * 1024
 RECENT_OPENS_LIMIT = 6
-PRESET_AVATAR_DIR = BACKEND_V2_DIR / "assets" / "avatars"   # 预设头像（随代码分发，不进数据目录）
-DEFAULT_PRESET_AVATAR = "preset/avatar_01.svg"
+# emoji 预设头像的标记形如 "avatar_07"；清单在前端常量（V1 的 AVATARS，20+ 个），后端只存标记
+AVATAR_MARKER_PATTERN = "avatar_"
 
 _SUBDIRS = ["users", "courses", "resources", "trash"]
 

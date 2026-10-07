@@ -97,7 +97,7 @@
 
 - **ID**：所有资源用不可猜测短 id（12 位字母数字），**不拿显示名当主键**（V1 的 course_name 定位 404 问题从根上消除）
 - **时间**：`YYYY-MM-DD HH:MM:SS`（本地时间）
-- **删除**：进回收站（软删）；"彻底删除"是独立动作
+- **删除**：进回收站（软删）；"彻底删除"是独立动作 —— **账号类例外：只停用、永不彻底删（2026-10-07 拍板，A6）**
 - **写接口幂等**：同参数重复提交不产生重复数据（覆盖式保存用 `PUT`）
 - **文件上传**：`multipart/form-data`，字段 `file` + `path`（相对路径）；课件/树上传 ≤50MB，头像 ≤2MB
 - **分页**：消息、笔记支持 `?page=&page_size=`（默认 20）；其余列表数据量小，默认全量返回
@@ -210,7 +210,7 @@ trash(
 ## 3. 接口清单
 
 > 「权限」列：`公开` = 无需登录；`本人` = 仅本人数据；`teacher` / `admin` = 角色白名单。
-> V1 的 91 个接口 → V2 **77 个**（合并动词式冗余、搜索并入列表过滤、去掉纯兼容接口，见 §5；2026-10-06 规范整改 + 账号域补 4 个功能后）。
+> V1 的 91 个接口 → V2 **76 个**（合并动词式冗余、搜索并入列表过滤、去掉纯兼容接口，见 §5；2026-10-06 规范整改 + 账号域补 3 个功能后——原清单接口因头像走前端 emoji 方案已删）。
 
 ### 3.1 认证与会话（auth）
 
@@ -229,13 +229,14 @@ trash(
 | POST | `/api/accounts` | 创建账号（role=admin 判定：建老师需 admin，建学生需 admin/teacher） | admin / teacher |
 | POST | `/api/accounts/batch` | **批量注册**：`{role, password?, usernames[]}`，已存在的跳过不报错，返回 created/skipped 明细；`password` 缺省用默认密码 | admin |
 | GET | `/api/accounts/{accountId}` | 账号详情 | 登录（他人仅基本字段） |
-| PATCH | `/api/accounts/{accountId}` | 改昵称 / 描述符 / 状态 | 本人 / admin |
+| PATCH | `/api/accounts/{accountId}` | 改**登录名**（2026-10-07 拍板：可改；本人限 teacher/admin，**学生一律不可改**，admin 可改任何人；重名 → 3001）/ 昵称 / 描述符 / 状态 | 本人 / admin |
 | DELETE | `/api/accounts/{accountId}` | 停用账号（软删 → 回收站，admin 不可删自己） | admin |
 | POST | `/api/accounts/{accountId}/password` | **管理员重置密码**（≥6 位；重置后该账号全部会话失效，需重新登录） | admin |
-| POST | `/api/accounts/{accountId}/avatar` | 上传头像（≤2MB，仅学生） | 本人 |
-| PUT | `/api/accounts/{accountId}/avatar/preset` | **选择预设头像** `{preset}`；任意角色，仅限本人；切换时清掉自定义文件 | 本人 |
-| GET | `/api/accounts/{accountId}/avatar` | 取头像图片；**没传过/文件缺失 → 回落到预设 `avatar_01.svg`**（永不 404） | 公开 |
-| GET | `/api/avatars/presets` | 预设头像清单（后端是唯一真相源，前端不写死） | 登录 |
+| POST | `/api/accounts/{accountId}/avatar` | 上传头像（**≤5MB**，仅学生；磁盘写入失败 → `507/9001`） | 本人 |
+| PUT | `/api/accounts/{accountId}/avatar/preset` | **选 emoji 预设头像** `{preset:"avatar_07"}` → **只存标记串**；任意角色，仅限本人；切换时清掉自定义文件 | 本人 |
+| GET | `/api/accounts/{accountId}/avatar` | 取**自定义上传**的图片；**标记（预设）或文件丢失 → 404/1004**，前端据此画默认 emoji | 公开 |
+
+> **头像设计（2026-10-06 方案一）**：emoji 头像库活在**前端常量**（V1 的 `AVATARS`，20+ 个），后端只存 `avatar_XX` 标记——**不存预设图片、不设清单接口**（两个真相源必坏其一）。原 `GET /api/avatars/presets` 与 8 个 SVG 矢量图已删除。
 
 > V1 的 `POST /api/register`、`/api/update-avatar`、`/api/update-descriptors`、`/api/user/change-password` 收敛到上面 4 个资源动作。
 
@@ -351,7 +352,7 @@ trash(
 |---|---|---|---|
 | GET | `/api/trash` | 列表（`?type=`；admin 全部，teacher 只看自己名下） | 登录 |
 | POST | `/api/trash/{id}/restore` | 恢复（账号/班级/课程/资料各按 type 还原） | owner / admin |
-| DELETE | `/api/trash/{id}` | 彻底删除（含磁盘目录） | admin |
+| DELETE | `/api/trash/{id}` | 彻底删除（含磁盘目录）——**仅内容类（班级/课程/资料）；账号条目只可恢复，不提供彻底删** | admin |
 | DELETE | `/api/trash` | 清空 | admin |
 
 ---
@@ -362,7 +363,7 @@ trash(
 
 | 操作 | admin | teacher | student | guest |
 |---|:---:|:---:|:---:|:---:|
-| 建教师账号 / 删账号 / 清空回收站 / 彻底删除 | ✅ | ❌ | ❌ | ❌ |
+| 建教师账号 / 停用账号 / 清空回收站 / 彻底删除（内容类） | ✅ | ❌ | ❌ | ❌ |
 | 建学生账号 / 建删改班级 / 课程与资料写操作 / 发消息 / 存课堂记录 | ✅ | ✅（限本人数据） | ❌ | ❌ |
 | 浏览课程/资料/教师列表（公开只读） | ✅ | ✅ | ✅ | ✅ |
 | 笔记、设置、头像、收发件箱 | ✅ | ✅ | ✅ | ❌ |

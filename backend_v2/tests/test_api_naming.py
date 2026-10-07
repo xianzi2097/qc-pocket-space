@@ -20,14 +20,14 @@ SPEC_PATH = Path(__file__).resolve().parents[2] / "docs" / "backend-v2-api-spec.
 
 # 资源段（复数名词）—— 规范 §3 已登记的资源
 RESOURCE_SEGMENTS = {
-    "auth", "accounts", "avatar", "avatars", "classes", "students", "courses",
+    "auth", "accounts", "avatar", "classes", "students", "courses",
     "lessons", "files", "resources", "messages", "message-folders", "notebooks",
     "notes", "class-records", "settings", "trash", "health",
 }
 
 # 动作段（规范 §1.7 登记过理由的一次性动作 / 语义子路径）
 ACTION_SEGMENTS = {
-    "login", "logout", "me", "password", "avatar", "presets", "preset",
+    "login", "logout", "me", "password", "avatar", "preset",
     "upload", "mkdir", "rename", "order", "batch",
     "publish", "publish-status", "restore", "download",
     "unread-count", "recent-opens",

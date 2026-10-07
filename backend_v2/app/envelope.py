@@ -75,6 +75,7 @@ E_NOTEBOOK_TAKEN = 8009
 
 # ---- 9xxx 服务端 ----
 E_INTERNAL = 9000
+E_STORAGE_FULL = 9001      # 磁盘空间不足 / 写文件失败（HTTP 507）
 
 
 class ApiError(Exception):

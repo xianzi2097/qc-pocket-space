@@ -238,6 +238,57 @@ def test_patch_status_requires_admin(client, login):
     assert resp.status_code == 403 and resp.json()["code"] == 2005
 
 
+# ---------------- 登录名修改（A4 · 2026-10-07 拍板：可改；学生一律不可） ----------------
+
+def test_teacher_renames_own_username(client, login):
+    admin = login()
+    t_token = _teacher_token(client, admin["token"], "t_oldname")
+    t_id = client.get("/api/auth/me", headers=_auth(t_token)).json()["data"]["id"]
+
+    resp = client.patch(f"/api/accounts/{t_id}", json={"username": "t_newname"}, headers=_auth(t_token))
+    assert resp.status_code == 200 and resp.json()["data"]["username"] == "t_newname"
+
+    # 库里真的改了 + 旧名作废、新名可登录
+    db = SessionLocal()
+    try:
+        assert db.get(Account, t_id).username == "t_newname"
+    finally:
+        db.close()
+    assert client.post("/api/auth/login", json={"username": "t_oldname", "password": "abcd1234"}).status_code == 401
+    assert client.post("/api/auth/login", json={"username": "t_newname", "password": "abcd1234"}).status_code == 200
+
+
+def test_rename_to_taken_username_409(client, login):
+    admin = login()
+    _teacher_token(client, admin["token"], "t_owner_of_name")
+    t2_token = _teacher_token(client, admin["token"], "t_wants_rename")
+    t2_id = client.get("/api/auth/me", headers=_auth(t2_token)).json()["data"]["id"]
+
+    resp = client.patch(f"/api/accounts/{t2_id}", json={"username": "t_owner_of_name"}, headers=_auth(t2_token))
+    assert resp.status_code == 409 and resp.json()["code"] == 3001
+
+
+def test_student_cannot_change_username(client, login):
+    admin = login()
+    _make_student(client, admin["token"], "stu_rename")
+    stu_token = client.post("/api/auth/login",
+                            json={"username": "stu_rename", "password": "abcd1234"}).json()["data"]["token"]
+    stu_id = client.get("/api/auth/me", headers=_auth(stu_token)).json()["data"]["id"]
+
+    resp = client.patch(f"/api/accounts/{stu_id}", json={"username": "stu_hacked"}, headers=_auth(stu_token))
+    assert resp.status_code == 403 and resp.json()["code"] == 2005
+
+
+def test_admin_renames_student(client, login):
+    admin = login()
+    stu_id = _make_student(client, admin["token"], "stu_old")
+    resp = client.patch(f"/api/accounts/{stu_id}", json={"username": "stu_renamed"},
+                        headers=_auth(admin["token"]))
+    assert resp.json()["code"] == 0
+    assert client.post("/api/auth/login",
+                       json={"username": "stu_renamed", "password": "abcd1234"}).status_code == 200
+
+
 # ---------------- 停用（软删 → 回收站） ----------------
 
 def test_delete_requires_admin(client, login):
@@ -363,10 +414,9 @@ def test_avatar_public_fetch(client, login):
     stu_token = client.post("/api/auth/login", json={"username": "stu_get", "password": "abcd1234"}).json()["data"]["token"]
     stu_id = client.get("/api/auth/me", headers=_auth(stu_token)).json()["data"]["id"]
 
-    # 没传过 → 回落预设头像（公开可取，永不 404）
-    fallback = client.get(f"/api/accounts/{stu_id}/avatar")
-    assert fallback.status_code == 200
-    assert fallback.headers["content-type"].startswith("image/")
+    # 没传过 → 库里是预设标记 avatar_00 → 接口 404，前端据此画 emoji（方案一约定）
+    marker = client.get(f"/api/accounts/{stu_id}/avatar")
+    assert marker.status_code == 404 and marker.json()["code"] == 1004
 
     client.post(f"/api/accounts/{stu_id}/avatar",
                 files={"file": ("a.png", PNG, "image/png")}, headers=_auth(stu_token))
@@ -375,12 +425,12 @@ def test_avatar_public_fetch(client, login):
     assert got.content == PNG
 
 
-def test_avatar_falls_back_when_file_missing(client, login):
-    """库里指向的文件丢了（历史数据 default.jpg 等）→ 回落到预设，不 500 不 404"""
+def test_avatar_missing_file_returns_404(client, login):
+    """库里指向自定义图片但文件丢了 → 404/1004，前端降级画 emoji（不再有兜底图片）"""
     admin = login()
     _make_student(client, admin["token"], "stu_lost")
-    stu_id = client.get("/api/accounts", headers=_auth(admin["token"])).json()["data"]["items"]
-    stu_id = next(i["id"] for i in stu_id if i["username"] == "stu_lost")
+    stu_id = next(i["id"] for i in client.get("/api/accounts", headers=_auth(admin["token"])).json()["data"]["items"]
+                  if i["username"] == "stu_lost")
 
     db = SessionLocal()
     try:
@@ -391,7 +441,26 @@ def test_avatar_falls_back_when_file_missing(client, login):
         db.close()
 
     resp = client.get(f"/api/accounts/{stu_id}/avatar")
-    assert resp.status_code == 200 and resp.headers["content-type"].startswith("image/svg")
+    assert resp.status_code == 404 and resp.json()["code"] == 1004
+
+
+def test_avatar_storage_full_returns_507(client, login, monkeypatch):
+    """磁盘写入失败（空间不足等）→ 507/9001，而不是泛化的 500 服务繁忙"""
+    from pathlib import Path
+
+    admin = login()
+    stu_id = _make_student(client, admin["token"], "stu_full")
+    stu_token = client.post("/api/auth/login",
+                            json={"username": "stu_full", "password": "abcd1234"}).json()["data"]["token"]
+
+    def boom(self, data):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(Path, "write_bytes", boom)
+    resp = client.post(f"/api/accounts/{stu_id}/avatar",
+                       files={"file": ("a.png", PNG, "image/png")}, headers=_auth(stu_token))
+    assert resp.status_code == 507
+    assert resp.json()["code"] == 9001
 
 
 # ---------------- 批量注册（规范 §3.2 · 启动器导入用） ----------------
@@ -503,16 +572,7 @@ def test_reset_unknown_account(client, login):
     assert resp.status_code == 404 and resp.json()["code"] == 3004
 
 
-# ---------------- 预设头像 ----------------
-
-def test_presets_list(client, login):
-    assert client.get("/api/avatars/presets").status_code == 401      # 需登录
-    data = client.get("/api/avatars/presets", headers=_auth(login()["token"])).json()
-    assert data["code"] == 0
-    presets = data["data"]["items"]
-    assert len(presets) == 8
-    assert presets[0]["preset"] == "avatar_01"
-
+# ---------------- emoji 预设头像（方案一：清单归前端，后端只存标记） ----------------
 
 def test_choose_preset_avatar(client, login):
     admin = login()
@@ -524,14 +584,16 @@ def test_choose_preset_avatar(client, login):
                       json={"preset": "avatar_03"}, headers=_auth(stu_token))
     assert resp.status_code == 200 and resp.json()["code"] == 0
 
+    # 只存标记串，不落任何图片文件
     db = SessionLocal()
     try:
-        assert db.get(Account, stu_id).avatar_path == "preset/avatar_03.svg"
+        assert db.get(Account, stu_id).avatar_path == "avatar_03"
     finally:
         db.close()
 
+    # 预设标记 → 图片接口 404，前端据此本地画 emoji
     got = client.get(f"/api/accounts/{stu_id}/avatar")
-    assert got.status_code == 200 and "svg" in got.headers["content-type"]
+    assert got.status_code == 404 and got.json()["code"] == 1004
 
 
 def test_choose_preset_only_self(client, login):
@@ -562,6 +624,7 @@ def test_choose_unknown_preset(client, login):
     stu_id = _make_student(client, admin["token"], "stu_bad")
     stu_token = client.post("/api/auth/login",
                             json={"username": "stu_bad", "password": "abcd1234"}).json()["data"]["token"]
-    resp = client.put(f"/api/accounts/{stu_id}/avatar/preset",
-                      json={"preset": "avatar_99"}, headers=_auth(stu_token))
-    assert resp.status_code == 400 and resp.json()["code"] == 1002
+    for bad in ("avatar_abc", "emoji01", "avatar_1234"):
+        resp = client.put(f"/api/accounts/{stu_id}/avatar/preset",
+                          json={"preset": bad}, headers=_auth(stu_token))
+        assert resp.status_code == 400 and resp.json()["code"] == 1002, bad

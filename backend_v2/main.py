@@ -88,7 +88,6 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["127.0.0.1"])
 
 app.include_router(auth.router)
 app.include_router(accounts.router)
-app.include_router(accounts.presets_router)
 app.include_router(classes.router)
 
 

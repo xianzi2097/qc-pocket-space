@@ -1,19 +1,24 @@
-"""账号 —— 规范 §3.2（M1a · 7 个接口：列表/创建/详情/改资料/停用/传头像/取头像）
+"""账号 —— 规范 §3.2（M1a · 10 个接口）
 
 权限要点（对照规范 §4 矩阵）：
-  GET    /api/accounts        公开：未登录只给基本字段；带 token 且 admin 看全量（含已停用）
-  POST   /api/accounts        admin 建老师或学生；teacher 只能建学生；角色值仅 teacher/student
-  GET    /api/accounts/{id}   需登录：本人/admin 看全字段，他人只看基本字段
-  PATCH  /api/accounts/{id}   本人改昵称/描述符；status 仅 admin；不能动别人
-  DELETE /api/accounts/{id}   仅 admin、不能删自己 → 软删（status=deleted + 进回收站 + 踢下线）
-  POST   /api/accounts/{id}/avatar  仅学生本人、≤2MB、必须是图片
-  GET    /api/accounts/{id}/avatar  公开直取（没传过 → 404，前端自行降级）
+  GET    /api/accounts            公开：未登录只给基本字段；带 token 且 admin 看全量（含已停用）
+  POST   /api/accounts            admin 建老师或学生；teacher 只能建学生；角色值仅 teacher/student
+  POST   /api/accounts/batch      仅 admin 批量注册（已存在跳过；密码缺省用 DEFAULT_ACCOUNT_PASSWORD）
+  GET    /api/accounts/{accountId}        需登录：本人/admin 看全字段，他人只看基本字段
+  PATCH  /api/accounts/{accountId}        本人改昵称/描述符；status 仅 admin；不能动别人
+  DELETE /api/accounts/{accountId}        仅 admin、不能删自己 → 软删（status=deleted + 进回收站 + 踢下线）
+  POST   /api/accounts/{accountId}/password  仅 admin 重置密码（重置即清该账号全部会话）
+  POST   /api/accounts/{accountId}/avatar    仅学生本人、≤5MB、必须是图片；磁盘满 → 507/9001
+  PUT    /api/accounts/{accountId}/avatar/preset  选 emoji 预设 → 存标记 "avatar_07"（仅本人，任意角色）
+  GET    /api/accounts/{accountId}/avatar    只服务自定义图片；标记/文件丢失 → 404（前端画默认 emoji）
+
+头像设计（2026-10-06 方案一）：emoji 库活在前端常量（V1 的 AVATARS，20+ 个），
+后端只存标记串——不存预设图片、不维护清单接口（两个真相源必坏其一）。
 
 安全纪律：写操作第一行鉴权（C-20）；密码哈希、路径落盘都走地基，不在此处手写。
 """
 import json
 import re
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import FileResponse
@@ -28,8 +33,10 @@ from ..envelope import (
     E_CANNOT_DELETE_SELF,
     E_FILE_TOO_LARGE,
     E_FORBIDDEN,
+    E_NOT_FOUND,
     E_PARAM_INVALID,
     E_ROLE_NOT_ALLOWED,
+    E_STORAGE_FULL,
     E_USERNAME_TAKEN,
     ApiError,
     ok,
@@ -45,12 +52,12 @@ from ..security import (
 )
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
-presets_router = APIRouter(prefix="/api/avatars", tags=["accounts"])
 
 _VALID_ROLES = {"teacher", "student"}
 _IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
-_MEDIA_BY_EXT = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp", "svg": "image/svg+xml"}
-_PRESET_NAME_RE = re.compile(r"^avatar_\d{2}$")
+_MEDIA_BY_EXT = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}
+# emoji 预设标记（如 "avatar_07"）：清单归前端，后端只认格式
+_AVATAR_MARKER_RE = re.compile(r"^avatar_\d{1,2}$")
 
 
 class AccountCreate(BaseModel):
@@ -61,6 +68,7 @@ class AccountCreate(BaseModel):
 
 
 class AccountPatch(BaseModel):
+    username: str | None = Field(default=None, min_length=1, max_length=config.MAX_USERNAME_LEN)
     display_name: str | None = Field(default=None, max_length=64)
     descriptors: str | None = None
     status: str | None = None
@@ -205,6 +213,18 @@ def patch_account(
     if not (is_self or account.role == "admin"):
         raise ApiError(E_FORBIDDEN, "没有权限", 403)
 
+    # 登录名可改（2026-10-07 拍板）：学生一律不可改（防捣乱），teacher/admin 可改自己，admin 可改任何人
+    if body.username is not None:
+        if account.role == "student":
+            raise ApiError(E_FORBIDDEN, "学生不能修改登录名", 403)
+        new_name = body.username.strip()
+        if not new_name:
+            raise ApiError(E_PARAM_INVALID, "登录名不能为空", 400)
+        if new_name != target.username:
+            if db.scalar(select(Account).where(Account.username == new_name)):
+                raise ApiError(E_USERNAME_TAKEN, "登录名已存在", 409)
+            target.username = new_name          # 文件路径都用 id，改名零副作用
+
     if body.status is not None:
         if account.role != "admin":
             raise ApiError(E_FORBIDDEN, "只有管理员可以修改状态", 403)
@@ -307,28 +327,17 @@ async def upload_avatar(
 
     ext = _IMAGE_TYPES[file.content_type]
     folder = config.DATA_ROOT / "users" / account.id
-    folder.mkdir(parents=True, exist_ok=True)
-    for old in folder.glob("avatar.*"):          # 换格式时清掉旧文件，不留孤儿
-        old.unlink()
-    path = folder / f"avatar.{ext}"
-    path.write_bytes(content)
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        for old in folder.glob("avatar.*"):          # 换格式时清掉旧文件，不留孤儿
+            old.unlink()
+        (folder / f"avatar.{ext}").write_bytes(content)
+    except OSError:                                  # 磁盘满 / 权限问题 → 明确报错，不装 500
+        raise ApiError(E_STORAGE_FULL, "磁盘空间不足，头像保存失败", 507)
 
     account.avatar_path = f"users/{account.id}/avatar.{ext}"
     db.commit()
     return ok({"avatar_path": account.avatar_path}, "头像已更新")
-
-
-def _resolve_avatar(avatar_path: str):
-    """把库里的 avatar_path 解析成真实文件；任何情况都回落到预设（永不 404）"""
-    if avatar_path.startswith("preset/"):
-        candidate = config.PRESET_AVATAR_DIR / Path(avatar_path).name
-        if candidate.is_file():
-            return candidate
-    else:
-        candidate = config.DATA_ROOT / avatar_path
-        if candidate.is_file():
-            return candidate
-    return config.PRESET_AVATAR_DIR / "avatar_01.svg"
 
 
 @router.put("/{accountId}/avatar/preset")
@@ -342,33 +351,32 @@ def choose_preset(
         raise ApiError(E_FORBIDDEN, "只能换自己的头像", 403)
 
     name = body.preset.strip()
-    if not _PRESET_NAME_RE.match(name) or not (config.PRESET_AVATAR_DIR / f"{name}.svg").is_file():
-        raise ApiError(E_PARAM_INVALID, "预设头像不存在", 400)
+    if not _AVATAR_MARKER_RE.match(name):          # 只验格式；清单归前端（可取模兜底）
+        raise ApiError(E_PARAM_INVALID, "预设头像标记不合法（形如 avatar_07）", 400)
 
     folder = config.DATA_ROOT / "users" / account.id
     if folder.is_dir():
-        for old in folder.glob("avatar.*"):     # 换预设时清掉自定义文件
+        for old in folder.glob("avatar.*"):        # 换回预设时清掉自定义文件
             old.unlink()
 
-    account.avatar_path = f"preset/{name}.svg"
+    account.avatar_path = name                     # 存标记串，不落任何图片
     db.commit()
     return ok({"avatar_path": account.avatar_path}, "头像已更新")
 
 
-@presets_router.get("/presets")
-def list_presets(_account: Account = Depends(get_current_account)):
-    """预设清单由后端目录决定（改文件即生效），前端不写死"""
-    names = sorted(p.stem for p in config.PRESET_AVATAR_DIR.glob("avatar_*.svg"))
-    items = [{"preset": name} for name in names]
-    return ok({"items": items, "total": len(items)})
-
-
 @router.get("/{accountId}/avatar")
 def get_avatar(accountId: str, db: DbSession = Depends(get_db)):
+    """只服务"自定义上传"的图片；预设标记或文件丢失 → 404，前端据此画 emoji"""
     target = db.get(Account, accountId)
     if target is None:
         raise ApiError(E_ACCOUNT_NOT_FOUND, "账号不存在", 404)
 
-    path = _resolve_avatar(target.avatar_path)
+    if _AVATAR_MARKER_RE.match(target.avatar_path):
+        raise ApiError(E_NOT_FOUND, "该账号使用预设头像（由前端渲染）", 404)
+
+    path = config.DATA_ROOT / target.avatar_path
+    if not path.is_file():
+        raise ApiError(E_NOT_FOUND, "头像文件不存在", 404)
+
     media = _MEDIA_BY_EXT.get(path.suffix.lstrip(".").lower(), "application/octet-stream")
     return FileResponse(path, media_type=media)
