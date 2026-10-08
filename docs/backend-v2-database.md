@@ -134,7 +134,7 @@ trash ──→ 指向被软删的 account / class（payload 存恢复所需快�
 | `name`        | String(128)        | 资料名   |                                        |
 | `description` | Text               | 说明     |                                        |
 | `tags`        | JSON（list）       | 标签     |                                        |
-| `category`    | String(16)         | 分类     | `reference` 参考 / `download` 下载 |
+| `category` | String(16) | 分类 | `reference` 参考资料（pdf/文档堆，查阅为主） / `download` **软件**（安装包等，下载即用） |
 | `format`      | String(16)         | 形态     | 默认`folder`（资料包）               |
 | `created_at`  | String(19)         | 创建时间 |                                        |
 
