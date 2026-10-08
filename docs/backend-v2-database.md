@@ -4,7 +4,7 @@
 > 规则（D7）：上线前 schema 允许推翻；上线后只增不改。
 > 配套阅读：[API 规范](./backend-v2-api-spec.md) §2（表）/ §3（接口）。
 
-## 总览：15 张表
+## 总览：14 张表
 
 | #  | 表                  | 分组 | 一句话                     | 阶段   |
 | -- | ------------------- | ---- | -------------------------- | ------ |
@@ -13,16 +13,15 @@
 | 3  | `login_attempts`  | 账号 | 登录失败计数（防暴力破解） | M1 ✅  |
 | 4  | `classes`         | 班级 | 班级本体                   | M1b ✅ |
 | 5  | `class_members`   | 班级 | 谁在哪个班（关系表）       | M1b ✅ |
-| 6  | `courses`         | 内容 | 课程（书架）               | 未来   |
-| 7  | `resources`       | 内容 | 资料/素材                  | 未来   |
-| 8  | `file_order`      | 内容 | 文件树自定义排序           | 未来   |
-| 9  | `message_folders` | 沟通 | 站内信文件夹               | 未来   |
-| 10 | `messages`        | 沟通 | 站内信                     | 未来   |
-| 11 | `notebooks`       | 个人 | 笔记本                     | 未来   |
-| 12 | `notes`           | 个人 | 笔记                       | 未来   |
-| 13 | `class_records`   | 其他 | 课堂记录（同班同日覆盖）   | 未来   |
-| 14 | `settings`        | 个人 | 每人的界面偏好             | 未来   |
-| 15 | `trash`           | 其他 | 统一回收站（软删快照）     | M1 ✅  |
+| 6  | `assets`          | 内容 | 资产合表：课程/书架/资料/软件（bucket 分类，D16） | 未来   |
+| 7  | `file_order`      | 内容 | 文件树自定义排序           | 未来   |
+| 8  | `message_folders` | 沟通 | 站内信文件夹               | 未来   |
+| 9  | `messages`        | 沟通 | 站内信                     | 未来   |
+| 10 | `notebooks`       | 个人 | 笔记本                     | 未来   |
+| 11 | `notes`           | 个人 | 笔记                       | 未来   |
+| 12 | `class_records`   | 其他 | 课堂记录（同班同日覆盖）   | 未来   |
+| 13 | `settings`        | 个人 | 每人的界面偏好             | 未来   |
+| 14 | `trash`           | 其他 | 统一回收站（软删快照）     | M1 ✅  |
 
 **关系网**（记住"每张表都指回主人"这一条规律即可）：
 
@@ -31,7 +30,7 @@ accounts（中心）
   ├─ class_members ──→ classes        谁在哪个班
   ├─ notebooks ──→ notes              谁的笔记本里有什么
   ├─ messages (sender/receiver)       谁发给谁（folder_id → message_folders）
-  ├─ courses / resources (owner_id)   谁的课程/资料
+  ├─ assets (owner_id)                谁的资产（课程/书架/资料/软件）
   ├─ settings                         谁的界面偏好
   └─ auth_sessions                    谁的登录态
 trash ──→ 指向被软删的 account / class（payload 存恢复所需快照）
@@ -110,48 +109,38 @@ trash ──→ 指向被软删的 account / class（payload 存恢复所需快�
 
 唯一约束：`(class_id, account_id)` 同班同人不能进两次 → 业务码 40009。
 
-## 6. `courses` — 课程（书架）
+## 6. `assets` — 资产合表（D16）
 
-| 字段            | 类型               | 含义       | 取值 / 备注                                            |
-| --------------- | ------------------ | ---------- | ------------------------------------------------------ |
-| `id`          | String(12) · 主键 | 课程 id    |                                                        |
-| `owner_id`    | String(12) · 索引 | 属于谁     | →`accounts.id`（老师的课程库）                      |
-| `name`        | String(128)        | 课程名     |                                                        |
-| `type`        | String(32)         | 课程类型   | 默认`scratch`                                        |
-| `format`      | String(32)         | 形态       | 视频/图文等，待细化                                    |
-| `description` | Text               | 简介       |                                                        |
-| `tags`        | JSON（list）       | 标签       | 筛选用                                                 |
-| `shelf`       | String(16)         | 放哪个书架 | `books` 书 / `courses` 课（兼容 V1 featured 数据） |
-| `publish`     | JSON               | 发布状态   | 以后上架/下架用                                        |
-| `created_at`  | String(19)         | 创建时间   |                                                        |
+**四类资产一张表**：课程、书架、资料、软件只是 `bucket` 值不同；`type/format/publish` 为课程族专用，资料/软件行保持为空。
 
-## 7. `resources` — 资料/素材
+| 字段 | 类型 | 含义 | 取值 / 备注 |
+|------|------|------|------------|
+| `id` | String(12) · 主键 | 资产 id | `new_id()`；文件树挂在它下面 |
+| `owner_id` | String(12) · 索引 | 属于谁 | → `accounts.id` |
+| `bucket` | String(16) · 索引 | **四分类** | `courses` 课 / `books` 书 / `reference` 参考资料 / `download` 软件（D15 四选一落这） |
+| `name` | String(128) | 资产名 | **同一 owner 下全局唯一**（跨类不重名）→ 业务码 5001/6001 |
+| `description` | Text | 说明 | |
+| `tags` | JSON（list） | 标签 | 筛选用 |
+| `type` | String(32) | 课程族：课程类型 | 默认空；`scratch` / `python` / `cpp`… |
+| `format` | String(32) | 课程族：打开方式 | 默认空；`scratch` / `folder` / `ebook`（格式两层论的第一层） |
+| `publish` | JSON | 课程族：发布队列状态 | 入队/构建中/成功/失败（C9/C10） |
+| `created_at` | String(19) | 创建时间 | |
 
-| 字段            | 类型               | 含义     | 取值 / 备注                            |
-| --------------- | ------------------ | -------- | -------------------------------------- |
-| `id`          | String(12) · 主键 | 资料 id  |                                        |
-| `owner_id`    | String(12) · 索引 | 属于谁   | →`accounts.id`                      |
-| `name`        | String(128)        | 资料名   |                                        |
-| `description` | Text               | 说明     |                                        |
-| `tags`        | JSON（list）       | 标签     |                                        |
-| `category` | String(16) | 分类 | `reference` 参考资料（pdf/文档堆，查阅为主） / `download` **软件**（安装包等，下载即用） |
-| `format`      | String(16)         | 形态     | 默认`folder`（资料包）               |
-| `created_at`  | String(19)         | 创建时间 |                                        |
+唯一约束：`(owner_id, name)` → 老师名下资产名不能重复（D16）。
 
-## 8. `file_order` — 文件树排序
+## 7. `file_order` — 文件树排序
 
 V1 各目录下散落的 `_order.json` 全部收进这一张表（一个文件一份 JSON → 一行记录）。
 
 | 字段            | 类型                | 含义          | 取值 / 备注                          |
 | --------------- | ------------------- | ------------- | ------------------------------------ |
 | `id`          | Integer · 主键自增 | 行号          |                                      |
-| `scope`       | String(16)          | 属于哪类      | `course` / `resource`            |
-| `scope_id`    | String(12) · 索引  | 哪个课程/资料 | →`courses.id` 或 `resources.id` |
+| `asset_id`    | String(12) · 索引  | 哪个资产      | → `assets.id`（D16 合表后一列搞定） |
 | `parent_path` | String(500)         | 所在目录      | 相对路径；空串 = 根目录              |
 | `name`        | String(255)         | 文件/文件夹名 |                                      |
 | `position`    | Integer             | 排序位置      | 数字小的排前面                       |
 
-## 9. `message_folders` — 信件文件夹
+## 8. `message_folders` — 信件文件夹
 
 | 字段         | 类型               | 含义      | 取值 / 备注              |
 | ------------ | ------------------ | --------- | ------------------------ |
@@ -162,7 +151,7 @@ V1 各目录下散落的 `_order.json` 全部收进这一张表（一个文件�
 
 唯一约束：`(owner_id, name)`。
 
-## 10. `messages` — 站内信
+## 9. `messages` — 站内信
 
 | 字段            | 类型               | 含义               | 取值 / 备注                                               |
 | --------------- | ------------------ | ------------------ | --------------------------------------------------------- |
@@ -175,7 +164,7 @@ V1 各目录下散落的 `_order.json` 全部收进这一张表（一个文件�
 | `is_read`     | Boolean            | 是否已读           | 默认 false                                                |
 | `created_at`  | String(19)         | 发送时间           |                                                           |
 
-## 11. `notebooks` — 笔记本
+## 10. `notebooks` — 笔记本
 
 | 字段           | 类型               | 含义      | 取值 / 备注       |
 | -------------- | ------------------ | --------- | ----------------- |
@@ -186,7 +175,7 @@ V1 各目录下散落的 `_order.json` 全部收进这一张表（一个文件�
 
 唯一约束：`(owner_id, name)`。
 
-## 12. `notes` — 笔记
+## 11. `notes` — 笔记
 
 | 字段            | 类型               | 含义           | 取值 / 备注                                  |
 | --------------- | ------------------ | -------------- | -------------------------------------------- |
@@ -197,7 +186,7 @@ V1 各目录下散落的 `_order.json` 全部收进这一张表（一个文件�
 | `updated_at`  | String(19)         | 最近修改时间   | 列表按它排序（最近编辑置顶）                 |
 | `created_at`  | String(19)         | 创建时间       |                                              |
 
-## 13. `class_records` — 课堂记录
+## 12. `class_records` — 课堂记录
 
 同班同日只有一份，**保存即覆盖**（幂等，不产生历史垃圾行）。
 
@@ -208,7 +197,7 @@ V1 各目录下散落的 `_order.json` 全部收进这一张表（一个文件�
 | `content`    | Text                   | 当天课堂记录 | 再次保存 = 覆盖  |
 | `updated_at` | String(19)             | 最近保存时间 |                  |
 
-## 14. `settings` — 个人界面偏好
+## 13. `settings` — 个人界面偏好
 
 一人一行，登录后前端拉取还原界面状态。
 
@@ -221,14 +210,14 @@ V1 各目录下散落的 `_order.json` 全部收进这一张表（一个文件�
 | `sidebar`      | Boolean            | 侧边栏是否展开 |                                                 |
 | `recent_opens` | JSON（list）       | 最近打开       | 上限`config.RECENT_OPENS_LIMIT`，超了挤掉最旧 |
 
-## 15. `trash` — 统一回收站
+## 14. `trash` — 统一回收站
 
 A6 停用账号、B5 删班都往这里写一行快照，恢复时照着快照还原。
 
 | 字段           | 类型               | 含义          | 取值 / 备注                                         |
 | -------------- | ------------------ | ------------- | --------------------------------------------------- |
 | `id`         | String(12) · 主键 | 回收站条目 id | 与被删对象的 id 无关（独立生成）                    |
-| `type`       | String(16) · 索引 | 什么类型      | `account` / `class` / `course` / `resource` |
+| `type`       | String(16) · 索引 | 什么类型      | `account` / `class` / `asset`（D16：原 course/resource 并入 asset） |
 | `owner_id`   | String(12) · 索引 | 归属人        | 谁删的/本该属于谁；决定谁能看到这条                 |
 | `name`       | String(128)        | 对象名快照    | 回收站列表直接显示，不用回查原表                    |
 | `payload`    | JSON               | 恢复所需快照  | 被删对象的完整字段（如账号的全部信息）              |

@@ -1,4 +1,4 @@
-"""数据表：15 张表各长什么样（V2 结构化数据全部入库，大文件留磁盘）
+"""数据表：14 张表各长什么样（V2 结构化数据全部入库，大文件留磁盘）
 
 本文件包含（按业务分组）：
   ┌─────────┬──────────────────────────────────────────────┐
@@ -7,7 +7,8 @@
   │ 账号     │ accounts 账号 / auth_sessions 登录态 /        │
   │         │ login_attempts 限流计数                       │
   │ 班级     │ classes 班级 / class_members 班内学生          │
-  │ 内容     │ courses 课程 / resources 资料 /               │
+  │ 内容     │ assets 资产（课程/书架/资料/软件四类合表      │
+  │         │ D16：bucket 分类）/                            │
   │         │ file_order 文件树顺序（原 _order.json）        │
   │ 沟通     │ messages 站内信 / message_folders 文件夹       │
   │ 个人     │ notebooks 笔记本 / notes 笔记 / settings 设置  │
@@ -96,32 +97,24 @@ class ClassMember(Base):
     __table_args__ = (UniqueConstraint("class_id", "account_id", name="uq_member"),)
 
 
-class Course(Base):
-    __tablename__ = "courses"
+class Asset(Base):
+    """资产（D16 合表）：课程/书架/资料/软件四类共用一张表，bucket 分类
+    type/format/publish 为课程族专用（bucket=courses|books 时用，其余为空）
+    """
+    __tablename__ = "assets"
 
     id: Mapped[str] = mapped_column(String(12), primary_key=True)
     owner_id: Mapped[str] = mapped_column(String(12), index=True)
-    name: Mapped[str] = mapped_column(String(128))
-    type: Mapped[str] = mapped_column(String(32), default="scratch")
-    format: Mapped[str] = mapped_column(String(32), default="")
-    description: Mapped[str] = mapped_column(Text, default="")
-    tags: Mapped[list] = mapped_column(JSON, default=list)
-    shelf: Mapped[str] = mapped_column(String(16), default="courses")  # books|courses
-    publish: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[str] = mapped_column(String(19), default=now_str)
-
-
-class Resource(Base):
-    __tablename__ = "resources"
-
-    id: Mapped[str] = mapped_column(String(12), primary_key=True)
-    owner_id: Mapped[str] = mapped_column(String(12), index=True)
+    bucket: Mapped[str] = mapped_column(String(16), index=True)  # courses|books|reference|download
     name: Mapped[str] = mapped_column(String(128))
     description: Mapped[str] = mapped_column(Text, default="")
     tags: Mapped[list] = mapped_column(JSON, default=list)
-    category: Mapped[str] = mapped_column(String(16), default="reference")  # reference|download
-    format: Mapped[str] = mapped_column(String(16), default="folder")
+    type: Mapped[str] = mapped_column(String(32), default="")     # 课程族：scratch|python|cpp…
+    format: Mapped[str] = mapped_column(String(32), default="")   # 课程族：scratch|folder|ebook
+    publish: Mapped[dict] = mapped_column(JSON, default=dict)     # 课程族：发布队列状态
     created_at: Mapped[str] = mapped_column(String(19), default=now_str)
+
+    __table_args__ = (UniqueConstraint("owner_id", "name", name="uq_asset_owner_name"),)
 
 
 class FileOrder(Base):
@@ -129,8 +122,7 @@ class FileOrder(Base):
     __tablename__ = "file_order"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    scope: Mapped[str] = mapped_column(String(16))  # course|resource
-    scope_id: Mapped[str] = mapped_column(String(12), index=True)
+    asset_id: Mapped[str] = mapped_column(String(12), index=True)
     parent_path: Mapped[str] = mapped_column(String(500), default="")
     name: Mapped[str] = mapped_column(String(255))
     position: Mapped[int] = mapped_column(Integer, default=0)
@@ -208,7 +200,7 @@ class Trash(Base):
     __tablename__ = "trash"
 
     id: Mapped[str] = mapped_column(String(12), primary_key=True)
-    type: Mapped[str] = mapped_column(String(16), index=True)  # account|class|course|resource
+    type: Mapped[str] = mapped_column(String(16), index=True)  # account|class|asset
     owner_id: Mapped[str] = mapped_column(String(12), index=True)
     name: Mapped[str] = mapped_column(String(128), default="")
     payload: Mapped[dict] = mapped_column(JSON, default=dict)  # 恢复所需快照

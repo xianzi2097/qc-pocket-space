@@ -5,7 +5,7 @@
 
 启动时依次做三件事（lifespan）：
   ① config.ensure_dirs()   创建数据目录 data_v2/{users,courses,resources,trash}
-  ② init_db()              建 15 张表（models.py）
+  ② init_db()              建 14 张表（models.py）
   ③ _ensure_admin()        没有 admin 就种一个：admin / 111111（提示立即改密）
 
 装配四件事：

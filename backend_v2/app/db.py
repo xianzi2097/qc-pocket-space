@@ -5,7 +5,7 @@
   SessionLocal  会话工厂：每个请求开一个独立会话，用完自动关
   Base          表结构基类：models.py 里所有 class 都继承它
   get_db()      FastAPI 依赖：接口参数写 Depends(get_db) 即可拿到会话
-  init_db()     启动时建表（15 张，缺哪张建哪张，已存在则跳过）
+  init_db()     启动时建表（14 张，缺哪张建哪张，已存在则跳过）
 
 位置记忆：config 管参数 → db 管连接 → models 管表结构
 """

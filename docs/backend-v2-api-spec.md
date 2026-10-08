@@ -26,6 +26,7 @@
 | D13 | 课程与资料的关系（2026-10-07 拍板） | **词汇统一为"资产家族"，表分开**（`courses` / `resources` 不合表）。共享层已合一（文件树同一套 service、`file_order`、`trash`、打包下载、权限、路径安全）；各自独有列/接口留在各域（课程：publish/ebook/shelf/课件；资料：category/zip）。不做 `assets` 总表；前端如需"资产总览"用**读侧拼接**（查两表合并返回），不合并存储。**统一层正式定名"资产管理"**（2026-10-07 补）：即"一行 + 一棵树 + F1~F7 七动作"那一层——后端大一统在此，分类只是元数据字符串、后端不看牌干活；别叫"资源管理"（会与资料域撞名）。 |
 | D14 | 课件代码保密（2026-10-07 拍板） | **服务端不按文件名拦截**（学生可下 `main.sb3`，维持 V1 现状），代码保密由魔改 Scratch 客户端按角色选择文件实现（学生→student.sb3/回退 main，教师→main）。后端保持格式不可知。附魔改 Scratch 集成事实（M5 改造清单）：① 保存 = 两次 upload（`save-sb3?file_type=` 砍掉后改 `files/upload` + `path=/课件/main.sb3`）；② 加载 = `fetch(folder+文件名)` 改走 `files/download?path=`；③ **F3 上传须自动创建路径中间层目录**（Scratch 只给完整路径不先建夹）；④ 双 sb3 约定仅存在于课程课件目录，资料域无此概念。 |
 | D15 | 资产上传与下载露出（2026-10-07 拍板） | ① 管理端**一个统一上传页 + 四分类选择**（课程/书架/资料/软件 → 映射 `courses.shelf` 与 `resources.category`，后端零改动）。② **下载按钮分界**：课程与书架**全域不提供下载**（含老师——老师本地保留源资产，平台是发布端不是仓库；"不给下载"= 前端不放按钮，服务端 F2 能力保留，scratch 加载/发布读文件不在此列）；资料与软件支持单文件 + 打包下载。③ scratch 散装素材（非双 sb3 课件本体）归资料 `reference`。 |
+| D16 | 资产合表（2026-10-08 拍板，**修订 D13 的"不建总表"**） | `courses` + `resources` 两表**合并为一张 `assets`**：`bucket(courses\|books\|reference\|download)` 四值分类（D15 四选一直接落库），`type/format/publish` 为课程族专用列；`UNIQUE(owner_id, name)`（每 owner 资产名全局唯一）。连带：`file_order.scope+scope_id → asset_id`、`trash.type` 值 `course\|resource → asset`。**接口前缀不动**（`/api/courses`、`/api/resources` 照旧，按 bucket 子集筛），文件树仍一套（D13 的大一统层照旧）。趁 M2 未动工零成本执行（D7）。 |
 
 ---
 
@@ -157,17 +158,15 @@ class_members(
   UNIQUE(class_id, account_id)
 )
 
--- 课程与资料（元信息入库，文件本体在磁盘）
-courses(
-  id PK, owner_id FK, name, type, format, description,
-  tags JSON, shelf(books|courses), publish JSON, created_at
-)
-resources(
-  id PK, owner_id FK, name, description, tags JSON,
-  category(reference|download), format, created_at
+-- 资产（D16 合表：课程/书架/资料/软件四类共用，bucket 分类）
+assets(
+  id PK, owner_id FK, bucket(courses|books|reference|download), name,
+  description, tags JSON, created_at,
+  type, format, publish JSON          -- 课程族专用（bucket=courses|books），其余为空
+  UNIQUE(owner_id, name)
 )
 file_order(                                          -- 文件树自定义顺序（原 _order.json）
-  scope(course|resource), scope_id, parent_path, name, position
+  asset_id FK, parent_path, name, position
 )
 
 -- 站内信
@@ -195,7 +194,7 @@ settings(
 
 -- 统一回收站（原"用户 DB 版 + 内容文件版"两套合一，D10）
 trash(
-  id PK, type(account|class|course|resource),
+  id PK, type(account|class|asset),
   owner_id FK, name, payload JSON,                   -- 恢复所需快照
   disk_path,                                         -- 内容类：被移动的目录
   deleted_at
@@ -260,6 +259,8 @@ trash(
 
 ### 3.4 课程（courses）
 
+> **落库**：`assets` 表 `bucket IN ('courses','books')`（D16 合表）；`?shelf=books|courses` 与 `PUT .../shelf` 的值即 bucket 值。
+
 | 方法 | 路径 | 功能 | 权限 |
 |---|---|---|---|
 | GET | `/api/courses` | 课程列表（`?shelf=books\|courses`、`?owner=`） | 公开 |
@@ -289,6 +290,8 @@ trash(
 | POST | `.../files/order` | 拖拽排序（body: `path`,`names[]`,`position`） | 写权限 |
 
 ### 3.6 资料与软件（resources）
+
+> **落库**：`assets` 表 `bucket IN ('reference','download')`（D16 合表）；`?category=reference|download` 的值即 bucket 值。
 
 | 方法 | 路径 | 功能 | 权限 |
 |---|---|---|---|
