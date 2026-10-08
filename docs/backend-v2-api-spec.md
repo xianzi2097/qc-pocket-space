@@ -24,9 +24,10 @@
 | D11 | 全新功能域（作品分享 / 统计 / AI 等） | **不预留、不提前设计**（待定，拍板人：用户）。要做时按 §8.1 循环新增：§3 追加接口行 → 新表 → 新 router → 先写测试 → main.py 挂一行 → 更新 README。地基不含业务假设，天然可扩 |
 | D12 | 运行时 | **复用 V1 的 `qc-pocket-space/runtime/`（python/caddy/node/vitepress-template），不复制**。生产用 `runtime/python`（已实测含 V2 全部依赖），测试用 `tests/venv`（同为 Python 3.12.13，无漂移）。Caddy 在 M0~M4 完全不碰（V2 跑 8001 不进反代），M5 切流时用 `runtime/caddy/generate_caddyfile.py` 重新生成配置。vitepress 原样复用（M4 电子书发布调用同一模板） |
 | D13 | 课程与资料的关系（2026-10-07 拍板） | **词汇统一为"资产家族"，表分开**（`courses` / `resources` 不合表）。共享层已合一（文件树同一套 service、`file_order`、`trash`、打包下载、权限、路径安全）；各自独有列/接口留在各域（课程：publish/ebook/shelf/课件；资料：category/zip）。不做 `assets` 总表；前端如需"资产总览"用**读侧拼接**（查两表合并返回），不合并存储。**统一层正式定名"资产管理"**（2026-10-07 补）：即"一行 + 一棵树 + F1~F7 七动作"那一层——后端大一统在此，分类只是元数据字符串、后端不看牌干活；别叫"资源管理"（会与资料域撞名）。 |
-| D14 | 课件代码保密（2026-10-07 拍板） | **服务端不按文件名拦截**（学生可下 `main.sb3`，维持 V1 现状），代码保密由魔改 Scratch 客户端按角色选择文件实现（学生→student.sb3/回退 main，教师→main）。后端保持格式不可知。附魔改 Scratch 集成事实（M5 改造清单）：① 保存 = 两次 upload（`save-sb3?file_type=` 砍掉后改 `files/upload` + `path=/课件/main.sb3`）；② 加载 = `fetch(folder+文件名)` 改走 `files/download?path=`；③ **F3 上传须自动创建路径中间层目录**（Scratch 只给完整路径不先建夹）；④ 双 sb3 约定仅存在于课程课件目录，资料域无此概念。 |
+| D14 | 课件代码保密（2026-10-07 拍板） | **服务端不按文件名拦截**（学生可下 `main.sb3`，维持 V1 现状），代码保密由魔改 Scratch 客户端按角色选择文件实现（学生→student.sb3/回退 main，教师→main）。后端保持格式不可知。附魔改 Scratch 集成事实（M5 改造清单）：① 保存 = 两次 upload（`save-sb3?file_type=` 砍掉后改 `files/upload` + `path=/课件/main.sb3`）；② 加载 = `fetch(folder+文件名)` 改走 `files/download?path=`；③ **F3 上传须自动创建路径中间层目录**（Scratch 只给完整路径不先建夹）；④ 双 sb3 约定仅存在于课程课件目录，资料域无此概念；⑤ **积木白名单在魔改 Scratch 内部完成**——保存时按白名单过滤生成两个内容不同的 sb3（同一课件、两份 JSON），后端只存字节、永不解析。 |
 | D15 | 资产上传与下载露出（2026-10-07 拍板） | ① 管理端**一个统一上传页 + 四分类选择**（课程/书架/资料/软件 → 映射 `courses.shelf` 与 `resources.category`，后端零改动）。② **下载按钮分界**：课程与书架**全域不提供下载**（含老师——老师本地保留源资产，平台是发布端不是仓库；"不给下载"= 前端不放按钮，服务端 F2 能力保留，scratch 加载/发布读文件不在此列）；资料与软件支持单文件 + 打包下载。③ scratch 散装素材（非双 sb3 课件本体）归资料 `reference`。 |
-| D16 | 资产合表（2026-10-08 拍板，**修订 D13 的"不建总表"**） | `courses` + `resources` 两表**合并为一张 `assets`**：`bucket(courses\|books\|reference\|download)` 四值分类（D15 四选一直接落库），`type/format/publish` 为课程族专用列；`UNIQUE(owner_id, name)`（每 owner 资产名全局唯一）。连带：`file_order.scope+scope_id → asset_id`、`trash.type` 值 `course\|resource → asset`。**接口前缀不动**（`/api/courses`、`/api/resources` 照旧，按 bucket 子集筛），文件树仍一套（D13 的大一统层照旧）。趁 M2 未动工零成本执行（D7）。 |
+| D16 | 资产合表（2026-10-08 拍板，**修订 D13 的"不建总表"**） | `courses` + `resources` 两表**合并为一张 `assets`**：`bucket(courses\|books\|reference\|download)` 四值分类（D15 四选一直接落库），`type/format/publish` 为课程族专用列；`UNIQUE(owner_id, name)`（每 owner 资产名全局唯一）。连带：`file_order.scope+scope_id → asset_id`、`trash.type` 值 `course\|resource → asset`。（"接口前缀不动"条款被 D17 修订）趁 M2 未动工零成本执行（D7）。 |
+| D17 | 资产接口合一（2026-10-08 拍板，**修订 D16 的"接口前缀不动"**） | `/api/courses` + `/api/resources` 两族 → **`/api/assets` 一族**：列表 `?bucket=`、建 `body.bucket`、PATCH 含 `bucket`（**跨族挪动允许**——上完的课转资料归档）。**原 shelf/category 词汇废除，全域只叫 bucket**（一字段一词）。判据：**行为同一份代码才合**——12 个动作同形（CRUD+文件树）已合，5 个不对称（lessons×2、publish×2、download）写**族守卫**（结构挡→代码挡，5 行，违反 404）；错误码 5001/6001 按 bucket 分；文件树挂载点二合一。C 板块评审结论（C2 双写、C8 确认、C9 单线程队列…）路径平移、规则不变。 |
 
 ---
 
@@ -94,8 +95,8 @@
 |---|---|
 | `POST /api/auth/login` | 登录 |
 | `GET /api/accounts` | 门户教师列表（**只返回 id/账号名/头像/角色**，不泄漏描述符等） |
-| `GET /api/courses`、`GET /api/courses/{id}`、`GET /api/courses/{id}/lessons` | 课程广场 |
-| `GET /api/resources`、`GET /api/resources/{id}`、文件树只读、`GET /api/resources/{id}/download` | 资料浏览与软件下载 |
+| `GET /api/assets`、`GET /api/assets/{id}`、`GET /api/assets/{id}/lessons` | 课程广场 |
+| `GET /api/assets?bucket=reference\|download`、文件树只读、`GET /api/assets/{id}/download` | 资料浏览与软件下载 |
 
 ### 1.6 其他约定
 
@@ -121,9 +122,9 @@ RESTful 的目的是**可预测**，不是纯度。以下 16 类接口使用动�
 |---|---|
 | `POST /api/auth/login`、`/logout`、`GET /api/auth/me` | 全行业惯例（GitHub 用 `/user`）；改成 `DELETE /api/sessions` 反而难懂 |
 | `POST .../files/upload`、`/mkdir`、`/rename`、`/order` | 纯 REST 要 `PUT /files/{path}`，但路径含 `/` 需 URL 转义，**前端会踩坑** |
-| `POST /api/courses/{id}/publish` | 发布是一次性动作，不是资源 |
+| `POST /api/assets/{id}/publish` | 发布是一次性动作，不是资源 |
 | `POST /api/trash/{id}/restore` | 恢复是一次性动作 |
-| `GET /api/resources/{id}/download`、`GET .../files/download` | 必须是 GET：浏览器 `<a href>` 直链下载、公开免登录 |
+| `GET /api/assets/{id}/download`、`GET .../files/download` | 必须是 GET：浏览器 `<a href>` 直链下载、公开免登录 |
 | `GET /api/messages/unread-count` | 聚合值，业界通行 |
 | `POST /api/settings/recent-opens` | 记录一条历史，POST 创建语义成立 |
 | `POST /api/accounts/batch` | 对集合的**批量**创建，单条创建已有 `POST /api/accounts` |
@@ -257,27 +258,28 @@ trash(
 | GET | `/api/students?q=` | 全体学生列表；带 `q` 时跨班模糊搜索（搜索=列表的过滤条件，不设独立端点） | teacher |
 | ~~GET~~ | ~~`/api/students/search`~~ | ❌ 已并入上一行（2026-10-06 规范整改） | — |
 
-### 3.4 课程（courses）
+### 3.4 资产（assets · 课程/书架/资料/软件合一 · D17）
 
-> **落库**：`assets` 表 `bucket IN ('courses','books')`（D16 合表）；`?shelf=books|courses` 与 `PUT .../shelf` 的值即 bucket 值。
+> **落库**：`assets` 一张表（D16）；**接口一族**（D17，2026-10-08 拍板：原 `/api/courses`、`/api/resources` 两前缀合一）。全域分类词只有一个：**`bucket`**（`courses|books|reference|download`——原 shelf/category 词汇废除）。
+> **族守卫**（5 处，违反 → 404）：`lessons`/`publish`/`publish-status` 仅课程族（bucket∈{courses,books}）；`download` 仅资料族。**跨族挪动允许**（PATCH bucket：上完的课可转资料归档，课程族专用字段保留、由族守卫挡住误用）。
 
 | 方法 | 路径 | 功能 | 权限 |
 |---|---|---|---|
-| GET | `/api/courses` | 课程列表（`?shelf=books\|courses`、`?owner=`） | 公开 |
-| POST | `/api/courses` | 建课程（生成唯一 id） | teacher / admin |
-| GET | `/api/courses/{id}` | 课程详情 | 公开 |
-| PATCH | `/api/courses/{id}` | 改名称 / 描述 / 标签 / 类型 / 打开方式 | owner / admin |
-| PUT | `/api/courses/{id}/shelf` | 移动书架（幂等放置：body `{shelf}`） | owner / admin |
-| DELETE | `/api/courses/{id}` | 删课程（进回收站，含发布产物清理） | owner / admin |
-| GET | `/api/courses/{id}/lessons` | 课件列表 | 公开 |
-| DELETE | `/api/courses/{id}/lessons/{lesson}` | 删课件文件夹 | owner / admin |
+| GET | `/api/assets` | 列表（`?bucket=courses\|books\|reference\|download`、`?owner=`；不传 bucket = 四类全返） | 公开 |
+| POST | `/api/assets` | 建资产（body.bucket = D15 四选一值；`type` 课程族必填——前端表单选；`format` 缺省按 type 兜底：scratch→scratch、python/cpp→folder；**库+盘双写**；重名 owner 全局 → 5001 课程族 / 6001 资料族） | teacher / admin |
+| GET | `/api/assets/{id}` | 详情（`assets` 行元信息：name/description/tags/type/format/publish…；文件树另走 F1） | 公开 |
+| PATCH | `/api/assets/{id}` | 改 名称/描述/标签/类型/打开方式 + **`bucket`**（= 挪书架/挪分类，幂等，族内族间均可；原 PUT /shelf 与资料改元信息并入，C5 砍） | owner / admin |
+| DELETE | `/api/assets/{id}` | 删（软删四联动：行→trash 快照(type=asset) · 磁盘移回收站 · 发布产物清理 · file_order 保留；彻底删才清账） | owner / admin |
+| GET | `/api/assets/{id}/lessons` | 课件列表（name/has_main/has_student/sb3_count，V1 平移；D14④ 唯一认识文件名处）**【仅课程族】** | 公开 |
+| DELETE | `/api/assets/{id}/lessons/{lesson}` | 删课件文件夹（**树内物理删、不可恢复** → 前端必须二次确认，2026-10-08 拍板）**【仅课程族】** | owner / admin |
 | ~~POST~~ | ~~`.../lessons/{lesson}/save-sb3`~~ | ❌ 砍掉（V1 联审清单：看板未调用的旧入口）→ 作品保存统一走 `files/upload`（2026-10-06） | — |
-| POST | `/api/courses/{id}/publish` | 电子书发布入队 | owner / admin |
-| GET | `/api/courses/{id}/publish-status` | 发布状态 | owner / admin |
+| POST | `/api/assets/{id}/publish` | 电子书发布入队（**后台单线程**跑 vitepress，状态写行内 publish 列）**【仅课程族】** | owner / admin |
+| GET | `/api/assets/{id}/publish-status` | 发布状态（排队中/构建中/成功/失败，前端轮询）**【仅课程族】** | owner / admin |
+| GET | `/api/assets/{id}/download` | 打包下载：单文件直发 / 文件夹**实时 zip 流式**（磁盘零残留）**【仅资料族】** | 公开 |
 
-### 3.5 文件树（files · 课程与资料**共用一套**，单一事实来源）
+### 3.5 文件树（files · 所有资产**共用一套**，单一事实来源）
 
-> 同样的 6 个动作分别挂在 `/api/courses/{id}/files` 与 `/api/resources/{id}/files` 下，实现共用同一 service。
+> 7 个动作只挂一个前缀：`/api/assets/{id}/files`（D17 合一后连挂载点也只剩一个），实现共用同一 service。
 
 | 方法 | 路径 | 功能 | 权限 |
 |---|---|---|---|
@@ -289,19 +291,9 @@ trash(
 | DELETE | `.../files?path=` | 物理删除（树内删除，不经回收站） | 写权限 |
 | POST | `.../files/order` | 拖拽排序（body: `path`,`names[]`,`position`） | 写权限 |
 
-### 3.6 资料与软件（resources）
+### 3.6 ~~资料与软件~~ —— ❌ 已并入 §3.4（D17 资产接口合一，2026-10-08）
 
-> **落库**：`assets` 表 `bucket IN ('reference','download')`（D16 合表）；`?category=reference|download` 的值即 bucket 值。
-
-| 方法 | 路径 | 功能 | 权限 |
-|---|---|---|---|
-| GET | `/api/resources` | 列表（`?category=reference\|download`、`?owner=`） | 公开 |
-| POST | `/api/resources` | 建资料 | teacher / admin |
-| GET | `/api/resources/{id}` | 详情 | 公开 |
-| PATCH | `/api/resources/{id}` | 改元信息 | owner / admin |
-| DELETE | `/api/resources/{id}` | 删（进回收站） | owner / admin |
-| GET | `/api/resources/{id}/download` | 下载（单文件直发 / 多文件实时打包 zip） | 公开 |
-| — | `.../files/*` | 文件树 7 个动作（见 3.5） | 读公开 / 写 owner |
+> 原 E1~E6 六个接口全部变成 §3.4 的 `/api/assets` 族（列表/建/详情/改/删 → 同款路径，`download` 带资料族守卫）。本节留编号占位、编号不重排（同 B7/C5 先例）。
 
 ### 3.7 站内信（messages）
 
@@ -409,7 +401,7 @@ trash(
 |---|---|---|
 | **M0 地基** ✅ 已完成 | 项目骨架、信封+错误码、DB engine + 建表、会话表鉴权、限流、路径安全、测试基架、OpenAPI 自动生成 | ✅ 33 用例全过 + 8001 实跑冒烟通过（2026-10-05） |
 | **M1 账号与班级** | 3.2 账号 + 3.3 班级（含软删进回收站） | 对应用例全过，权限矩阵逐格验证 |
-| **M2 课程与文件** | 3.4 课程 + 3.5 文件树 + 3.6 资料 | 文件树全链路（上传/建夹/改名/排序/下载/打包）用例全过 |
+| **M2 课程与文件** | 3.4 资产（D17 合一）+ 3.5 文件树 | 文件树全链路（上传/建夹/改名/排序/下载/打包）用例全过 |
 | **M3 内容与沟通** | 3.7 站内信 + 3.8 笔记 + 3.9 课堂记录 + 3.10 设置 | 对应用例全过 |
 | **M4 收口** | 3.11 回收站合并、backup/build 平移、V1 横切能力清单逐项核对 | 横切清单 100% 存活 |
 | **M5 切流** | 前端按新规范改造（统一 fetch 封装 + 信封拦截）、真实流程手测、停旧起新 | 前端全流程手测通过，V1 下线 |
@@ -433,6 +425,7 @@ async function api(path, options) {
 - token 存 localStorage，请求自动带 Bearer；收到 `2002/2003` 跳登录页
 - `msg` 直接 toast 展示，不另建错误文案表
 - 公开页面（门户/课程广场/资料）不带 token 也能正常工作
+- **危险操作必须二次确认**（2026-10-08 拍板）：树内删除文件/课件、回收站彻底删除——弹窗文案必须含"**不可恢复**"字样；软删类（停用账号、删班级/课程）提示"可在回收站恢复"
 
 ## 8. 工作流与测试策略
 
