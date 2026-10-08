@@ -340,7 +340,7 @@ def remove_path(assetId: str, path: str = "", db: DbSession = Depends(get_db),
     asset = _load(db, assetId)
     _require_owner(asset, account)
     filetree.remove(db, assetId, path)
-    return ok(None, "已删除")
+    return ok(None, "已删除（不可恢复）")
 
 
 @router.post("/{assetId}/files/order")
@@ -384,7 +384,7 @@ def delete_lesson(
     _require_family(asset, _COURSE_FAMILY)
     _require_owner(asset, account)
     filetree.remove(db, assetId, lesson)         # 树内物理删（前端必须二次确认）
-    return ok(None, "课件已删除")
+    return ok(None, "课件已删除（不可恢复）")
 
 
 # ---------------- 发布队列（C9/C10 · 课程族守卫） ----------------

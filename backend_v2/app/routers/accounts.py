@@ -273,7 +273,7 @@ def delete_account(
     )
     db.query(AuthSession).filter(AuthSession.account_id == target.id).delete()  # 踢下线
     db.commit()
-    return ok(None, "账号已停用")
+    return ok(None, "账号已停用，可在回收站恢复")
 
 
 @router.post("/{accountId}/password")
