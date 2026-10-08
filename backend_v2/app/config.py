@@ -47,7 +47,7 @@ RECENT_OPENS_LIMIT = 6
 # emoji 预设头像的标记形如 "avatar_07"；清单在前端常量（V1 的 AVATARS，20+ 个），后端只存标记
 AVATAR_MARKER_PATTERN = "avatar_"
 
-_SUBDIRS = ["users", "courses", "resources", "trash"]
+_SUBDIRS = ["users", "assets", "trash"]
 
 
 def ensure_dirs() -> None:
