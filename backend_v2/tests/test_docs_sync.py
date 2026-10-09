@@ -19,6 +19,7 @@ import pytest
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 README = BACKEND_DIR / "README.md"
+DB_DOC = BACKEND_DIR.parent / "docs" / "backend-v2-database.md"
 
 STAGES = ["M0", "M1", "M2", "M3", "M4", "M5"]
 PLACEHOLDER = "⚠ 待补职责描述"
@@ -95,3 +96,57 @@ def test_readme_stage_table_complete():
     missing = [stage for stage in STAGES if stage not in text]
     assert not missing, f"README 阶段进度表缺行：{missing}"
     assert "✅ 完成" in text, "阶段进度表里没有任何『✅ 完成』标记"
+
+
+def _implemented_tables() -> set[str]:
+    """app 代码（含 main.py）真实 import 了的模型 → 其 __tablename__"""
+    models_src = (BACKEND_DIR / "app" / "models.py").read_text(encoding="utf-8")
+    table_of = dict(re.findall(
+        r"class\s+(\w+)\(Base\):.*?__tablename__\s*=\s*[\"'](\w+)[\"']", models_src, re.S))
+    used: set[str] = set()
+    for py in [BACKEND_DIR / "main.py", *(BACKEND_DIR / "app").rglob("*.py")]:
+        if py.name == "models.py" or "__pycache__" in py.parts:
+            continue
+        text = py.read_text(encoding="utf-8")
+        # 抓 from ...models import A, B( ...多行... )
+        for stmt in re.findall(r"from\s+[\w.]*models\s+import\s+\(?([^)]*)\)?", text):
+            for name in re.split(r"[,\s]+", stmt):
+                name = name.strip()
+                if name in table_of:
+                    used.add(table_of[name])
+    return used
+
+
+def test_database_doc_stage_matches_implementation():
+    """数据库说明书的阶段列必须跟上实现（2026-10-09 漏更 8 行的教训转成机器闸门）
+
+    两条断言：
+      ① models 里每张表都在"总览"登记（新表必入册）
+      ② 代码里【已经 import】的模型，其总览行阶段列不许还是"未来"
+    """
+    assert DB_DOC.exists(), f"数据库说明书不存在：{DB_DOC}"
+    text = DB_DOC.read_text(encoding="utf-8")
+
+    models_src = (BACKEND_DIR / "app" / "models.py").read_text(encoding="utf-8")
+    all_tables = set(re.findall(
+        r"__tablename__\s*=\s*[\"'](\w+)[\"']", models_src))
+
+    rows = {m[0]: m[1].strip() for m in re.findall(
+        r"\|\s*\d+\s*\|\s*`(\w+)`\s*\|[^|]*\|[^|]*\|\s*([^|\n]+)\|", text)}
+
+    missing_rows = sorted(t for t in all_tables if t not in rows)
+    assert not missing_rows, (
+        f"数据库说明书总览缺表行：{missing_rows} → 加进『总览』表"
+    )
+
+    stale = sorted(t for t in _implemented_tables() if "未来" in rows.get(t, ""))
+    assert not stale, (
+        f"这些表代码已在用，但数据库说明书阶段列还写『未来』：{stale}"
+        " → 打 ✅ 并填所属阶段（维护规则第 3 条）"
+    )
+
+    # 自检：解析规则真能抓到"阶段列写未来"的行（防止规则被改松，同命名闸门传统）
+    probe = {k: v.strip() for k, v in re.findall(
+        r"\|\s*\d+\s*\|\s*`(\w+)`\s*\|[^|]*\|[^|]*\|\s*([^|\n]+)\|",
+        "| 99 | `probe_table` | a | b | 未来 |")}
+    assert probe == {"probe_table": "未来"}
