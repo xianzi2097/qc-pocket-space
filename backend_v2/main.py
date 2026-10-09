@@ -27,7 +27,7 @@ from app import config
 from app.db import SessionLocal, init_db
 from app.envelope import install_error_handlers, ok
 from app.models import Account, new_id
-from app.routers import accounts, assets, auth, classes, messages, notes
+from app.routers import accounts, assets, auth, class_records, classes, messages, notes, settings
 from app.security import hash_password
 
 logging.basicConfig(
@@ -91,6 +91,8 @@ app.include_router(classes.router)
 app.include_router(assets.router)
 app.include_router(messages.router)
 app.include_router(notes.router)
+app.include_router(class_records.router)
+app.include_router(settings.router)
 
 
 @app.get("/api/health", tags=["health"])
