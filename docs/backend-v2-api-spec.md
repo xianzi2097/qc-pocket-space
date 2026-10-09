@@ -180,7 +180,7 @@ messages(
 
 -- 笔记
 notebooks(id PK, owner_id FK, name, created_at, UNIQUE(owner_id,name))
-notes(id PK, notebook_id FK, title, content TEXT, updated_at)
+notes(id PK, notebook_id FK, title, content TEXT, updated_at, created_at)
 
 -- 课堂记录（原按月 JSON 文件）
 class_records(
