@@ -28,6 +28,7 @@
 | D15 | 资产上传与下载露出（2026-10-07 拍板） | ① 管理端**一个统一上传页 + 四分类选择**（课程/书架/资料/软件 → 映射 `courses.shelf` 与 `resources.category`，后端零改动）。② **下载按钮分界**：课程与书架**全域不提供下载**（含老师——老师本地保留源资产，平台是发布端不是仓库；"不给下载"= 前端不放按钮，服务端 F2 能力保留，scratch 加载/发布读文件不在此列）；资料与软件支持单文件 + 打包下载。③ scratch 散装素材（非双 sb3 课件本体）归资料 `reference`。 |
 | D16 | 资产合表（2026-10-08 拍板，**修订 D13 的"不建总表"**） | `courses` + `resources` 两表**合并为一张 `assets`**：`bucket(courses\|books\|reference\|download)` 四值分类（D15 四选一直接落库），`type/format/publish` 为课程族专用列；`UNIQUE(owner_id, name)`（每 owner 资产名全局唯一）。连带：`file_order.scope+scope_id → asset_id`、`trash.type` 值 `course\|resource → asset`。（"接口前缀不动"条款被 D17 修订）趁 M2 未动工零成本执行（D7）。 |
 | D17 | 资产接口合一（2026-10-08 拍板，**修订 D16 的"接口前缀不动"**） | `/api/courses` + `/api/resources` 两族 → **`/api/assets` 一族**：列表 `?bucket=`、建 `body.bucket`、PATCH 含 `bucket`（**跨族挪动允许**——上完的课转资料归档）。**原 shelf/category 词汇废除，全域只叫 bucket**（一字段一词）。判据：**行为同一份代码才合**——12 个动作同形（CRUD+文件树）已合，5 个不对称（lessons×2、publish×2、download）写**族守卫**（结构挡→代码挡，5 行，违反 404）；错误码 5001/6001 按 bucket 分；文件树挂载点二合一。C 板块评审结论（C2 双写、C8 确认、C9 单线程队列…）路径平移、规则不变。 |
+| D18 | 层级结构（2026-10-09 拍板） | **邮件夹、笔记本一律单层平铺，不支持嵌套**（学生用不到，高年级该去用 Obsidian；嵌套 = V1 扫描/改名 bug 的翻倍器）。升级路径已预留：将来要嵌套 = 表加一列 `parent_id`（后端半天级，前端画树是大头），现有数据零迁移。 |
 
 ---
 
@@ -297,18 +298,22 @@ trash(
 
 ### 3.7 站内信（messages）
 
+> **落库两张表**：`message_folders`（夹，单层平铺 D18）+ `messages`（信，一行一封，`folder_id` 指所在夹）。
+> **方案 A（2026-10-09 拍板）**：信**只存一份挂收件人**；发件人的"已发送"= 同一张表按 `sender_id` 查（`?box=sent`）。
+> **单份语义**：收件人删除 → 发件人的已发送里也消失（一份数据，一处删完）。
+
 | 方法 | 路径 | 功能 | 权限 |
 |---|---|---|---|
-| GET | `/api/messages` | 收件箱（`?folder=`、分页） | 本人 |
-| POST | `/api/messages` | 发消息（**仅教师→学生**） | teacher |
-| GET | `/api/messages/{id}` | 读一条（自动置已读） | 收件人 |
-| PATCH | `/api/messages/{id}` | 移动到文件夹 / 标记已读 | 收件人 |
-| DELETE | `/api/messages/{id}` | 删除 | 收件人 |
+| GET | `/api/messages` | 列表：`?folder=` 选夹（仅收件箱视角）、`?box=inbox\|sent`、`?page=&page_size=` 分页（默认 20 条/页，上限 100） | 本人 |
+| POST | `/api/messages` | 发消息（**仅 teacher——admin 也不发，2026-10-09 拍板：管理员有微信**；收件人必须在世学生；默认进对方收件箱；正文 = Markdown） | teacher |
+| GET | `/api/messages/{id}` | 读一条（**自动置已读**——收件人读才置，发件人读自己的已发送不改状态） | 收件人 / 发件人 |
+| PATCH | `/api/messages/{id}` | 移动到自己的文件夹 / 改已读状态 | **仅收件人** |
+| DELETE | `/api/messages/{id}` | 删除（**真删不进回收站**，响应带"不可恢复"） | **仅收件人** |
 | GET | `/api/messages/unread-count` | 未读总数（角标轮询） | 本人 |
-| GET | `/api/message-folders` | 文件夹 + 未读统计 | 本人 |
-| POST | `/api/message-folders` | 新建 | 本人 |
-| PATCH | `/api/message-folders/{id}` | 重命名（内置"收件箱"不可改） | 本人 |
-| DELETE | `/api/message-folders/{id}` | 删除（内置不可删，消息退回收件箱） | 本人 |
+| GET | `/api/message-folders` | 文件夹 + 每夹计数/未读 + 总未读（内置收件箱懒创建，登录天然有） | 本人 |
+| POST | `/api/message-folders` | 新建（同名拦） | 本人 |
+| PATCH | `/api/message-folders/{id}` | 重命名（内置"收件箱"不可改；**改名信件零动**——folder_id 指针红利） | 本人 |
+| DELETE | `/api/message-folders/{id}` | 删除（内置不可删；**信退回收件箱**：一条 UPDATE 搬家，一封不丢） | 本人 |
 
 ### 3.8 笔记（notebooks / notes）
 
