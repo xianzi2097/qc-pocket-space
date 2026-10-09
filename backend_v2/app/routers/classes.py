@@ -230,7 +230,7 @@ def delete_class(
         Trash(
             id=new_id(),
             type="class",
-            owner_id=cls.id,                 # owner_id 存班级 id（回收站按被删对象归档）
+            owner_id=cls.owner_id,            # 归属 = 班主任（列表按主人筛；班 id 在快照里）
             name=cls.name,
             payload={
                 "id": cls.id,

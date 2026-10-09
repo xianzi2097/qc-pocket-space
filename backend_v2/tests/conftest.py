@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 _TMP_ROOT = Path(tempfile.mkdtemp(prefix="qc_v2_test_"))
 os.environ["QC_V2_DATA_ROOT"] = str(_TMP_ROOT / "data")
 os.environ["QC_V2_DB"] = str(_TMP_ROOT / "test.db")
+os.environ["QC_DISABLE_AUTO_BACKUP"] = "1"   # 测试不起每日备份线程（app/backup.py）
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

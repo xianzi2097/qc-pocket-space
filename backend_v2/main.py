@@ -23,11 +23,11 @@ from fastapi import FastAPI
 from sqlalchemy import select
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app import config
+from app import backup, config
 from app.db import SessionLocal, init_db
 from app.envelope import install_error_handlers, ok
 from app.models import Account, new_id
-from app.routers import accounts, assets, auth, class_records, classes, messages, notes, settings
+from app.routers import accounts, assets, auth, class_records, classes, messages, notes, settings, trash
 from app.security import hash_password
 
 logging.basicConfig(
@@ -70,6 +70,7 @@ async def lifespan(_app: FastAPI):
     config.ensure_dirs()
     init_db()
     _ensure_admin()
+    backup.start_auto_backup()      # M4：每日自动备份（QC_DISABLE_AUTO_BACKUP=1 可关）
     yield
 
 
@@ -93,6 +94,7 @@ app.include_router(messages.router)
 app.include_router(notes.router)
 app.include_router(class_records.router)
 app.include_router(settings.router)
+app.include_router(trash.router)
 
 
 @app.get("/api/health", tags=["health"])

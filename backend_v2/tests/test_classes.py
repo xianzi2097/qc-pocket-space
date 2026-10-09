@@ -252,8 +252,10 @@ def test_delete_by_owner_goes_to_trash(client, login):
     db = SessionLocal()
     try:
         assert db.get(ClassRoom, cls["id"]) is None                    # 班级行已删
-        trash = db.query(Trash).filter(Trash.type == "class", Trash.owner_id == cls["id"]).first()
+        trash = db.query(Trash).filter(Trash.type == "class") \
+            .order_by(Trash.deleted_at.desc()).first()
         assert trash is not None and trash.payload["name"] == "待删班"   # 快照可恢复
+        assert trash.owner_id == trash.payload["owner_id"]              # 归属 = 班主任（M4 修正）
         assert db.query(ClassMember).filter(ClassMember.class_id == cls["id"]).count() == 1  # 成员关系保留
     finally:
         db.close()
