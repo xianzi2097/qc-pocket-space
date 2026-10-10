@@ -1,6 +1,7 @@
 #!/bin/sh
 # pre-commit：backend_v2 有变更时，顺便同步 README 并跑两道闸门，不绿不许提交
 # 装置：仓库已设 core.hooksPath=hooks（本文件随仓库版本化）
+# 2026-10-10：解释器由 tests/venv 换为 backend_v2/.venv（原 venv 已随 V1 测试退役）；职责不变
 set -e
 
 # 中文输出防乱码（Windows 控制台默认 GBK）

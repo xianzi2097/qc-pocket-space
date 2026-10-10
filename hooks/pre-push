@@ -15,7 +15,7 @@ PY=".venv/Scripts/python.exe"
 if [ ! -f "$PY" ]; then
   echo "✗ 找不到 $PY —— 测试环境还没建，无法验证这次 push："
   echo "    cd backend_v2"
-  echo "    py -3.14 -m venv .venv"
+  echo "    runtime\\python\\python.exe -m venv .venv   # 与生产同版 3.12"
   echo "    .venv/Scripts/python.exe -m pip install -r requirements-dev.txt"
   echo "  （或临时绕过：git push --no-verify —— 风险自负）"
   exit 1
