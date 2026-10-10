@@ -29,6 +29,7 @@
 | D16 | 资产合表（2026-10-08 拍板，**修订 D13 的"不建总表"**） | `courses` + `resources` 两表**合并为一张 `assets`**：`bucket(courses\|books\|reference\|download)` 四值分类（D15 四选一直接落库），`type/format/publish` 为课程族专用列；`UNIQUE(owner_id, name)`（每 owner 资产名全局唯一）。连带：`file_order.scope+scope_id → asset_id`、`trash.type` 值 `course\|resource → asset`。（"接口前缀不动"条款被 D17 修订）趁 M2 未动工零成本执行（D7）。 |
 | D17 | 资产接口合一（2026-10-08 拍板，**修订 D16 的"接口前缀不动"**） | `/api/courses` + `/api/resources` 两族 → **`/api/assets` 一族**：列表 `?bucket=`、建 `body.bucket`、PATCH 含 `bucket`（**跨族挪动允许**——上完的课转资料归档）。**原 shelf/category 词汇废除，全域只叫 bucket**（一字段一词）。判据：**行为同一份代码才合**——12 个动作同形（CRUD+文件树）已合，5 个不对称（lessons×2、publish×2、download）写**族守卫**（结构挡→代码挡，5 行，违反 404）；错误码 5001/6001 按 bucket 分；文件树挂载点二合一。C 板块评审结论（C2 双写、C8 确认、C9 单线程队列…）路径平移、规则不变。 |
 | D18 | 层级结构（2026-10-09 拍板） | **邮件夹、笔记本一律单层平铺，不支持嵌套**（学生用不到，高年级该去用 Obsidian；嵌套 = V1 扫描/改名 bug 的翻倍器）。升级路径已预留：将来要嵌套 = 表加一列 `parent_id`（后端半天级，前端画树是大头），现有数据零迁移。 |
+| D20 | 设置 theme 语义勘误（2026-10-10 拍板，**M5 唯二的后端改动之一**，另一个是 P4 如触发） | `settings.theme` 白名单由 `light/dark`（凭空设计的"明暗模式"，前端根本没有暗黑）改为**前端真实四值**：`''`（橙·默认）/ `green` / `blue` / `custom`；`hue` 默认 210→**95**（橙）与 theme 默认配套。判据：**V2 重写时未对照前端代码，spec 想象了不存在的功能**（M5 设置域迁移时发现，231 测试因只测后端自洽未能拦截）。改动面：白名单 1 行 + 默认值 2 处 + 对应测试。 |
 
 ---
 
@@ -351,7 +352,7 @@ trash(
 | 方法 | 路径 | 功能 | 权限 |
 |---|---|---|---|
 | GET | `/api/settings` | 读设置（缺省字段补默认值） | 本人 |
-| PUT | `/api/settings` | 改设置（主题/色相/字号 12-28/侧栏） | 本人 |
+| PUT | `/api/settings` | 改设置（主题四值 `''`/`green`/`blue`/`custom` 见 D20、色相 0-360、字号 12-28、侧栏） | 本人 |
 | POST | `/api/settings/recent-opens` | 记最近打开（去重置顶，上限 6） | 登录 |
 
 ### 3.11 回收站（trash · 两套合一，D10）

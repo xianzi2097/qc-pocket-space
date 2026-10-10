@@ -188,8 +188,8 @@ class Setting(Base):
     __tablename__ = "settings"
 
     account_id: Mapped[str] = mapped_column(String(12), primary_key=True)
-    theme: Mapped[str] = mapped_column(String(16), default="light")
-    hue: Mapped[int] = mapped_column(Integer, default=210)
+    theme: Mapped[str] = mapped_column(String(16), default="")     # D20：''=橙
+    hue: Mapped[int] = mapped_column(Integer, default=95)
     font_size: Mapped[int] = mapped_column(Integer, default=16)
     sidebar: Mapped[bool] = mapped_column(Boolean, default=True)
     recent_opens: Mapped[list] = mapped_column(JSON, default=list)  # 上限 config.RECENT_OPENS_LIMIT

@@ -39,18 +39,18 @@ def _user(client, login):
 def test_get_defaults_without_saving(client, login):
     t = _user(client, login)
     data = client.get("/api/settings", headers=_auth(t)).json()["data"]
-    assert data["theme"] == "light" and data["font_size"] == 16
+    assert data["theme"] == "" and data["font_size"] == 16          # D20：默认橙
     assert data["sidebar"] is True and data["recent_opens"] == []
 
 
 def test_put_partial_update(client, login):
     t = _user(client, login)
-    resp = client.put("/api/settings", json={"theme": "dark", "hue": 300},
+    resp = client.put("/api/settings", json={"theme": "custom", "hue": 300},
                       headers=_auth(t))
     assert resp.json()["code"] == 0
 
     data = client.get("/api/settings", headers=_auth(t)).json()["data"]
-    assert data["theme"] == "dark" and data["hue"] == 300
+    assert data["theme"] == "custom" and data["hue"] == 300
     assert data["font_size"] == 16                                 # 没传的字段保持默认
 
 
@@ -59,7 +59,7 @@ def test_put_validation(client, login):
     bad_size = client.put("/api/settings", json={"font_size": 30}, headers=_auth(t))
     assert bad_size.status_code == 400 and bad_size.json()["code"] == 1002
 
-    bad_theme = client.put("/api/settings", json={"theme": "blue"}, headers=_auth(t))
+    bad_theme = client.put("/api/settings", json={"theme": "purple"}, headers=_auth(t))
     assert bad_theme.status_code == 400 and bad_theme.json()["code"] == 1002
 
     bad_hue = client.put("/api/settings", json={"hue": 999}, headers=_auth(t))
@@ -90,12 +90,12 @@ def test_recent_opens_dedup_front_and_cap(client, login):
 def test_settings_isolated_per_user(client, login):
     t1 = _user(client, login)
     t2 = _user(client, login)
-    client.put("/api/settings", json={"theme": "dark"}, headers=_auth(t1))
+    client.put("/api/settings", json={"theme": "green"}, headers=_auth(t1))
 
     assert client.get("/api/settings", headers=_auth(t1)
-                      ).json()["data"]["theme"] == "dark"
+                      ).json()["data"]["theme"] == "green"
     assert client.get("/api/settings", headers=_auth(t2)
-                      ).json()["data"]["theme"] == "light"         # 各管各的
+                      ).json()["data"]["theme"] == ""               # 各管各的（默认橙）
 
 
 def test_requires_login(client, login):

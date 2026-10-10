@@ -208,8 +208,8 @@ V1 各目录下散落的 `_order.json` 全部收进这一张表（一个文件�
 | 字段             | 类型               | 含义           | 取值 / 备注                                     |
 | ---------------- | ------------------ | -------------- | ----------------------------------------------- |
 | `account_id`   | String(12) · 主键 | 属于谁         | →`accounts.id`（一人只有一行）               |
-| `theme`        | String(16)         | 主题           | `light` / `dark`                            |
-| `hue`          | Integer            | 主题色相       | 0-360                                           |
+| `theme`        | String(16)         | 主题           | `''`（橙·默认）/ `green` / `blue` / `custom`（D20） |
+| `hue`          | Integer            | 主题色相       | 0-360（默认 95=橙）                             |
 | `font_size`    | Integer            | 字号           | 默认 16                                         |
 | `sidebar`      | Boolean            | 侧边栏是否展开 |                                                 |
 | `recent_opens` | JSON（list）       | 最近打开       | 上限`config.RECENT_OPENS_LIMIT`，超了挤掉最旧 |

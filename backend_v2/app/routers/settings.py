@@ -19,7 +19,7 @@ from ..security import get_current_account
 
 router = APIRouter(prefix="/api", tags=["settings"])
 
-_THEMES = ("light", "dark")
+_THEMES = ("", "green", "blue", "custom")   # D20：前端真实四值（''=橙默认）；light/dark 系 spec 想象的暗黑，已勘误
 
 
 class SettingsPut(BaseModel):
@@ -34,8 +34,8 @@ class RecentOpen(BaseModel):
 
 
 def _shape(row: Setting | None) -> dict:
-    if row is None:                              # 没存过 → 全套默认
-        return {"theme": "light", "hue": 210, "font_size": 16,
+    if row is None:                              # 没存过 → 全套默认（D20：橙）
+        return {"theme": "", "hue": 95, "font_size": 16,
                 "sidebar": True, "recent_opens": []}
     return {"theme": row.theme, "hue": row.hue, "font_size": row.font_size,
             "sidebar": row.sidebar, "recent_opens": row.recent_opens or []}
@@ -60,7 +60,7 @@ def put_settings(
     account = Depends(get_current_account),
 ):
     if body.theme is not None and body.theme not in _THEMES:
-        raise ApiError(E_PARAM_INVALID, "theme 只能是 light 或 dark", 400)
+        raise ApiError(E_PARAM_INVALID, "theme 只能是 ''/green/blue/custom（D20）", 400)
     if body.hue is not None and not (0 <= body.hue <= 360):
         raise ApiError(E_PARAM_INVALID, "hue 取值 0-360", 400)
     if body.font_size is not None and not (12 <= body.font_size <= 28):
