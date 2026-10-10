@@ -288,7 +288,7 @@ def test_delete_self_blocked(client, login):
     assert resp.status_code == 403 and resp.json()["code"] == 3010
 
 
-def test_delete_soft_kills_sessions_and_lands_in_trash(client, login):
+def test_delete_soft_kills_sessions_without_trash(client, login):
     admin_token = login()["token"]
     target_id = _make_student(client, admin_token, "stu_dead")
     stu_token = client.post("/api/auth/login", json={"username": "stu_dead", "password": "abcd1234"}).json()["data"]["token"]
@@ -302,8 +302,9 @@ def test_delete_soft_kills_sessions_and_lands_in_trash(client, login):
     try:
         row = db.get(Account, target_id)
         assert row.status == "deleted"
+        # D25（2026-10-10）：停用不写回收站——账号生命周期只在用户列表里（停用/启用）
         trash = db.query(Trash).filter(Trash.type == "account", Trash.owner_id == target_id).first()
-        assert trash is not None and trash.name == "stu_dead"
+        assert trash is None
         # 会话全部清除
         assert db.query(AuthSession).filter(AuthSession.account_id == target_id).count() == 0
     finally:
@@ -311,8 +312,13 @@ def test_delete_soft_kills_sessions_and_lands_in_trash(client, login):
 
     # 老 token 立即失效、也不能重新登录
     assert client.get("/api/auth/me", headers=_auth(stu_token)).status_code == 401
+    # D26（2026-10-10）：停用号 + 正确密码 → 明确提示「账号已被停用」
     again = client.post("/api/auth/login", json={"username": "stu_dead", "password": "abcd1234"})
-    assert again.status_code == 401 and again.json()["code"] == 2001
+    assert again.status_code == 401 and again.json()["code"] == 2004
+    assert again.json()["msg"] == "账号已被停用"
+    # 停用号 + 错误密码 → 仍是通用 2001（不泄露账号存在性，守 test_auth 防枚举原则）
+    wrong = client.post("/api/auth/login", json={"username": "stu_dead", "password": "wrong-pass"})
+    assert wrong.status_code == 401 and wrong.json()["code"] == 2001
 
 
 # ---------------- 头像 ----------------

@@ -73,9 +73,9 @@ def test_list_scoped_and_type_filter(client, login):
     assert client.get("/api/trash").status_code == 401
 
 
-# ---------------- 恢复：账号 ----------------
+# ---------------- 恢复：账号（D25：不进回收站，用户列表直接启用） ----------------
 
-def test_restore_account_revives_login(client, login):
+def test_disabled_account_absent_from_trash_and_patch_revives(client, login):
     admin, t1, _ = _setup(client, login)
     sid = _mk(client, admin, "tr_stu", "student")
     client.delete(f"/api/accounts/{sid}", headers=_auth(admin))
@@ -84,25 +84,23 @@ def test_restore_account_revives_login(client, login):
                        json={"username": "tr_stu", "password": PWD}
                        ).status_code in (401, 403)
 
-    item = next(i for i in _trash_items(client, admin)
-                if i["type"] == "account" and i["name"] == "tr_stu")
-    resp = client.post(f"/api/trash/{item['id']}/restore", headers=_auth(admin))
-    assert resp.json()["code"] == 0
-
-    # 复活：能登录了；回收站里自己的条目没了
-    assert client.post("/api/auth/login",
-                       json={"username": "tr_stu", "password": PWD}).json()["code"] == 0
+    # D25（2026-10-10）：停用不写回收站——桶里找不到账号条目
     assert not any(i["type"] == "account" and i["name"] == "tr_stu"
                    for i in _trash_items(client, admin))
 
+    # 启用：PATCH status=active → 复活可登录
+    resp = client.patch(f"/api/accounts/{sid}", json={"status": "active"},
+                        headers=_auth(admin))
+    assert resp.json()["code"] == 0
+    assert client.post("/api/auth/login",
+                       json={"username": "tr_stu", "password": PWD}).json()["code"] == 0
 
-def test_restore_account_requires_admin(client, login):
+
+def test_patch_status_requires_admin(client, login):
     admin, t1, _ = _setup(client, login)
     sid = _mk(client, admin, "tr_stu2", "student")
-    client.delete(f"/api/accounts/{sid}", headers=_auth(admin))
-    item = next(i for i in _trash_items(client, admin)
-                if i["type"] == "account" and i["name"] == "tr_stu2")
-    resp = client.post(f"/api/trash/{item['id']}/restore", headers=_auth(t1))
+    resp = client.patch(f"/api/accounts/{sid}", json={"status": "active"},
+                        headers=_auth(t1))
     assert resp.status_code == 403 and resp.json()["code"] == 2005
 
 
@@ -225,12 +223,17 @@ def test_purge_requires_admin_and_content_only(client, login):
     assert client.delete(f"/api/trash/{item['id']}",
                          headers=_auth(t1)).status_code == 403
 
-    # 账号条目永不提供彻底删（哪怕 admin）
-    sid = _mk(client, admin, "tr_purge_stu", "student")
-    client.delete(f"/api/accounts/{sid}", headers=_auth(admin))
-    acc_item = next(i for i in _trash_items(client, admin)
-                    if i["type"] == "account" and i["name"] == "tr_purge_stu")
-    resp = client.delete(f"/api/trash/{acc_item['id']}", headers=_auth(admin))
+    # 账号条目永不提供彻底删（哪怕 admin）——D25 后正常流程不产生账号行，
+    # 这里直接造一条存量行验证防御分支仍在
+    db = SessionLocal()
+    try:
+        db.add(Trash(id="trpurglegacy1", type="account", owner_id="legacyacc01",
+                     name="legacy_acc", payload={}, disk_path="",
+                     deleted_at="2026-10-10 00:00:00"))
+        db.commit()
+    finally:
+        db.close()
+    resp = client.delete("/api/trash/trpurglegacy1", headers=_auth(admin))
     assert resp.status_code == 403 and resp.json()["code"] == 2005
 
 

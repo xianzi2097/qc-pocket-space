@@ -255,25 +255,10 @@ def delete_account(
         raise ApiError(E_CANNOT_DELETE_SELF, "不能停用自己的账号", 403)
 
     target.status = "deleted"
-    db.add(
-        Trash(
-            id=new_id(),
-            type="account",
-            owner_id=target.id,
-            name=target.username,
-            payload={
-                "id": target.id,
-                "username": target.username,
-                "role": target.role,
-                "avatar_path": target.avatar_path,
-                "descriptors": target.descriptors,
-                "created_at": target.created_at,
-            },
-        )
-    )
     db.query(AuthSession).filter(AuthSession.account_id == target.id).delete()  # 踢下线
     db.commit()
-    return ok(None, "账号已停用，可在回收站恢复")
+    # D25（2026-10-10）：账号不进回收站——生命周期只在用户列表（停用/启用）
+    return ok(None, "账号已停用，可随时启用")
 
 
 @router.post("/{accountId}/password")

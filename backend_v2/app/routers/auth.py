@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from .. import config
 from ..db import get_db
-from ..envelope import E_BAD_CREDENTIALS, E_PARAM_INVALID, ApiError, ok
+from ..envelope import E_ACCOUNT_DISABLED, E_BAD_CREDENTIALS, E_PARAM_INVALID, ApiError, ok
 from ..models import Account, AuthSession
 from ..security import (
     account_self,
@@ -54,9 +54,13 @@ def login(body: LoginIn, request: Request, db: DbSession = Depends(get_db)):
 
     username = body.username.strip()
     account = db.scalar(select(Account).where(Account.username == username))
-    if account is None or account.status != "active" or not verify_password(body.password, account.password_hash):
+    if account is None or not verify_password(body.password, account.password_hash):
         record_login_failure(db, ip)
         raise ApiError(E_BAD_CREDENTIALS, "账号或密码错误", 401)
+    if account.status != "active":
+        # D26（2026-10-10）：密码对了才说停用——外人（密码错）仍是通用 2001，不泄露存在性
+        record_login_failure(db, ip)
+        raise ApiError(E_ACCOUNT_DISABLED, "账号已被停用", 401)
 
     clear_login_failures(db, ip)
     token = create_session(db, account, ip=ip, user_agent=request.headers.get("user-agent", ""))
