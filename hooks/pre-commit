@@ -12,9 +12,9 @@ if ! git diff --cached --name-only -- backend_v2 | grep -q .; then
   exit 0
 fi
 
-# 解释器：优先仓库自带测试 venv（Windows 部署环境），否则系统 python
-if [ -f "tests/venv/Scripts/python.exe" ]; then
-  PY="tests/venv/Scripts/python.exe"
+# 解释器：优先 backend_v2 专属 venv（新测试环境），否则系统 python
+if [ -f "backend_v2/.venv/Scripts/python.exe" ]; then
+  PY="backend_v2/.venv/Scripts/python.exe"
 elif command -v python >/dev/null 2>&1; then
   PY="python"
 else

@@ -102,7 +102,9 @@ def main() -> int:
     # ② 文件地图缺项（排除包标记与缓存）
     files = sorted(
         path for path in BACKEND_DIR.rglob("*.py")
-        if "__pycache__" not in path.parts and path.name != "__init__.py"
+        if "__pycache__" not in path.parts
+        and ".venv" not in path.parts
+        and path.name != "__init__.py"
     )
     pending = [
         (path.name, path.relative_to(BACKEND_DIR).parts[0] == "tests")

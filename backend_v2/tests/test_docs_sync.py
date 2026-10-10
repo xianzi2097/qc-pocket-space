@@ -29,7 +29,9 @@ def _python_files() -> list[Path]:
     """全部源码与测试文件（排除包标记与缓存）"""
     return [
         path for path in BACKEND_DIR.rglob("*.py")
-        if "__pycache__" not in path.parts and path.name != "__init__.py"
+        if "__pycache__" not in path.parts
+        and ".venv" not in path.parts
+        and path.name != "__init__.py"
     ]
 
 
