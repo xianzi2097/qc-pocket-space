@@ -26,7 +26,7 @@ def main():
         site_domain = "codenova.cn"
     else:
         site_domain = "localhost"
-    fastapi_port = sys.argv[3] if len(sys.argv) > 3 else "8000"
+    fastapi_port = sys.argv[3] if len(sys.argv) > 3 else "8001"
     caddy_port = sys.argv[4] if len(sys.argv) > 4 else ""
     judge0_upstream = sys.argv[5].strip() if len(sys.argv) > 5 and sys.argv[5].strip() else ""
 
