@@ -45,8 +45,19 @@ def get_db():
 def init_db() -> None:
     from . import models  # noqa: F401  导入以注册表定义
 
+    _ensure_tables()
     Base.metadata.create_all(bind=engine)
     _ensure_columns()
+
+
+# 老库重建：file_order 早期骨架（scope/scope_id）与现模型不兼容（asset_id），
+# 且只存排序位置（派生数据，无业务内容）；create_all 不改已存在的旧表，
+# 残留旧表会让目录列表一直 500（no such column: asset_id）→ 发现即删，交给 create_all 重建
+def _ensure_tables() -> None:
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(file_order)")}
+        if cols and "asset_id" not in cols:
+            conn.exec_driver_sql("DROP TABLE file_order")
 
 
 # 老库补列（SQLite 的 ADD COLUMN 没有 IF NOT EXISTS）：建表后新增的列在此兜底

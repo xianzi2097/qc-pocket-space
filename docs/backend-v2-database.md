@@ -42,8 +42,7 @@ trash ──→ 指向被软删的 account / class（payload 存恢复所需快�
 - **时间**：一律 `String(19)` 格式 `"YYYY-MM-DD HH:MM:SS"` 字符串，SQLite 里好排序好比较（例外：`accounts.enrolled_at` 只存 `YYYY-MM-DD` 日期）
 - **JSON 列**：存 JSON 文本，Python 侧是 dict/list，读出来直接用
 - **软删**：没有物理删除，状态位 + 回收站，数据可恢复
-- **老库补列（2026-10-12）**：SQLite 的 `ADD COLUMN` 没有 `IF NOT EXISTS`，新列登记在 `db.py::_EXTRA_COLUMNS`，启动时 `init_db → _ensure_columns` 自动对老库补列；**加列容易、删列/改类型难（要重建表），字段想清楚再加**
-
+- **老库补列（2026-10-12）**：SQLite 的 `ADD COLUMN` 没有 `IF NOT EXISTS`，新列登记在 `db.py::_EXTRA_COLUMNS`，启动时 `init_db → _ensure_columns` 自动对老库补列；**加列容易、删列/改类型难（要重建表），字段想清楚再加**- **老库重建表（2026-10-12）**：`create_all` 只建缺失的表、**不改已存在的旧表**——旧骨架残留会一直 500（实例：file_order 早期 scope/scope_id 骨架 vs 现 asset_id，目录列表报 no such column）。守卫在 `db.py::_ensure_tables`：发现旧骨架直接删表交 `create_all` 重建（只丢派生数据）；**仅限派生/可重建数据表这么干，业务表不许自动删**
 ---
 
 ## 1. `accounts` — 账号本体

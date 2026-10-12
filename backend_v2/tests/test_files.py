@@ -64,3 +64,18 @@ def test_valid_new_name():
     for bad in ["", "   ", "..", ".", "a<b", "a" * 300, "a\tb"]:
         with pytest.raises(ApiError):
             valid_new_name(bad)
+
+def test_ensure_tables_rebuilds_legacy_file_order():
+    """老库守卫：file_order 残留 scope/scope_id 旧骨架 → init_db 删表重建（防目录列表 500）"""
+    from app.db import engine, init_db
+
+    with engine.begin() as conn:
+        conn.exec_driver_sql("DROP TABLE IF EXISTS file_order")
+        conn.exec_driver_sql(
+            "CREATE TABLE file_order (id INTEGER PRIMARY KEY, scope TEXT, scope_id TEXT,"
+            " parent_path TEXT, name TEXT, position INTEGER)"
+        )
+    init_db()
+    with engine.connect() as conn:
+        cols = {r[1] for r in conn.exec_driver_sql("PRAGMA table_info(file_order)")}
+    assert "asset_id" in cols and "scope" not in cols
