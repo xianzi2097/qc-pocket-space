@@ -127502,35 +127502,22 @@ class MenuBar extends react__WEBPACK_IMPORTED_MODULE_5__.Component {
     const loadAllCourses = () => {
       const sel = document.getElementById("sct-course");
       sel.innerHTML = '<option value="">加载中...</option>';
-      fetch("/api/users?t=".concat(Date.now())).then(r => r.json()).then(data => {
-        const teachers = data.users.filter(u => u.role === "teacher");
-        if (teachers.length === 0) {
-          sel.innerHTML = '<option value="">暂无老师，请先创建</option>';
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      fetch("/api/assets?t=".concat(Date.now()), {
+        headers: authHeaders()
+      }).then(r => r.json()).then(body => {
+        const items = body && body.data && body.data.items || [];
+        // 只列自己的课程族资产（V2 上传需 owner 权限）
+        const allOptions = items.filter(a => (a.bucket === "courses" || a.bucket === "books") && (!user.id || a.owner_id === user.id)).map(a => ({
+          id: a.id,
+          name: a.name,
+          teacher: a.owner_name
+        }));
+        if (allOptions.length === 0) {
+          sel.innerHTML = '<option value="">暂无课程，请先创建</option>';
           return;
         }
-        // 并发获取所有老师的课程
-        return Promise.all(teachers.map(t => fetch("/api/courses?teacher=".concat(t.username, "&t=").concat(Date.now()), {
-          headers: authHeaders()
-        }).then(r => r.json()))).then(results => {
-          let allOptions = [];
-          results.forEach((courseData, i) => {
-            if (courseData.status === "success" && courseData.courses) {
-              courseData.courses.forEach(c => {
-                allOptions.push({
-                  id: c.id,
-                  name: c.name,
-                  material_count: c.material_count,
-                  teacher: teachers[i].username
-                });
-              });
-            }
-          });
-          if (allOptions.length === 0) {
-            sel.innerHTML = '<option value="">暂无课程，请先创建</option>';
-            return;
-          }
-          sel.innerHTML = allOptions.map(c => "<option value=\"".concat(c.id, "\" data-teacher=\"").concat(c.teacher, "\">").concat(c.name, "\uFF08").concat(c.teacher, "\uFF09</option>")).join("");
-        });
+        sel.innerHTML = allOptions.map(c => "<option value=\"".concat(c.id, "\">").concat(c.name, "\uFF08").concat(c.teacher, "\uFF09</option>")).join("");
       }).catch(() => {
         sel.innerHTML = '<option value="">加载失败</option>';
       });
@@ -127538,12 +127525,10 @@ class MenuBar extends react__WEBPACK_IMPORTED_MODULE_5__.Component {
     loadAllCourses();
     document.getElementById("sct-cancel").onclick = () => overlay.remove();
     document.getElementById("sct-confirm").onclick = () => {
-      var _sel$options$sel$sele;
       const sel = document.getElementById("sct-course");
-      const courseName = sel.value;
-      const teacher = ((_sel$options$sel$sele = sel.options[sel.selectedIndex]) === null || _sel$options$sel$sele === void 0 || (_sel$options$sel$sele = _sel$options$sel$sele.dataset) === null || _sel$options$sel$sele === void 0 ? void 0 : _sel$options$sel$sele.teacher) || "";
+      const assetId = sel.value;
       const lessonName = document.getElementById("sct-lesson").value.trim();
-      if (!courseName || !lessonName) {
+      if (!assetId || !lessonName) {
         alert("请选择课程并填写课件名称");
         return;
       }
@@ -127553,8 +127538,7 @@ class MenuBar extends react__WEBPACK_IMPORTED_MODULE_5__.Component {
       toast.textContent = "⏳ 正在保存到课程...";
       document.body.appendChild(toast);
       saveToCourse({
-        teacher,
-        courseName,
+        assetId,
         lessonName
       }).then(result => {
         toast.textContent = "✅ 已保存到课程！";
@@ -138740,18 +138724,16 @@ class SaveToCourse extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
   }
 
   /**
-   * 保存到课程
+   * 保存到课程（V2：/api/assets/{id}/files/upload，§5.2 课件保存）
    * @param {Object} options
-   * @param {string} options.teacher - 老师用户名
-   * @param {string} options.courseName - 课程名
-   * @param {string} options.lessonName - 课件名
+   * @param {string} options.assetId - 资产 id（V2 身份，取代老师名+课程名）
+   * @param {string} options.lessonName - 课件名（资产根下的课件目录）
    * @returns {Promise<{path: string}>}
    */
   saveToCourse(_ref) {
     var _this = this;
     let {
-      teacher,
-      courseName,
+      assetId,
       lessonName
     } = _ref;
     return _asyncToGenerator(function* () {
@@ -138771,37 +138753,36 @@ class SaveToCourse extends react__WEBPACK_IMPORTED_MODULE_1__.Component {
       }
 
       // 3. 上传 main.sb3
-      yield _this.uploadSb3(teacher, courseName, lessonName, "main", mainBlob);
+      yield _this.uploadSb3(assetId, lessonName, "main", mainBlob);
 
       // 4. 上传 student.sb3
-      yield _this.uploadSb3(teacher, courseName, lessonName, "student", studentBlob);
+      yield _this.uploadSb3(assetId, lessonName, "student", studentBlob);
       return {
-        path: "/share/".concat(teacher, "_course/").concat(courseName, "/").concat(lessonName, "/")
+        path: "/api/assets/".concat(encodeURIComponent(assetId), "/files/download?path=").concat(encodeURIComponent(lessonName), "/")
       };
     })();
   }
-  uploadSb3(teacher, courseName, lessonName, fileType, blob) {
+  uploadSb3(assetId, lessonName, fileType, blob) {
     return _asyncToGenerator(function* () {
+      const fileName = fileType === "main" ? "main.sb3" : "student.sb3";
       const formData = new FormData();
-      formData.append("file", blob, fileType === "main" ? "main.sb3" : "student.sb3");
+      formData.append("file", blob, fileName);
+      formData.append("path", "".concat(lessonName, "/").concat(fileName));
       const token = localStorage.getItem("auth_token");
       const headers = {};
 
-      // 如果已登录，带上 auth token（后端需要认证）
+      // 如果已登录，带上 auth token（V2 上传需 owner 身份）
       if (token) {
         headers["Authorization"] = "Bearer ".concat(token);
       }
-      const url = "/api/courses/".concat(encodeURIComponent(courseName), "/materials/").concat(encodeURIComponent(lessonName), "/save-sb3?teacher=").concat(encodeURIComponent(teacher), "&file_type=").concat(fileType);
-      const res = yield fetch(url, {
+      const res = yield fetch("/api/assets/".concat(encodeURIComponent(assetId), "/files/upload"), {
         method: "POST",
         headers,
         body: formData
       });
-      if (!res.ok) {
-        const err = yield res.json().catch(() => ({
-          detail: "上传失败"
-        }));
-        throw new Error(err.detail || "\u4E0A\u4F20\u5931\u8D25: ".concat(res.status));
+      const body = yield res.json().catch(() => null);
+      if (!body || body.code !== 0) {
+        throw new Error(body && body.msg || "\u4E0A\u4F20\u5931\u8D25: ".concat(res.status));
       }
     })();
   }
