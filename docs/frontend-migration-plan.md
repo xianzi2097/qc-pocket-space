@@ -5,7 +5,7 @@
 
 ## 📌 进行中（开着的活都写这里；干完清空并入 §4 进度记录）
 
-（暂无——只剩 M5b-8 回收站收尾：AttendancePanel 3 个 V1 trash 调用点 + 全站终验）
+（无——**M5b 全部 8 块完成** 🏁 全站切 V2、V1 调用清零。待用户总验收（D28））
 
 
 ## 0. 决策（接 spec D 表续号）
@@ -36,7 +36,7 @@
 | M5b-5 | 班级学生 B | 11 | — | ✅ **完成**（e2e E19~E22 + 后端 231 绿；UI 拟重设计免手测拍板 2026-10-11） |
 | M5b-6 | 资产族 F/C/E（拆三亚块：公开读面→管理面→文件树） | 41+2※ | P2 P4（P1 已拍：合并一页） | ✅ **完成**（e2e E28~E32 + 全量 36/36；2026-10-12）※挂账兑现：fetchTeacherNames N+1 链改一次全量取 |
 | M5b-7 | 课堂记录 R | 4（+1 未接线） | D27 | ✅ **完成**（e2e E25~E27 先红后绿 + 全量 31/31；2026-10-12） |
-| M5b-8 | 回收站 | 13 | — | ⬜（依赖块 6；管理端垃圾桶页已随 M5b-2 提前切 V2） |
+| M5b-8 | 回收站 | 3（收口） | — | ✅ **完成**（e2e E33 + 全量 37/37；2026-10-12）※大头早已随块 2/6 切完，本块收 AttendancePanel 尾 |
 
 ## 2. 每块五步仪式（对齐后端 M1/M2）
 
@@ -59,6 +59,7 @@
 - **2026-10-10 M5b-1 完成**：3 接口迁移（`/api/settings` 族、`PATCH /api/auth/password`、`PUT /api/accounts/{id}/avatar/preset`）+ login/me 补存 id + 401 按错误码分流（2001 凭证错不踢人）+ D24 首例（教师/管理端改密入口，共享表单 `ui/ChangePassword.tsx`）。e2e 10/10 绿、231 绿；用户终验管理端/教师端通过。
 - **2026-10-11 M5b-2 完成**：账号管理域（列表/创建/删除切 V2）+ **D25** 停用/启用直操（停用不进回收站）+ **D26** 停用登录提示 2004 + 垃圾桶页提前切 V2（4 接口，M5b-8 的 UI 部分）+ 删死代码 CoursePlaza + `ui/confirmDelete.tsx` 统一确认封装（spec §7，含 confirmDisable）+ **geek-green/cyber-bg @theme 桥接修复**（漏桥接致工具类透明隐形，创建老师按钮/选中 tab 长期黑字不可见的根因）+ **管理端翻浅色**（用户拍板后台新风格：浅底深字、看得见优先）。e2e 14/14 绿、231 绿；用户终验停用/启用/2004 提示通过。测试账号 `test-disabled/123456` 留库可复用。
 - **2026-10-11 M5b-3 完成**：站内信 12 调用点切 V2（文件夹/消息全 id 制、读即已读、详情单独取、md 沿用现成 marked 渲染零新增）+ 发送面板换 V2 学生源（receiver_id）+ **群发灰按钮（P-a A，M5b-5 恢复）** + 教师端框架/外壳/发送面板翻浅（4 数据面板随各自域块翻，分期有因）+ FolderTreePanel 基件换 confirmDelete 契约弹窗（Notebook 受益）+ 缓存失效修复（移动即见、删夹信回流）+ 详情区 flex-1 布局修正 + workers:1 串行根治跨文件测试竞争。e2e 18/18、231 绿、用户 7 条终验过（当场修复中文编码/横扩/缓存三反馈）。**服务改 Start-Process 独立进程，脱离会话不再被回收**。
+- **2026-10-12 M5b-8 完成 · 全站收口**：AttendancePanel 垃圾桶 3 调用点切 V2（`/api/trash` 形状：id/type/name/deleted_at，只显 class 条目；恢复 `POST /trash/{id}/restore`；彻底删 `DELETE /trash/{id}` 换 confirmDelete 不可恢复文案 + **仅 admin 显钮**；顺手删死参 username（V2 token 身份后无调用方））。e2e E33（删班→桶→恢复闭环，先红后绿；测试开头清历史桶——历年软删班全堆桶里曾撑出 83 个同名钮）+ **全量 37/37**、tsc 0、lint 回基线。**🏁 M5b 全部 8 块完成：全站 V1 调用清零**（端点扫描仅剩 1 句注释提及 V1）。
 - **2026-10-12 M5b-6 完成**：资产族三面全切 V2。**S1 公开读面**：`api.ts` 资产层重写（`fetchCourses` 一次全量取代逐师 N+1 挂账兑现、删 `fetchTeacherNames`、`fetchFileEntries` 逐层拉取、`fileHref/zipHref/scratchFolderHref` 链接器）+ `types/course.ts`（bucket 四值、删 material_count/teacher_key/shelf）+ 5 组件（CourseCatalog/CourseDetail/ResourceFileTree/Resources/Downloads，P4 计数移除、ebook 状态词改 `publish.state==='done'`、树改逐层懒加载 P2）。**S2 管理面**：新 `AssetManager.tsx`（P1 一页管 bucket 四选一；CRUD+星标挪书架+发布轮询（state: none/queued/building/done/failed）+回收站（V2 形状，永久删仅 admin 显钮）+浅色风格）；**删 CourseManager+ResourcesManager（1900 行孪生）**，TeacherDashboard 三 tab 收敛「资产管理」。**S3 文件树**：逐层钻取 + 上传（文件/文件夹 webkitdirectory）/建目录/改名/物理删（不可恢复二次确认）/上下移排序（D30）/下载。e2e 新增 `assets.spec.ts` E28~E29 + `assets-manage.spec.ts` E30~E32，**全量 36/36**；后端 **235**（+1 守卫测试）；tsc 0、lint 零新增（净减 2）。🐛 修复：① `apiV2` FormData 不塞 json 头（上传报「缺少参数：file」根因）② **SQLite 老库陷阱二咬**（dev 库 file_order 残留 scope/scope_id 旧骨架 → 列表接口 500；`db.py::_ensure_tables` 守卫删表重建 + 测试，上传不碰表所以完好）③ e2e 模糊匹配撞 msg 提示条（改 exact）+ confirmDelete 确认钮实为「确认」。经验：8001 会被起两个 uvicorn（.venv 与 runtime 便携版），跑测前查端口归属；vite 客户端 fetch 的 Content-Type 决定后端能不能收到 multipart。端点扫描：资产族 V1 调用清零，全仓仅剩 AttendancePanel 3 处 trash（M5b-8）。
 - **2026-10-12 M5b-7 完成**：课堂记录 4 调用点切 V2（`AttendancePanel.tsx` 单文件；班级名→class_id、`username=` 全删、保存后二次 GET 并入 `loadSessions()`）+ **D27** 落地（`content` = JSON.stringify(学生记录数组)，`parseSessionStudents` 解析失败容错为空）+ **D28** 拍板（终验合并到最后一次性）。e2e 新文件 `class-records.spec.ts` E25~E27 先红（V1 端点对 V2 404）后绿、**全量 31/31**、后端 234 绿（零改动）、tsc/eslint 零新增（3 条同规则同数基线）。学生视角 `?student=` 本期不接线（V2 端点已备好）。端点扫描：课堂记录域零 V1 残留；剩余 V1 = M5b-6 资产族 + M5b-8 trash 族（AttendancePanel/CourseManager/ResourcesManager 各 3 处）。
 - **2026-10-11 M5b-5 完成**：班级学生域 11 调用点切 V2（AttendancePanel：列表无学生→逐班详情合并、§455 全量拉取、PATCH 改排课/改名全 id 制、移出学生不删号、find-student→`/api/students?q=` 重名检测、V1 二次 GET 并入 loadClasses）+ **P5** 新建学生默认密码 111111（后端按 username 自动挂接已有号）+ **P6 群发恢复**（班级下拉 + 人数按钮 + 失败计数；M5b-3 灰按钮挂账兑现）+ `types.ts` ApiStudent.id number→string。e2e 26/26 绿、后端 231 绿、eslint 顺手清 7 条老账；用户拍板 UI 拟重设计免手测（功能层以 e2e 为准）。
