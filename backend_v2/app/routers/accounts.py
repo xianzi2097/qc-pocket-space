@@ -41,7 +41,7 @@ from ..envelope import (
     ApiError,
     ok,
 )
-from ..models import Account, AuthSession, Trash, new_id
+from ..models import Account, AuthSession, Trash, new_id, now_str
 from ..security import (
     account_public,
     account_self,
@@ -64,12 +64,17 @@ class AccountCreate(BaseModel):
     username: str = Field(min_length=1, max_length=config.MAX_USERNAME_LEN)
     password: str = Field(min_length=1)
     role: str = Field(min_length=1)
+    # 档案字段（2026-10-12，规范 §3.2）：可选，缺省空/当日
+    remark: str = Field(default="", max_length=255)
+    enrolled_at: str = Field(default="", max_length=19)
 
 
 class AccountPatch(BaseModel):
     username: str | None = Field(default=None, min_length=1, max_length=config.MAX_USERNAME_LEN)
     descriptors: str | None = None
     status: str | None = None
+    remark: str | None = Field(default=None, max_length=255)
+    enrolled_at: str | None = Field(default=None, max_length=19)
 
 
 class BatchRegister(BaseModel):
@@ -136,6 +141,9 @@ def create_account(
         username=username,
         password_hash=hash_password(body.password),
         role=body.role,
+        # 档案字段（2026-10-12）：入学/入职时间不填则记创建当日
+        remark=body.remark.strip(),
+        enrolled_at=(body.enrolled_at.strip() or now_str()[:10]),
     )
     db.add(created)
     db.commit()
@@ -234,6 +242,16 @@ def patch_account(
         except (ValueError, TypeError):
             raise ApiError(E_PARAM_INVALID, "描述符必须是合法 JSON", 400)
         target.descriptors = body.descriptors
+
+    # 档案字段（2026-10-12）：remark/enrolled_at 仅 admin
+    if body.remark is not None:
+        if account.role != "admin":
+            raise ApiError(E_FORBIDDEN, "只有管理员可以修改备注", 403)
+        target.remark = body.remark.strip()
+    if body.enrolled_at is not None:
+        if account.role != "admin":
+            raise ApiError(E_FORBIDDEN, "只有管理员可以修改入学时间", 403)
+        target.enrolled_at = body.enrolled_at.strip()
 
     db.commit()
     return ok(account_self(target) if (is_self or account.role == "admin") else account_public(target))

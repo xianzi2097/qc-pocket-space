@@ -33,7 +33,7 @@ from ..envelope import (
     ok,
 )
 from ..models import Account, ClassMember, ClassRoom, Trash, new_id
-from ..security import account_public, get_current_account, hash_password
+from ..security import account_member, account_public, get_current_account, hash_password
 
 router = APIRouter(prefix="/api", tags=["classes"])
 
@@ -175,7 +175,7 @@ def get_class(
     ).all()
     students = [
         {
-            **account_public(acc),
+            **account_member(acc),          # 含档案三字段（teacher/admin 视图）
             "joined_at": member.joined_at,
         }
         for member, acc in members
@@ -375,7 +375,7 @@ def list_students(
 
     items = [
         {
-            **account_public(student),
+            **account_member(student),      # 含档案三字段（teacher/admin 视图）
             "classes": sorted(classes_by_student.get(student.id, []), key=lambda c: c["name"]),
         }
         for student in students

@@ -51,6 +51,9 @@ class Account(Base):
     descriptors: Mapped[str] = mapped_column(Text, default="{}")
     status: Mapped[str] = mapped_column(String(16), default="active")  # active|deleted
     created_at: Mapped[str] = mapped_column(String(19), default=now_str)
+    # 档案字段（2026-10-12 定稿，规范 §3.2）：备注 + 入学/入职时间（name 姓名列已移除，显示名即账号名）
+    remark: Mapped[str] = mapped_column(String(255), default="")
+    enrolled_at: Mapped[str] = mapped_column(String(19), default="")  # 入学/入职 YYYY-MM-DD，≠created_at
 
 
 class AuthSession(Base):

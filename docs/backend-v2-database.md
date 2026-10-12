@@ -39,9 +39,10 @@ trash ──→ 指向被软删的 account / class（payload 存恢复所需快�
 **通用约定**：
 
 - **id**：`new_id()` 生成的 12 位随机串（字母表去掉了易混的 `l/o/0/1`），不从登录名推导——登录名可改，id 永不变
-- **时间**：一律 `String(19)` 格式 `"YYYY-MM-DD HH:MM:SS"` 字符串，SQLite 里好排序好比较
+- **时间**：一律 `String(19)` 格式 `"YYYY-MM-DD HH:MM:SS"` 字符串，SQLite 里好排序好比较（例外：`accounts.enrolled_at` 只存 `YYYY-MM-DD` 日期）
 - **JSON 列**：存 JSON 文本，Python 侧是 dict/list，读出来直接用
 - **软删**：没有物理删除，状态位 + 回收站，数据可恢复
+- **老库补列（2026-10-12）**：SQLite 的 `ADD COLUMN` 没有 `IF NOT EXISTS`，新列登记在 `db.py::_EXTRA_COLUMNS`，启动时 `init_db → _ensure_columns` 自动对老库补列；**加列容易、删列/改类型难（要重建表），字段想清楚再加**
 
 ---
 
@@ -56,9 +57,12 @@ trash ──→ 指向被软删的 account / class（payload 存恢复所需快�
 | `password_hash` | String(255)            | 密码哈希           | argon2 哈希，**永不明文**；重置密码 = 覆盖此列            |
 | `role`          | String(16) · 索引     | 角色               | `admin` / `teacher` `student`；决定权限矩阵哪一行         |
 | `avatar_path`   | String(255)            | 头像标记或文件路径 | 预设头像存标记`avatar_07`；自定义上传存磁盘路径               |
-| `descriptors`   | Text（JSON 串）        | 描述符             | 学生画像/标签，V1 遗留字段，保留备用                            |
+| `descriptors`   | Text（JSON 串）        | 学生完整备注资料   | V1 有此设计，学它（画像/标签/备注，学生管理阶段用）                |
 | `status`        | String(16)             | 账号状态           | `active` 正常 / `deleted` 已停用（A6 软删）；停用后无法登录 |
 | `created_at`    | String(19)             | 注册时间           | 创建时写入，不再变                                              |
+| `remark`        | String(255)            | 备注（老师便签）   | 老师/管理员的简短便签（如"试听生"）；公开视图不返回（2026-10-12） |
+| `enrolled_at`   | String(19)             | 入学/入职时间      | **一列两义**：学生=入学、老师=入职；`YYYY-MM-DD`，≠`created_at`（2026-10-12） |
+| ~~`name`~~      | —（已移除）            | ~~姓名~~ **已移除** | 2026-10-11 曾加、2026-10-12 代码移除（旧库残留空列无害）；**显示名即账号名**（身份 = id + 账号名 + 密码） |
 
 ## 2. `auth_sessions` — 登录态
 
@@ -205,14 +209,14 @@ V1 各目录下散落的 `_order.json` 全部收进这一张表（一个文件�
 
 一人一行，登录后前端拉取还原界面状态。
 
-| 字段             | 类型               | 含义           | 取值 / 备注                                     |
-| ---------------- | ------------------ | -------------- | ----------------------------------------------- |
-| `account_id`   | String(12) · 主键 | 属于谁         | →`accounts.id`（一人只有一行）               |
+| 字段             | 类型               | 含义           | 取值 / 备注                                                  |
+| ---------------- | ------------------ | -------------- | ------------------------------------------------------------ |
+| `account_id`   | String(12) · 主键 | 属于谁         | →`accounts.id`（一人只有一行）                            |
 | `theme`        | String(16)         | 主题           | `''`（橙·默认）/ `green` / `blue` / `custom`（D20） |
-| `hue`          | Integer            | 主题色相       | 0-360（默认 95=橙）                             |
-| `font_size`    | Integer            | 字号           | 默认 16                                         |
-| `sidebar`      | Boolean            | 侧边栏是否展开 |                                                 |
-| `recent_opens` | JSON（list）       | 最近打开       | 上限`config.RECENT_OPENS_LIMIT`，超了挤掉最旧 |
+| `hue`          | Integer            | 主题色相       | 0-360（默认 95=橙）                                          |
+| `font_size`    | Integer            | 字号           | 默认 16                                                      |
+| `sidebar`      | Boolean            | 侧边栏是否展开 |                                                              |
+| `recent_opens` | JSON（list）       | 最近打开       | 上限`config.RECENT_OPENS_LIMIT`，超了挤掉最旧              |
 
 ## 14. `trash` — 统一回收站
 

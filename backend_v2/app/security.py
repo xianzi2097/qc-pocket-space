@@ -197,6 +197,18 @@ def account_self(account: Account) -> dict:
         "descriptors": account.descriptors,
         "status": account.status,
         "created_at": account.created_at,
+        # 档案字段（2026-10-12，规范 §3.2）
+        "remark": account.remark,
+        "enrolled_at": account.enrolled_at,
+    }
+
+
+def account_member(account: Account) -> dict:
+    """teacher/admin 的学生视图：公开字段 + 档案字段（备注不进公开视图）"""
+    return {
+        **account_public(account),
+        "remark": account.remark,
+        "enrolled_at": account.enrolled_at,
     }
 
 

@@ -615,3 +615,48 @@ def test_choose_unknown_preset(client, login):
         resp = client.put(f"/api/accounts/{stu_id}/avatar/preset",
                           json={"preset": bad}, headers=_auth(stu_token))
         assert resp.status_code == 400 and resp.json()["code"] == 1002, bad
+
+
+# ---------------- 档案三字段（2026-10-11 翻案恢复/新增：name/remark/enrolled_at） ----------------
+
+
+def test_create_with_profile_fields(client, login):
+    token = login()["token"]
+    resp = client.post("/api/accounts", json={
+        "username": "stu_profile", "password": "abcd1234", "role": "student",
+        "remark": "试听", "enrolled_at": "2026-09-01",
+    }, headers=_auth(token))
+    body = resp.json()
+    assert body["code"] == 0, resp.text
+    data = body["data"]
+    assert data["remark"] == "试听" and data["enrolled_at"] == "2026-09-01"
+    assert "name" not in data   # 姓名字段已移除（显示名即账号名，身份=id+账号名+密码）
+
+
+def test_profile_defaults_and_patch_rules(client, login):
+    token = login()["token"]
+    sid = _make_student(client, token, "stu_profile2")
+    # 缺省：姓名/备注空；入学时间不填 = 记创建当日
+    detail = client.get(f"/api/accounts/{sid}", headers=_auth(token)).json()["data"]
+    assert detail["remark"] == ""
+    assert len(detail["enrolled_at"]) == 10
+    # admin 档案字段可改
+    patched = client.patch(f"/api/accounts/{sid}", headers=_auth(token),
+                           json={"remark": "转班", "enrolled_at": "2025-03-02"}).json()["data"]
+    assert patched["remark"] == "转班" and patched["enrolled_at"] == "2025-03-02"
+    # 学生本人：remark/enrolled_at 一律 403（显示名即账号名，无昵称可改）
+    stu_token = client.post("/api/auth/login",
+                            json={"username": "stu_profile2", "password": "abcd1234"}).json()["data"]["token"]
+    for field, val in (("remark", "偷改"), ("enrolled_at", "2020-01-01")):
+        resp = client.patch(f"/api/accounts/{sid}", headers=_auth(stu_token), json={field: val})
+        assert resp.status_code == 403, field
+
+
+def test_student_views_carry_profile_fields(client, login):
+    """teacher/admin 学生视图带档案字段且不再含 name；公开裁剪视图仍不带（test_public_list_is_trimmed 盯着）"""
+    token = login()["token"]
+    sid = _make_student(client, token, "stu_prof_view")   # 全局唯一名（stu_view 已被 152 行占用）
+    client.patch(f"/api/accounts/{sid}", headers=_auth(token), json={"remark": "视图"})
+    hit = next(i for i in client.get("/api/students", headers=_auth(token)).json()["data"]["items"]
+               if i["username"] == "stu_prof_view")
+    assert hit["remark"] == "视图" and "enrolled_at" in hit and "name" not in hit

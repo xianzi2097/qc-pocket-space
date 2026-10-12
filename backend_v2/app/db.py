@@ -46,3 +46,22 @@ def init_db() -> None:
     from . import models  # noqa: F401  导入以注册表定义
 
     Base.metadata.create_all(bind=engine)
+    _ensure_columns()
+
+
+# 老库补列（SQLite 的 ADD COLUMN 没有 IF NOT EXISTS）：建表后新增的列在此兜底
+_EXTRA_COLUMNS = {
+    "accounts": [
+        ("remark", "TEXT DEFAULT ''"),
+        ("enrolled_at", "TEXT DEFAULT ''"),
+    ],
+}
+
+
+def _ensure_columns() -> None:
+    with engine.begin() as conn:
+        for table, cols in _EXTRA_COLUMNS.items():
+            existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+            for col, ddl in cols:
+                if col not in existing:
+                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")

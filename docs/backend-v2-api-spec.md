@@ -233,10 +233,10 @@ trash(
 | 方法 | 路径 | 功能 | 权限 |
 |---|---|---|---|
 | GET | `/api/accounts` | 账号列表（`?role=teacher\|student`）；公开访问时字段裁剪 | 公开（裁剪）/ admin |
-| POST | `/api/accounts` | 创建账号（role=admin 判定：建老师需 admin，建学生需 admin/teacher） | admin / teacher |
+| POST | `/api/accounts` | 创建账号（role=admin 判定：建老师需 admin，建学生需 admin/teacher）；body 可带**档案三字段** `name`/`remark`/`enrolled_at`（缺省：空/空/当日） | admin / teacher |
 | POST | `/api/accounts/batch` | **批量注册**：`{role, password?, usernames[]}`，已存在的跳过不报错，返回 created/skipped 明细；`password` 缺省用默认密码 | admin |
 | GET | `/api/accounts/{accountId}` | 账号详情 | 登录（他人仅基本字段） |
-| PATCH | `/api/accounts/{accountId}` | 改**登录名**（2026-10-07 拍板：可改；本人限 teacher/admin，**学生一律不可改**，admin 可改任何人；重名 → 3001）/ 描述符 / 状态（**无昵称：显示名即账号名，2026-10-07 砍掉 display_name**；`status:'active'` 即**启用**停用的账号 —— D25） | 本人 / admin |
+| PATCH | `/api/accounts/{accountId}` | 改**登录名**（2026-10-07 拍板：可改；本人限 teacher/admin，**学生一律不可改**，admin 可改任何人；重名 → 3001）/ 描述符 / 状态 / **档案三字段**（`name` 本人或 admin，`remark`/`enrolled_at` 仅 admin；`status:'active'` 即**启用**停用的账号 —— D25） | 本人 / admin |
 | DELETE | `/api/accounts/{accountId}` | **停用**（纯改 status + 踢全部会话；**不进回收站**，用户列表直接启用 —— D25；admin 不可停用自己） | admin |
 | POST | `/api/accounts/{accountId}/password` | **管理员重置密码**（≥6 位；重置后该账号全部会话失效，需重新登录） | admin |
 | POST | `/api/accounts/{accountId}/avatar` | 上传头像（**≤5MB**，仅学生；磁盘写入失败 → `507/9001`） | 本人 |
@@ -246,6 +246,8 @@ trash(
 > **头像设计（2026-10-06 方案一）**：emoji 头像库活在**前端常量**（V1 的 `AVATARS`，20+ 个），后端只存 `avatar_XX` 标记——**不存预设图片、不设清单接口**（两个真相源必坏其一）。原 `GET /api/avatars/presets` 与 8 个 SVG 矢量图已删除。
 
 > V1 的 `POST /api/register`、`/api/update-avatar`、`/api/update-descriptors`、`/api/user/change-password` 收敛到上面 4 个资源动作。
+
+> **档案字段（2026-10-12 定稿）**：`remark` 备注（老师便签）、`enrolled_at` 入学/入职时间（**一列两义**：学生=入学、老师=入职；`YYYY-MM-DD`，**≠账号创建时间**）。**显示名即账号名**（身份 = id + 账号名 + 密码；2026-10-11 曾加 `name` 姓名字段，2026-10-12 **彻底移除**，旧库残留空列无害）。`descriptors` 学生完整备注资料（V1 有此设计，保留沿用）。**公开裁剪视图不含**；teacher/admin 学生视图（`GET /api/students`、`GET /api/classes/{id}`）与本人/管理员详情返回。
 
 ### 3.3 班级与学生（classes）
 
