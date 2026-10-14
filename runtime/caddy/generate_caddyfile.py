@@ -30,6 +30,11 @@ def main():
     caddy_port = sys.argv[4] if len(sys.argv) > 4 else ""
     judge0_upstream = sys.argv[5].strip() if len(sys.argv) > 5 and sys.argv[5].strip() else ""
 
+    # qwen 站点地址按模式分叉（用户拍板 2026-10-14）：
+    # local  明示 http:// = 不在本机申请证书（域名解析指向服务器，本机必败且无限重试）
+    # server 裸域名 = Caddy 自动 HTTPS 领证（与现状一致）
+    qwen_site = "http://qwen.codenova.cn" if mode == "local" else "qwen.codenova.cn"
+
     # Caddy 地址：本地模式用 `:端口`（纯HTTP），域名模式用 `域名:端口`
     if mode == "local":
         port = caddy_port if caddy_port else "80"
@@ -132,7 +137,7 @@ def main():
 }}
 
 # ================= 千问模型（朋友SSH隧道，子域名） =================
-qwen.codenova.cn {{
+{qwen_site} {{
     reverse_proxy localhost:25553
 }}"""
 
