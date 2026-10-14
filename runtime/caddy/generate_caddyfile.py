@@ -2,8 +2,8 @@
 青橙 Studio - Caddyfile 生成器
 自动检测项目路径，注入绝对路径到 Caddyfile。
 零依赖，可直接用系统 Python 运行。
-用法: python generate_caddyfile.py local [域名] [端口]    (本地测试)
-      python generate_caddyfile.py server [域名] [端口]   (线上生产)
+用法: python generate_caddyfile.py local|server [域名] [fastapi端口] [caddy端口] [judge0上游] [agent域名]
+      judge0 上游留空 = 不生成 judge0 代理；agent 域名留空 = 不生成 Agent 站点（且仅 server 模式生成）
 """
 import os
 import sys
@@ -30,10 +30,11 @@ def main():
     caddy_port = sys.argv[4] if len(sys.argv) > 4 else ""
     judge0_upstream = sys.argv[5].strip() if len(sys.argv) > 5 and sys.argv[5].strip() else ""
 
-    # qwen 站点地址按模式分叉（用户拍板 2026-10-14）：
-    # local  明示 http:// = 不在本机申请证书（域名解析指向服务器，本机必败且无限重试）
-    # server 裸域名 = Caddy 自动 HTTPS 领证（与现状一致）
-    qwen_site = "http://qwen.codenova.cn" if mode == "local" else "qwen.codenova.cn"
+    # Agent 站点（如千问，SSH 隧道反代）（用户拍板 2026-10-14）：
+    # 填域名才生成，留空 = 不生成（二开没配就永远碰不到证书问题）
+    # 裸域名 = Caddy 自动 HTTPS 领证；写 http://xxx = 明示不启用 TLS
+    # 局域网模式一律不生成（域名解析指向服务器，本机生成毫无意义）
+    agent_site = sys.argv[6].strip() if len(sys.argv) > 6 and sys.argv[6].strip() else ""
 
     # Caddy 地址：本地模式用 `:端口`（纯HTTP），域名模式用 `域名:端口`
     if mode == "local":
@@ -60,6 +61,15 @@ def main():
     handle_path /judge0/* {{
         reverse_proxy {judge0_upstream}
     }}"""
+
+    # Agent 站点（如千问）：SSH 隧道反代，上游固定隧道端口 localhost:25553
+    agent_block = ""
+    if agent_site and mode == "server":
+        agent_block = f"""
+# ================= Agent 站点（如千问，SSH 隧道反代） =================
+{agent_site} {{
+    reverse_proxy localhost:25553
+}}"""
 
     # 构建 Caddyfile 内容（f-string 直接生成，无需模板文件）
     caddyfile = f"""# ================= 你的网站配置 =================
@@ -134,12 +144,7 @@ def main():
         file_server
     }}
 
-}}
-
-# ================= 千问模型（朋友SSH隧道，子域名） =================
-{qwen_site} {{
-    reverse_proxy localhost:25553
-}}"""
+}}{agent_block}"""
 
     # 写出最终的 Caddyfile（覆盖旧的）
     caddyfile_path = os.path.join(script_dir, "Caddyfile")
@@ -149,6 +154,8 @@ def main():
     print(f"[OK] Caddyfile 已生成")
     print(f"     路径   = {site_path}")
     print(f"     域名   = {site_domain}")
+    if agent_block:
+        print(f"     Agent  = {agent_site} → localhost:25553")
     print(f"     文件   = {caddyfile_path}")
 
 
