@@ -15,7 +15,6 @@ def main():
     project_root = os.path.dirname(os.path.dirname(script_dir))
     # Caddy 需要正斜杠
     site_path = os.path.join(project_root, "frontend").replace("\\", "/")
-    data_path = os.path.join(os.path.dirname(project_root), "data").replace("\\", "/")
 
     # 模式：local 或 server，后面可跟自定义域名
     mode = sys.argv[1] if len(sys.argv) > 1 else "local"
@@ -119,18 +118,6 @@ def main():
     handle_path /course/* {{
         root * "{site_path}/course_vitepress_dist"
         file_server
-    }}
-
-    # 3. 课件文件（data/courses/）—— 只读：学生浏览/下载课件；写走网页后台上传（/api）
-    handle_path /courses/* {{
-        root * "{data_path}/courses"
-        file_server browse
-    }}
-
-    # 3.1 资源文件（data/resources/）—— 软件安装包、参考资料等
-    handle_path /resources/* {{
-        root * "{data_path}/resources"
-        file_server browse
     }}
 
     # 6. Scratch 在线编辑器前端
