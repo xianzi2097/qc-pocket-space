@@ -3,7 +3,6 @@
 自动检测项目路径，注入绝对路径到 Caddyfile。
 零依赖，可直接用系统 Python 运行。
 用法: python generate_caddyfile.py local|server [域名] [fastapi端口] [caddy端口] [judge0上游] [agent域名]
-      judge0 上游留空 = 不生成 judge0 代理；agent 域名留空 = 不生成 Agent 站点（且仅 server 模式生成）
 """
 import os
 import sys
@@ -30,10 +29,7 @@ def main():
     caddy_port = sys.argv[4] if len(sys.argv) > 4 else ""
     judge0_upstream = sys.argv[5].strip() if len(sys.argv) > 5 and sys.argv[5].strip() else ""
 
-    # Agent 站点（如千问，SSH 隧道反代）（用户拍板 2026-10-14）：
-    # 填域名才生成，留空 = 不生成（二开没配就永远碰不到证书问题）
-    # 裸域名 = Caddy 自动 HTTPS 领证；写 http://xxx = 明示不启用 TLS
-    # 局域网模式一律不生成（域名解析指向服务器，本机生成毫无意义）
+    # Agent 站点（如：qwen.codenova.cn）留空不生成，仅 server 模式；裸域名自动领证，http:// 前缀=不用 TLS
     agent_site = sys.argv[6].strip() if len(sys.argv) > 6 and sys.argv[6].strip() else ""
 
     # Caddy 地址：本地模式用 `:端口`（纯HTTP），域名模式用 `域名:端口`
@@ -62,11 +58,11 @@ def main():
         reverse_proxy {judge0_upstream}
     }}"""
 
-    # Agent 站点（如千问）：SSH 隧道反代，上游固定隧道端口 localhost:25553
+    # Agent 站点：反代到 SSH 隧道 localhost:25553
     agent_block = ""
     if agent_site and mode == "server":
         agent_block = f"""
-# ================= Agent 站点（如千问，SSH 隧道反代） =================
+# ================= Agent 站点 =================
 {agent_site} {{
     reverse_proxy localhost:25553
 }}"""
