@@ -88,7 +88,7 @@ def main():
         file_server
     }}
 
-    # 1. 前端 SPA（所有路由 / /courses /dashboard 等统一 try_files 兜底）
+    # 1. 前端 SPA（所有路由统一 try_files 兜底）
     handle {{
         root * "{site_path}/dashboard"
         try_files {{path}} /index.html
