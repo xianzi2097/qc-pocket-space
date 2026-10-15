@@ -8,7 +8,7 @@
 
 ## 🚀 快速开始
 
-绿色交付包 = `qc-pocket-space/`（程序主体）+ `qx-launcher/`（控制面板）+ `data/`（数据）三个文件夹。
+绿色交付包 = `qc-pocket-space/`（程序主体）+ `qx-launcher/`（控制面板）+ `data_v2/`（数据）三个文件夹。
 
 ```bash
 # 1. 克隆部署包
