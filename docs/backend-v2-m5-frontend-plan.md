@@ -1,6 +1,6 @@
 # 后端 V2 · M5 切流施工清单（前端平移到 V2）
 
-> **状态**：📋 待确认 —— 用户拍板 §7 的 7 条后开工
+> **状态**：✅ 已完成 —— M5b 全部 8 块切流 2026-10-12 落地，全站 V1 调用清零；V1（backend/ + data/ + qingcheng.db）2026-10-14 删除。本文留作历史图纸（接口对照表仍准）
 > **依据**：[backend-v2-api-spec.md](./backend-v2-api-spec.md) §3 接口清单 / §6 阶段表 / §7 前端对接约定 / §8.2 L3·L4 · D12/D14/D15/D17 附则
 > **前置**：M0~M4 全部 ✅（`backend_v2` 231 用例绿，2026-10-10 实跑确认；README 原文「后端业务全部封板，剩余仅 M5 切流」）
 > **代码位置**：前端 `labs_dev/qx-dashboard-ts/`（React 19 + Vite + Tailwind v4）· 魔改 Scratch `labs_dev/scratch-gui.4.0.43/` · 启动器 `labs_dev/qx-launcher/` · 后端 `qc-pocket-space/backend_v2/`（本阶段预期**零改**）
@@ -11,7 +11,7 @@
 
 | 证据 | 内容 |
 |---|---|
-| 阶段表 | M0 地基 → M4 收口 全部 ✅；**M5 切流** ⏸ 未开始 |
+| 阶段表 | M0 地基 → M4 收口 全部 ✅；**M5 切流** ✅ 2026-10-12 全部完成（详见 frontend-migration-plan.md） |
 | M4 结论 | 「后端业务全部封板。剩余 **仅 M5 切流**（前端改造 + e2e + 停 V1 起 V2）」 |
 | 实跑 | `backend_v2` pytest → **231 passed**（2026-10-10） |
 | 前端现状 | 仍说 **V1 协议**：`vite.config.ts` 里 `/api` → `localhost:8000`；响应读 `{status:'success', detail}`；身份用 `?username=` 查参；笔记/消息用**名字**当身份（`/api/notes/{笔记本}/{文件名}`） |
