@@ -271,9 +271,9 @@ trash(
 
 | 方法 | 路径 | 功能 | 权限 |
 |---|---|---|---|
-| GET | `/api/assets` | 列表（`?bucket=courses\|books\|reference\|download`、`?owner=`；不传 bucket = 四类全返） | 公开 |
+| GET | `/api/assets` | 列表（`?bucket=courses\|books\|reference\|download`、`?owner=`；不传 bucket = 四类全返；**含 `publish.state`**——渲染状态词 none/queued/building/done/failed，前端据此开电子书 iframe，`message` 不外发） | 公开 |
 | POST | `/api/assets` | 建资产（body.bucket = D15 四选一值；`type` 课程族必填——前端表单选；`format` 缺省按 type 兜底：scratch→scratch、python/cpp→folder；**库+盘双写**；重名 owner 全局 → 5001 课程族 / 6001 资料族） | teacher / admin |
-| GET | `/api/assets/{id}` | 详情（`assets` 行元信息：name/description/tags/type/format/publish…；文件树另走 F1） | 公开 |
+| GET | `/api/assets/{id}` | 详情（`assets` 行元信息：name/description/tags/type/format/publish.state…；**完整 publish（含失败 message，可能带服务器路径）仅 owner/admin**；文件树另走 F1） | 公开 |
 | PATCH | `/api/assets/{id}` | 改 名称/描述/标签/类型/打开方式 + **`bucket`**（= 挪书架/挪分类，幂等，族内族间均可；原 PUT /shelf 与资料改元信息并入，C5 砍） | owner / admin |
 | DELETE | `/api/assets/{id}` | 删（软删四联动：行→trash 快照(type=asset) · 磁盘移回收站 · 发布产物清理 · file_order 保留；彻底删才清账） | owner / admin |
 | GET | `/api/assets/{id}/lessons` | 课件列表（name/has_main/has_student/sb3_count，V1 平移；D14④ 唯一认识文件名处）**【仅课程族】** | 公开 |

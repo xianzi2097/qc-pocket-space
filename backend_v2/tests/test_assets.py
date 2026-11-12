@@ -152,11 +152,33 @@ def test_detail_public_trim(client, login):
     data = _mk_asset(client, token, name="ast_trim", type_="scratch")
     resp = client.get(f"/api/assets/{data['id']}")          # 不带 token
     body = resp.json()["data"]
-    assert "publish" not in body
+    # publish.state 公开（前端据此开电子书 iframe），message（可能带服务器路径）不外发
+    assert body["publish"] == {"state": "none"}
     allowed = {"id", "owner_id", "owner_name", "bucket", "name",
-               "description", "tags", "type", "format", "created_at"}
+               "description", "tags", "type", "format", "created_at", "publish"}
     assert set(body.keys()) <= allowed
     assert body["owner_name"] == "admin"
+
+
+def test_list_publish_state_public_message_trimmed(client, login, monkeypatch):
+    """列表公开面：只见 state 词；owner 自己的列表才带失败 message（渲染排障用）"""
+    import app.publish as publish
+    monkeypatch.setattr(publish, "_run_build",
+                        lambda asset_id: (_ for _ in ()).throw(RuntimeError("模板缺失: C:\\x")))
+    token = login()["token"]
+    data = _mk_asset(client, token, name="ast_pstate", type_="scratch")
+    client.post(f"/api/assets/{data['id']}/publish", headers=_auth(token))
+    assert _wait_publish(client, token, data["id"]) == "failed"
+
+    pub = client.get("/api/assets", params={"bucket": "courses"}).json()["data"]["items"]
+    row = next(i for i in pub if i["id"] == data["id"])
+    assert row["publish"]["state"] == "failed"
+    assert "message" not in row["publish"]                  # 公开不带 message
+
+    own = client.get("/api/assets", params={"bucket": "courses"},
+                     headers=_auth(token)).json()["data"]["items"]
+    mine = next(i for i in own if i["id"] == data["id"])
+    assert "模板缺失" in mine["publish"]["message"]          # owner 可见排障信息
 
 
 def test_detail_owner_sees_publish(client, login):

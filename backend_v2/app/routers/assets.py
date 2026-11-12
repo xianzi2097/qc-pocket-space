@@ -120,8 +120,9 @@ def _owner_names(db: DbSession, owner_ids: set[str]) -> dict[str, str]:
     return {row.id: row.username for row in rows}
 
 
-def _public(asset: Asset, owner_names: dict[str, str]) -> dict:
-    return {
+def _public(asset: Asset, owner_names: dict[str, str],
+            viewer=None) -> dict:
+    data = {
         "id": asset.id,
         "owner_id": asset.owner_id,
         "owner_name": owner_names.get(asset.owner_id, ""),
@@ -132,14 +133,18 @@ def _public(asset: Asset, owner_names: dict[str, str]) -> dict:
         "type": asset.type,
         "format": asset.format,
         "created_at": asset.created_at,
+        # publish.state 公开（前端据此开电子书 iframe）；message 可能带服务器路径，仅 owner/admin
+        "publish": asset.publish or {"state": "none"},
     }
+    if not (viewer is not None
+            and (viewer.role == "admin" or viewer.id == asset.owner_id)):
+        state = data["publish"].get("state", "none")
+        data["publish"] = {"state": state}
+    return data
 
 
 def _view(db: DbSession, asset: Asset, viewer) -> dict:
-    data = _public(asset, _owner_names(db, {asset.owner_id}))
-    if viewer is not None and (viewer.role == "admin" or viewer.id == asset.owner_id):
-        data["publish"] = asset.publish or {}
-    return data
+    return _public(asset, _owner_names(db, {asset.owner_id}), viewer)
 
 
 # ---------------- 资产 CRUD ----------------
@@ -149,6 +154,7 @@ def list_assets(
     bucket: str | None = None,
     owner: str | None = None,
     db: DbSession = Depends(get_db),
+    viewer=Depends(get_optional_account),
 ):
     if bucket and bucket not in _BUCKETS:
         raise ApiError(E_PARAM_INVALID, "bucket 只能是 courses/books/reference/download", 400)
@@ -159,7 +165,7 @@ def list_assets(
         stmt = stmt.where(Asset.owner_id == owner)
     items_all = db.scalars(stmt.order_by(Asset.created_at.desc())).all()
     names = _owner_names(db, {a.owner_id for a in items_all})
-    items = [_public(a, names) for a in items_all]
+    items = [_public(a, names, viewer) for a in items_all]
     return ok({"items": items, "total": len(items)})
 
 
