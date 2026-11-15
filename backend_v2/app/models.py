@@ -115,6 +115,7 @@ class Asset(Base):
     type: Mapped[str] = mapped_column(String(32), default="")     # 课程族：scratch|python|cpp…
     format: Mapped[str] = mapped_column(String(32), default="")   # 课程族：scratch|folder|ebook
     publish: Mapped[dict] = mapped_column(JSON, default=dict)     # 课程族：发布队列状态
+    shareable: Mapped[bool] = mapped_column(Boolean, default=False)  # 课程族下载开关（D34，资料族不用）
     created_at: Mapped[str] = mapped_column(String(19), default=now_str)
 
     __table_args__ = (UniqueConstraint("owner_id", "name", name="uq_asset_owner_name"),)

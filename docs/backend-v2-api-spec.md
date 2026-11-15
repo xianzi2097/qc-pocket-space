@@ -267,21 +267,21 @@ trash(
 ### 3.4 资产（assets · 课程/书架/资料/软件合一 · D17）
 
 > **落库**：`assets` 一张表（D16）；**接口一族**（D17，2026-10-08 拍板：原 `/api/courses`、`/api/resources` 两前缀合一）。全域分类词只有一个：**`bucket`**（`courses|books|reference|download`——原 shelf/category 词汇废除）。
-> **族守卫**（5 处，违反 → 404）：`lessons`/`publish`/`publish-status` 仅课程族（bucket∈{courses,books}）；`download` 仅资料族。**跨族挪动允许**（PATCH bucket：上完的课可转资料归档，课程族专用字段保留、由族守卫挡住误用）。
+> **族守卫**（4 处，违反 → 404）：`lessons`/`publish`/`publish-status` 仅课程族（bucket∈{courses,books}）。**跨族挪动允许**（PATCH bucket：上完的课可转资料归档，课程族专用字段保留、由族守卫挡住误用）。**`download` 已全族开放**（2026-11-15 D33：课程族也允许打包下载；打包仍锁在本资产根目录内，不新增公开面——课程读面本就公开；**课程族须 `shareable=true`，见 D34**）。
 
 | 方法 | 路径 | 功能 | 权限 |
 |---|---|---|---|
-| GET | `/api/assets` | 列表（`?bucket=courses\|books\|reference\|download`、`?owner=`；不传 bucket = 四类全返；**含 `publish.state`**——渲染状态词 none/queued/building/done/failed，前端据此开电子书 iframe，`message` 不外发） | 公开 |
+| GET | `/api/assets` | 列表（`?bucket=courses\|books\|reference\|download`、`?owner=`；不传 bucket = 四类全返；**含 `publish.state`**——渲染状态词 none/queued/building/done/failed，前端据此开电子书 iframe，`message` 不外发；**含 `shareable`**——课程下载开关公开可见，前端据此显隐下载按钮） | 公开 |
 | POST | `/api/assets` | 建资产（body.bucket = D15 四选一值；`type` 课程族必填——前端表单选；`format` 缺省按 type 兜底：scratch→scratch、python/cpp→folder；**库+盘双写**；重名 owner 全局 → 5001 课程族 / 6001 资料族） | teacher / admin |
 | GET | `/api/assets/{id}` | 详情（`assets` 行元信息：name/description/tags/type/format/publish.state…；**完整 publish（含失败 message，可能带服务器路径）仅 owner/admin**；文件树另走 F1） | 公开 |
-| PATCH | `/api/assets/{id}` | 改 名称/描述/标签/类型/打开方式 + **`bucket`**（= 挪书架/挪分类，幂等，族内族间均可；原 PUT /shelf 与资料改元信息并入，C5 砍） | owner / admin |
+| PATCH | `/api/assets/{id}` | 改 名称/描述/标签/类型/打开方式 + **`bucket`**（= 挪书架/挪分类，幂等，族内族间均可；原 PUT /shelf 与资料改元信息并入，C5 砍）+ **`shareable`**（课程族下载开关，D34，owner 可改） | owner / admin |
 | DELETE | `/api/assets/{id}` | 删（软删四联动：行→trash 快照(type=asset) · 磁盘移回收站 · 发布产物清理 · file_order 保留；彻底删才清账） | owner / admin |
 | GET | `/api/assets/{id}/lessons` | 课件列表（name/has_main/has_student/sb3_count，V1 平移；D14④ 唯一认识文件名处）**【仅课程族】** | 公开 |
 | DELETE | `/api/assets/{id}/lessons/{lesson}` | 删课件文件夹（**树内物理删、不可恢复** → 前端必须二次确认，2026-10-08 拍板）**【仅课程族】** | owner / admin |
 | ~~POST~~ | ~~`.../lessons/{lesson}/save-sb3`~~ | ❌ 砍掉（V1 联审清单：看板未调用的旧入口）→ 作品保存统一走 `files/upload`（2026-10-06） | — |
 | POST | `/api/assets/{id}/publish` | 电子书发布入队（**后台单线程**跑 vitepress，状态写行内 publish 列）**【仅课程族】** | owner / admin |
 | GET | `/api/assets/{id}/publish-status` | 发布状态（排队中/构建中/成功/失败，前端轮询）**【仅课程族】** | owner / admin |
-| GET | `/api/assets/{id}/download` | 打包下载：单文件直发 / 文件夹**实时 zip 流式**（磁盘零残留）**【仅资料族】** | 公开 |
+| GET | `/api/assets/{id}/download` | 打包下载：单文件直发 / 文件夹**实时 zip 流式**（磁盘零残留）。**资料族直接可用；课程族须 `shareable=true`，否则 403**（D34：老师后台开关控制课程可否被下载；D33 课程族开放的前提即此开关） | 公开 |
 
 ### 3.5 文件树（files · 所有资产**共用一套**，单一事实来源）
 
@@ -299,7 +299,7 @@ trash(
 
 ### 3.6 ~~资料与软件~~ —— ❌ 已并入 §3.4（D17 资产接口合一，2026-10-08）
 
-> 原 E1~E6 六个接口全部变成 §3.4 的 `/api/assets` 族（列表/建/详情/改/删 → 同款路径，`download` 带资料族守卫）。本节留编号占位、编号不重排（同 B7/C5 先例）。
+> 原 E1~E6 六个接口全部变成 §3.4 的 `/api/assets` 族（列表/建/详情/改/删 → 同款路径，`download` 2026-11-15 起全族开放，见 D33/D34）。本节留编号占位、编号不重排（同 B7/C5 先例）。
 
 ### 3.7 站内信（messages）
 

@@ -14,7 +14,7 @@
       - F7 拖拽排序落 file_order、幂等、未知名 1002
   · 课件（族守卫：仅课程族，违反 404）：扫描 has_main/has_student/sb3_count、删课件
   · 发布（仅课程族）：入队即返、后台单线程、状态轮询、失败留 message
-  · 打包下载（仅资料族）：多文件实时 zip、单文件直发
+  · 打包下载（全族，D33/D34）：多文件实时 zip、单文件直发、课程族须 shareable=true
 """
 import io
 import time
@@ -155,7 +155,7 @@ def test_detail_public_trim(client, login):
     # publish.state 公开（前端据此开电子书 iframe），message（可能带服务器路径）不外发
     assert body["publish"] == {"state": "none"}
     allowed = {"id", "owner_id", "owner_name", "bucket", "name",
-               "description", "tags", "type", "format", "created_at", "publish"}
+               "description", "tags", "type", "format", "shareable", "created_at", "publish"}
     assert set(body.keys()) <= allowed
     assert body["owner_name"] == "admin"
 
@@ -686,8 +686,35 @@ def test_download_single_file_direct(client, login):
     assert resp.status_code == 200 and resp.content == b"PK-single"    # 单文件直发不套壳
 
 
-def test_download_guard_course_404(client, login):
+def test_download_course_family_zip(client, login):
+    """D33/D34：课程族打包下载须 shareable=true，默认关 → 403；PATCH 打开 → 整资产实时 zip。"""
     token = login()["token"]
-    data = _mk_asset(client, token, bucket="courses", name="ast_zipg", type_="scratch")
+    data = _mk_asset(client, token, bucket="courses", name="ast_share", type_="scratch")
+    _upload(client, token, data["id"], "01.开篇.md", b"# hello")
+    _upload(client, token, data["id"], "img/logo.png", b"\x89PNG-fake")
+
+    # 默认关闭 → 403
     resp = client.get(f"/api/assets/{data['id']}/download")
-    assert resp.status_code == 404 and resp.json()["code"] == 1004
+    assert resp.status_code == 403 and resp.json()["code"] == 2005
+
+    # 老师打开开关 → 200，zip 含全部源文件
+    patch = client.patch(f"/api/assets/{data['id']}",
+                         json={"shareable": True},
+                         headers={"Authorization": f"Bearer {token}"})
+    assert patch.status_code == 200 and patch.json()["data"]["shareable"] is True
+
+    resp = client.get(f"/api/assets/{data['id']}/download")
+    assert resp.status_code == 200
+    zf = zipfile.ZipFile(io.BytesIO(resp.content))
+    names = zf.namelist()
+    assert "01.开篇.md" in names and "img/logo.png" in names
+    assert zf.read("01.开篇.md") == b"# hello"
+
+    # 开关公开可见（游客列表也能看到，前端据此显隐按钮）
+    pub = client.get("/api/assets").json()["data"]["items"]
+    assert any(a["id"] == data["id"] and a["shareable"] is True for a in pub)
+
+    # 资料族不受开关限制（原行为不变，恒可下载）
+    ref = _mk_asset(client, token, bucket="reference", name="ast_ref_dl")
+    _upload(client, token, ref["id"], "notes.txt", b"NN")
+    assert client.get(f"/api/assets/{ref['id']}/download").status_code == 200

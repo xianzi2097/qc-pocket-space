@@ -7,7 +7,7 @@ bucket 四值（courses|books|reference|download）是全域唯一的分类词�
   读（列表/详情/文件树/下载）   公开；详情的 publish 字段仅 owner/admin 可见
   写（建/改/删/文件树写/课件/发布） owner 或 admin；建资产仅 teacher/admin
   族守卫（违反 → 404）          lessons/publish/publish-status 仅课程族；
-                                download（zip）仅资料族
+                                download（zip）全族开放（D33/D34：课程族须 shareable=true）
   软删四联动                    行删 + trash 快照(type=asset) + 磁盘移 trash/{id}
                                 + file_order 保留（彻底删 M4 清账）
   重名                          按 owner 全局查（跨族也不许重名）→ 5001 课程族 / 6001 资料族
@@ -41,8 +41,7 @@ from ..security import get_current_account, get_optional_account
 router = APIRouter(prefix="/api/assets", tags=["assets"])
 
 _BUCKETS = {"courses", "books", "reference", "download"}
-_COURSE_FAMILY = {"courses", "books"}      # 族守卫：lessons/publish 只认这两值
-_RESOURCE_FAMILY = {"reference", "download"}  # 族守卫：zip 打包只认这两值
+_COURSE_FAMILY = {"courses", "books"}      # 族守卫：lessons/publish 只认这两值（zip 下载已全族开放，D33/D34）
 
 
 # ---------------- 模型 ----------------
@@ -63,6 +62,7 @@ class AssetPatch(BaseModel):
     type: str | None = Field(default=None, max_length=32)
     format: str | None = Field(default=None, max_length=32)
     bucket: str | None = Field(default=None, min_length=1, max_length=16)  # 挪书架/挪分类
+    shareable: bool | None = None                             # 课程族下载开关（D34）
 
 
 class MkdirBody(BaseModel):
@@ -132,6 +132,7 @@ def _public(asset: Asset, owner_names: dict[str, str],
         "tags": asset.tags,
         "type": asset.type,
         "format": asset.format,
+        "shareable": bool(asset.shareable),   # 课程下载开关公开（前端显隐下载按钮，D34）
         "created_at": asset.created_at,
         # publish.state 公开（前端据此开电子书 iframe）；message 可能带服务器路径，仅 owner/admin
         "publish": asset.publish or {"state": "none"},
@@ -250,6 +251,8 @@ def patch_asset(
         asset.type = body.type
     if body.format is not None:
         asset.format = body.format
+    if body.shareable is not None:
+        asset.shareable = body.shareable      # 课程下载开关（D34）
 
     db.commit()
     return ok(_view(db, asset, account), "已更新")
@@ -426,12 +429,14 @@ def publish_status(
     return ok(asset.publish or {"state": "none"})
 
 
-# ---------------- 打包下载（资料族守卫） ----------------
+# ---------------- 打包下载（全族开放，D33/D34） ----------------
 
 @router.get("/{assetId}/download")
 def download_asset(assetId: str, path: str = "", db: DbSession = Depends(get_db)):
     asset = _load(db, assetId)
-    _require_family(asset, _RESOURCE_FAMILY)
+    if asset.bucket in _COURSE_FAMILY and not asset.shareable:
+        # 课程族下载闸门（D34）：老师后台开关没开就不许打包；资料族不限（原行为）
+        raise ApiError(E_FORBIDDEN, "该课程未开放下载", 403)
     target, is_temp = filetree.pack(assetId, path)
     if is_temp:
         return FileResponse(

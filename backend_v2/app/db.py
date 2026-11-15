@@ -66,6 +66,9 @@ _EXTRA_COLUMNS = {
         ("remark", "TEXT DEFAULT ''"),
         ("enrolled_at", "TEXT DEFAULT ''"),
     ],
+    "assets": [
+        ("shareable", "BOOLEAN NOT NULL DEFAULT 0"),   # D34：课程族下载开关
+    ],
 }
 
 
