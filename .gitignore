@@ -72,3 +72,6 @@ yarn.lock
 # è¿è¡Œæ—¶æ¸²æŸ“ä¸­é—´äº§ç‰©ï¼ˆbuild.py æ¯æ¬¡æ¸²æŸ“é‡å†™ï¼‰
 # =========================
 runtime/vitepress-template/docs/.vitepress/gen/
+
+# ±¾µØÊÔ¹¹½¨²úÎï£¨publish.py Ã¿´ÎäÖÈ¾»áÇå¿ÕÖØ½¨£©
+runtime/vitepress-template/docs/out/

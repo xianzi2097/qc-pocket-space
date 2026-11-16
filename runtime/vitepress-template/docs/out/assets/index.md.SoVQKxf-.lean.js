@@ -1,1 +1,0 @@
-import{_ as r,c as n,o,a1 as s}from"./chunks/framework.CB_unfPP.js";const p=JSON.parse('{"title":"什么是 C++","description":"","frontmatter":{},"headers":[],"relativePath":"index.md","filePath":"index.md"}'),e={name:"index.md"};function i(a,t,l,g,_,d){return o(),n("div",null,[...t[0]||(t[0]=[s("",5)])])}const u=r(e,[["render",i]]);export{p as __pageData,u as default};
