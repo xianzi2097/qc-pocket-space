@@ -30,7 +30,7 @@ TEMPLATE_DIR = RUNTIME_DIR / "vitepress-template"
 NODE_EXE = RUNTIME_DIR / "node" / "node.exe"
 SITES_DIR = config.QC_DIR / "frontend" / "course_vitepress_dist"
 LOGS_DIR = config.DATA_ROOT / "build_logs"
-_BUILD_TIMEOUT = 300   # 秒（服务器弱，vitepress 放宽到 5 分钟，V1 原值）
+_BUILD_TIMEOUT = 1200  # 秒（2026-11-16 实测：2GB 服务器换页抖动下 23 文件要 910s，原 300s 必超时）
 
 _q: "queue.Queue[str]" = queue.Queue()
 _start_lock = threading.Lock()
