@@ -349,7 +349,11 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-  margin: 1rem 0;
+  /* fit-content：卡片收缩到网格实际宽度（VitePress 默认 display:block 会撑满容器，
+     内部网格靠左 → 右侧留白）；auto 水平居中；宽表格仍受 max-width 约束 */
+  width: fit-content;
+  max-width: 100%;
+  margin: 1rem auto;
 }
 
 .vp-doc th {
