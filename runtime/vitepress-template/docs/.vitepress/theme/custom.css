@@ -18,6 +18,26 @@
   --spring-bg: #fefefe;
   --spring-selection: #def2e8;
 
+  /* 派生色（原硬编码，主题化后统一走变量；学科主题只覆盖本组） */
+  --spring-h1-fade: rgba(152, 251, 152, 0);
+  --spring-h2-underline: #3ea174;
+  --spring-h2-fade: rgba(106, 158, 69, 0);
+  --spring-p-hover: rgba(123, 181, 147, 0.06);
+  --spring-em-hover: #006400;
+  --spring-code-text: #359d09;
+  --spring-code-hover-bg: rgba(221, 235, 213, 0.85);
+  --spring-code-block-text: #2f4f4f;
+  --spring-td-hover: rgba(239, 245, 242, 0.7);
+  --spring-hr-edge: #5ea67c;
+  --spring-tagline: #5a8a6e;
+  --spring-btn-hover-bg: #d0e8d8;
+  --spring-feature-hover-shadow: rgba(47, 132, 94, 0.1);
+  --spring-dot-1: #015e19;
+  --spring-dot-2: #068f28;
+  --spring-dot-3: rgb(116, 219, 38);
+  --spring-syntax-kw: #087725;
+  --spring-syntax-fn: #0b8f38;
+
   /* Code block Mac dots */
   --dot-red: #fc625d;
   --dot-yellow: #fdbc40;
@@ -59,7 +79,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, rgba(152, 251, 152, 0), #e8f4ee, rgba(152, 251, 152, 0));
+  background: linear-gradient(90deg, var(--spring-h1-fade), var(--spring-green-light), var(--spring-h1-fade));
   transform: scaleX(0);
   transform-origin: center;
   transition: transform 0.4s ease;
@@ -92,7 +112,7 @@
   max-width: 80%;
   height: 2.5px;
   margin: 0.5rem auto 0;
-  background: linear-gradient(90deg, rgba(106, 158, 69, 0), #3ea174, rgba(106, 158, 69, 0));
+  background: linear-gradient(90deg, var(--spring-h2-fade), var(--spring-h2-underline), var(--spring-h2-fade));
   border-radius: 10px;
   transform: scaleX(0);
   transition: transform 0.4s ease;
@@ -134,7 +154,7 @@
 }
 
 .vp-doc p:not(:has(img)):hover {
-  background-color: rgba(123, 181, 147, 0.06);
+  background-color: var(--spring-p-hover);
 }
 
 /* ---------- Links ---------- */
@@ -154,13 +174,13 @@
 }
 
 .vp-doc em:hover {
-  color: #006400;
+  color: var(--spring-em-hover);
 }
 
 /* ---------- Inline Code ---------- */
 .vp-doc code {
   background-color: var(--spring-green-pale);
-  color: #359d09;
+  color: var(--spring-code-text);
   padding: 0.15em 0.4em;
   border-radius: 4px;
   font-size: 0.875em;
@@ -168,7 +188,7 @@
 }
 
 .vp-doc code:hover {
-  background-color: rgba(221, 235, 213, 0.85);
+  background-color: var(--spring-code-hover-bg);
 }
 
 /* ============================================================
@@ -203,10 +223,10 @@
   left: 42px;
   width: 11px;
   height: 11px;
-  background: #015e19;           /* green dot */
+  background: var(--spring-dot-1);
   border-radius: 50%;
-  box-shadow: 17px 0 #068f28,    /* darker green */
-              34px 0 rgb(116, 219, 38); /* light green */
+  box-shadow: 17px 0 var(--spring-dot-2),
+              34px 0 var(--spring-dot-3);
   z-index: 10;
   transition: all 0.3s ease;
 }
@@ -231,19 +251,19 @@
 
 .vp-doc div[class*='language-'] > pre > code {
   background: transparent !important;
-  color: #2f4f4f;
+  color: var(--spring-code-block-text);
   padding: 0;
 }
 
 /* Spring-style syntax: keywords & function names → green, others keep Shiki colors */
 /* Keywords (D73A49): int, void, for, if, return, using, namespace, bool, true, false, etc. */
 .vp-doc div[class*='language-'] pre code span[style*="--shiki-light:#D73A49"] {
-  color: #087725 !important;
+  color: var(--spring-syntax-kw) !important;
   font-weight: bold;
 }
 /* Function/class names (6F42C1): bubbleSort, main, std, cout, endl, etc. */
 .vp-doc div[class*='language-'] pre code span[style*="--shiki-light:#6F42C1"] {
-  color: #0b8f38 !important;
+  color: var(--spring-syntax-fn) !important;
 }
 /* Parameters/variables (E36209): arr, n, j, temp, etc. — keep orange but slightly muted */
 .vp-doc div[class*='language-'] pre code span[style*="--shiki-light:#E36209"] {
@@ -347,7 +367,7 @@
 }
 
 .vp-doc td:hover {
-  background-color: rgba(239, 245, 242, 0.7);
+  background-color: var(--spring-td-hover);
 }
 
 .vp-doc tr:last-child td {
@@ -439,7 +459,7 @@
   height: 2px;
   margin: 2rem auto;
   max-width: 80%;
-  background: linear-gradient(90deg, #5ea67c, #2f845e, #5ea67c);
+  background: linear-gradient(90deg, var(--spring-hr-edge), var(--spring-green-dark), var(--spring-hr-edge));
   border-radius: 2px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -469,6 +489,23 @@ html.dark {
   --spring-link-hover: #7de0e5;
   --spring-selection: #1e4a32;
 
+  /* 派生色（暗色） */
+  --spring-h1-fade: rgba(74, 173, 122, 0);
+  --spring-h2-underline: #4aad7a;
+  --spring-h2-fade: rgba(74, 173, 122, 0);
+  --spring-p-hover: rgba(74, 173, 122, 0.08);
+  --spring-em-hover: #7de0a0;
+  --spring-code-text: #7dc98a;
+  --spring-code-hover-bg: rgba(221, 235, 213, 0.14);
+  --spring-code-block-text: #c8d6c0;
+  --spring-td-hover: rgba(74, 173, 122, 0.1);
+  --spring-hr-edge: #3a7a5c;
+  --spring-tagline: #7aaa8e;
+  --spring-btn-hover-bg: #234a34;
+  --spring-feature-hover-shadow: rgba(74, 173, 122, 0.18);
+  --spring-syntax-kw: #4aad7a;
+  --spring-syntax-fn: #6bc993;
+
   --alert-tip-bg: #162e1f;
   --alert-caution-bg: #2e1a1a;
   --alert-warning-bg: #2e2616;
@@ -484,7 +521,7 @@ html.dark .vp-doc div[class*='language-'] > pre {
   background: #1e1e1e !important;
 }
 html.dark .vp-doc div[class*='language-'] > pre > code {
-  color: #c8d6c0;
+  color: var(--spring-code-block-text);
 }
 
 /* Dark: blockquotes */
@@ -496,13 +533,13 @@ html.dark .vp-doc blockquote {
 /* Dark: tables */
 html.dark .vp-doc th {
   background-color: var(--spring-green-lighter);
-  color: var(--spring-green-strong);
+  color: var(--spring-strong);
 }
 html.dark .vp-doc td {
-  border-bottom-color: #2a4a32;
+  border-bottom-color: var(--spring-green-dark);
 }
 html.dark .vp-doc td:hover {
-  background-color: rgba(74, 173, 122, 0.1);
+  background-color: var(--spring-td-hover);
 }
 
 /* Dark: alerts */
@@ -518,8 +555,8 @@ html.dark .vp-doc strong { color: var(--spring-strong); }
 
 /* Dark: inline code */
 html.dark .vp-doc code {
-  background-color: rgba(221, 235, 213, 0.12);
-  color: #7dc98a;
+  background-color: var(--spring-code-hover-bg);
+  color: var(--spring-code-text);
 }
 
 /* Dark: selection */
@@ -527,15 +564,15 @@ html.dark ::selection { background-color: var(--spring-selection); }
 
 /* Dark: headings pseudo-elements */
 html.dark .vp-doc h1::before {
-  background: linear-gradient(90deg, rgba(74, 173, 122, 0), #1a3c2a, rgba(74, 173, 122, 0));
+  background: linear-gradient(90deg, var(--spring-h1-fade), var(--spring-green-light), var(--spring-h1-fade));
 }
 html.dark .vp-doc h2::after {
-  background: linear-gradient(90deg, rgba(74, 173, 122, 0), #4aad7a, rgba(74, 173, 122, 0));
+  background: linear-gradient(90deg, var(--spring-h2-fade), var(--spring-h2-underline), var(--spring-h2-fade));
 }
 
 /* Dark: hr */
 html.dark .vp-doc hr {
-  background: linear-gradient(90deg, #3a7a5c, #4aad7a, #3a7a5c);
+  background: linear-gradient(90deg, var(--spring-hr-edge), var(--spring-green-dark), var(--spring-hr-edge));
 }
 
 /* Dark: code block dots stay Mac colors (they're visible on dark bg) */
@@ -567,7 +604,7 @@ html.dark .vp-doc div[class*='language-']:hover::before {
 
 /* Tagline */
 .VPHomeHero .tagline {
-  color: #5a8a6e;
+  color: var(--spring-tagline);
 }
 
 /* "开始" button → light green */
@@ -577,7 +614,7 @@ html.dark .vp-doc div[class*='language-']:hover::before {
   background-color: var(--spring-green-light);
 }
 .VPHomeHero .VPButton.alt:hover {
-  background-color: #d0e8d8;
+  background-color: var(--spring-btn-hover-bg);
   border-color: var(--spring-green-dark);
 }
 
@@ -595,7 +632,7 @@ html.dark .vp-doc div[class*='language-']:hover::before {
 }
 .VPHomeFeatures .VPFeature:hover {
   border-color: var(--spring-green-light);
-  box-shadow: 0 2px 12px rgba(47, 132, 94, 0.1);
+  box-shadow: 0 2px 12px var(--spring-feature-hover-shadow);
 }
 
 /* Dark mode */
@@ -605,17 +642,17 @@ html.dark .VPHomeHero .name {
   -webkit-text-fill-color: var(--spring-green-dark) !important;
   background: none !important;
 }
-html.dark .VPHomeHero .tagline { color: #7aaa8e; }
+html.dark .VPHomeHero .tagline { color: var(--spring-tagline); }
 html.dark .VPHomeHero .VPButton.alt {
-  background-color: #1a3c2a;
+  background-color: var(--spring-green-light);
   border-color: var(--spring-green-dark);
   color: var(--spring-green);
 }
 html.dark .VPHomeHero .VPButton.alt:hover {
-  background-color: #234a34;
+  background-color: var(--spring-btn-hover-bg);
 }
 html.dark .VPHomeFeatures .VPFeature .icon {
-  background-color: #1a3c2a;
+  background-color: var(--spring-green-light);
   color: var(--spring-green-dark);
 }
 
@@ -651,4 +688,142 @@ html.dark .VPHomeFeatures .VPFeature .icon {
 /* 正文内容区加宽（覆盖默认 688px，iframe 嵌入时视口达不到 1440，必须在外面） */
 .VPDoc.has-aside .content-container {
   max-width: 860px !important;
+}
+
+/* ============================================================
+   学科主题调色板 —— 构建期由 VP_THEME 决定（publish.py 按 asset.type 注入）
+   <html data-vp-theme="green|blue|orange">，这里只覆盖 :root 变量，
+   全部结构规则复用上方一套。green = 默认调色板，无需覆盖块。
+   选择器特意放在文件末尾（同特异性靠后覆盖 :root）；
+   暗色块用 html.dark[data-vp-theme] 提特异性压过 html.dark。
+   ============================================================ */
+
+/* ---------- 蓝（C++）· 浅色 ---------- */
+[data-vp-theme='blue'] {
+  --spring-green-dark: #2b66c4;
+  --spring-green: #3b79d9;
+  --spring-green-light: #e9f1fc;
+  --spring-green-lighter: #f0f5fd;
+  --spring-green-pale: rgba(214, 229, 250, 0.55);
+  --spring-strong: #0d3f96;
+  --spring-link: #0c74c9;
+  --spring-link-hover: #024a8f;
+  --spring-selection: #dbe9fb;
+
+  --spring-h1-fade: rgba(147, 197, 255, 0);
+  --spring-h2-underline: #4a90d9;
+  --spring-h2-fade: rgba(90, 160, 240, 0);
+  --spring-p-hover: rgba(120, 170, 235, 0.07);
+  --spring-em-hover: #0049a8;
+  --spring-code-text: #1a66d0;
+  --spring-code-hover-bg: rgba(214, 229, 250, 0.85);
+  --spring-code-block-text: #2f4568;
+  --spring-td-hover: rgba(237, 243, 252, 0.7);
+  --spring-hr-edge: #5f94d9;
+  --spring-tagline: #5a7494;
+  --spring-btn-hover-bg: #d3e4f8;
+  --spring-feature-hover-shadow: rgba(43, 102, 196, 0.12);
+  --spring-dot-1: #0a3d8f;
+  --spring-dot-2: #1266d4;
+  --spring-dot-3: rgb(80, 160, 255);
+  --spring-syntax-kw: #0a5ec7;
+  --spring-syntax-fn: #1a7ae0;
+
+  --alert-tip-border: #1a63c4;
+  --alert-tip-bg: #e9f1fc;
+}
+
+/* ---------- 蓝（C++）· 暗色 ---------- */
+html.dark[data-vp-theme='blue'] {
+  --spring-green-dark: #6aa5ec;
+  --spring-green-light: #17293f;
+  --spring-green-lighter: #1b2f47;
+  --spring-strong: #86b5f5;
+  --spring-link: #6cb6e8;
+  --spring-link-hover: #93d0f5;
+  --spring-selection: #1e3a5f;
+
+  --spring-h1-fade: rgba(90, 150, 235, 0);
+  --spring-h2-underline: #6aa5ec;
+  --spring-h2-fade: rgba(90, 150, 235, 0);
+  --spring-p-hover: rgba(90, 150, 235, 0.12);
+  --spring-em-hover: #93d0f5;
+  --spring-code-text: #82b5f0;
+  --spring-code-hover-bg: rgba(214, 229, 250, 0.14);
+  --spring-code-block-text: #c9d8ee;
+  --spring-td-hover: rgba(90, 150, 235, 0.12);
+  --spring-hr-edge: #3a6394;
+  --spring-tagline: #7f9cc4;
+  --spring-btn-hover-bg: #23405e;
+  --spring-feature-hover-shadow: rgba(90, 150, 235, 0.2);
+  --spring-syntax-kw: #6aa5ec;
+  --spring-syntax-fn: #8dbcfa;
+
+  --alert-tip-border: #3a7fd0;
+  --alert-tip-bg: #17293f;
+}
+
+/* ---------- 橙红（Scratch）· 浅色 ---------- */
+[data-vp-theme='orange'] {
+  --spring-green-dark: #cf4d1f;
+  --spring-green: #e06735;
+  --spring-green-light: #fdeee6;
+  --spring-green-lighter: #fcf3ee;
+  --spring-green-pale: rgba(252, 224, 208, 0.55);
+  --spring-strong: #9c2f0a;
+  --spring-link: #c7451a;
+  --spring-link-hover: #8a2c08;
+  --spring-selection: #fbdccf;
+
+  --spring-h1-fade: rgba(255, 180, 140, 0);
+  --spring-h2-underline: #e07a4a;
+  --spring-h2-fade: rgba(240, 150, 100, 0);
+  --spring-p-hover: rgba(235, 160, 120, 0.08);
+  --spring-em-hover: #b03000;
+  --spring-code-text: #d4500f;
+  --spring-code-hover-bg: rgba(252, 224, 208, 0.85);
+  --spring-code-block-text: #5f4030;
+  --spring-td-hover: rgba(253, 240, 233, 0.7);
+  --spring-hr-edge: #dd8a60;
+  --spring-tagline: #a57a63;
+  --spring-btn-hover-bg: #f8d9c8;
+  --spring-feature-hover-shadow: rgba(207, 77, 31, 0.12);
+  --spring-dot-1: #8f2f0a;
+  --spring-dot-2: #d1451a;
+  --spring-dot-3: rgb(255, 160, 90);
+  --spring-syntax-kw: #c04a12;
+  --spring-syntax-fn: #e06a2e;
+
+  --alert-tip-border: #c2410c;
+  --alert-tip-bg: #fdeee6;
+}
+
+/* ---------- 橙红（Scratch）· 暗色 ---------- */
+html.dark[data-vp-theme='orange'] {
+  --spring-green-dark: #f09060;
+  --spring-green-light: #3a2116;
+  --spring-green-lighter: #42281c;
+  --spring-strong: #f5a982;
+  --spring-link: #f0a578;
+  --spring-link-hover: #f8c4a4;
+  --spring-selection: #4a2a18;
+
+  --spring-h1-fade: rgba(240, 144, 96, 0);
+  --spring-h2-underline: #f09060;
+  --spring-h2-fade: rgba(240, 144, 96, 0);
+  --spring-p-hover: rgba(240, 144, 96, 0.12);
+  --spring-em-hover: #f8c4a4;
+  --spring-code-text: #f0a578;
+  --spring-code-hover-bg: rgba(252, 224, 208, 0.14);
+  --spring-code-block-text: #e8d5c8;
+  --spring-td-hover: rgba(240, 144, 96, 0.12);
+  --spring-hr-edge: #94522f;
+  --spring-tagline: #c49a82;
+  --spring-btn-hover-bg: #4a2a18;
+  --spring-feature-hover-shadow: rgba(240, 144, 96, 0.2);
+  --spring-syntax-kw: #f09060;
+  --spring-syntax-fn: #f5b189;
+
+  --alert-tip-border: #d1622f;
+  --alert-tip-bg: #3a2116;
 }

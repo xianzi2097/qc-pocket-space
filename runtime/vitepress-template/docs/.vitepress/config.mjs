@@ -6,10 +6,19 @@ import { sidebar } from './gen/sidebar.mjs'
 // - base：由环境变量 VP_BASE 注入（Python 每次构建时按课程设置）
 // - sidebar：由 Python 生成到 ./gen/sidebar.mjs
 // - outDir：相对「项目根目录」（即运行 vitepress 的 cwd），Python 构建后原子替换到正式目录
+// - 主题：环境变量 VP_THEME（green/blue/orange）→ <html data-vp-theme>，
+//   custom.css 末尾按属性覆盖调色板（green=默认，无覆盖块）
+const vpTheme = process.env.VP_THEME || 'green'
+
 export default withMermaid({
   base: process.env.VP_BASE || '/course/test/',
   outDir: 'out',
   ignoreDeadLinks: true,
+
+  // 同步内联脚本：head 解析时即执行，属性先于页面渲染落地，无色彩闪烁
+  head: [
+    ['script', {}, `document.documentElement.dataset.vpTheme=${JSON.stringify(vpTheme)}`],
+  ],
 
   markdown: {
     lineNumbers: true,

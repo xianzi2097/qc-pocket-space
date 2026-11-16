@@ -149,6 +149,9 @@ def _run_build(asset_id: str) -> None:
             env = dict(os.environ)
             env["VP_BASE"] = f"/course/{asset_id}/"
             env["VP_TITLE"] = title
+            # 学科主题（2026-11-16）：按课程类型选调色板，模板 [data-vp-theme] 覆盖
+            env["VP_THEME"] = {"scratch": "orange", "cpp": "blue"}.get(
+                (asset.type or "").lower(), "green")
             cmd = [str(NODE_EXE), "node_modules/vitepress/bin/vitepress.js", "build", "docs"]
             log("=== 开始渲染 ===")
             proc = subprocess.run(
