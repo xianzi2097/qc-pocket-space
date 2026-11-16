@@ -75,3 +75,7 @@ runtime/vitepress-template/docs/.vitepress/gen/
 
 # 本地试构建产物（publish.py 每次渲染会清空重建）
 runtime/vitepress-template/docs/out/
+
+# 模板工作区（publish.py 每次渲染清空重建，只保留 .vitepress 配置）
+runtime/vitepress-template/docs/*
+!runtime/vitepress-template/docs/.vitepress/
