@@ -1,0 +1,1 @@
+import{_ as t,c as d,o as a,a2 as o}from"./chunks/framework.BKNXJ1nb.js";const b=JSON.parse('{"title":"二次开发","description":"","frontmatter":{},"headers":[],"relativePath":"dev/index.md","filePath":"dev/index.md"}'),c={name:"dev/index.md"};function r(i,e,l,n,s,h){return a(),d("div",null,[...e[0]||(e[0]=[o("",12)])])}const u=t(c,[["render",r]]);export{b as __pageData,u as default};
