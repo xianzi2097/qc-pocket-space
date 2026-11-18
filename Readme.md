@@ -45,7 +45,7 @@ git clone https://github.com/xianzi2097/qc-pocket-space.git
 ## 📖 文档
 
 - API 规范 / 数据库设计 / 架构决策：`docs/` 目录（backend-v2-api-spec、backend-v2-database、frontend-migration-plan）
-- 在线学习手册：站内 `/docs` 路径（VitePress 构建，含 C++ / Python / Scratch 课程）
+- 在线学习手册：站内 `/wiki` 路径（VitePress 构建，含 C++ / Python / Scratch 课程）
 
 ## ⚖️ 许可
 

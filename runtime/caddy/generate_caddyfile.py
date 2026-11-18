@@ -108,8 +108,8 @@ def main():
     }}
     respond @options 200
 
-    # 2. 学习手册：映射到 VitePress 打包目录
-    handle_path /docs/* {{
+    # 2. 站点维基（原 /docs，2026-11-18 改路由）：映射到 VitePress 打包目录
+    handle_path /wiki/* {{
         root * "{site_path}/vitepress_dist"
         file_server
     }}
