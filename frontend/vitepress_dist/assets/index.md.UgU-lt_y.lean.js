@@ -1,1 +1,0 @@
-import{_ as e,c as r,o as t,a0 as i}from"./chunks/framework.CbayCaz9.js";const u=JSON.parse('{"title":"站点维基","description":"","frontmatter":{},"headers":[],"relativePath":"index.md","filePath":"index.md"}'),o={name:"index.md"};function n(l,a,s,h,c,d){return t(),r("div",null,[...a[0]||(a[0]=[i("",8)])])}const p=e(o,[["render",n]]);export{u as __pageData,p as default};
