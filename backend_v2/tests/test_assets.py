@@ -15,6 +15,8 @@
   · 课件（族守卫：仅课程族，违反 404）：扫描 has_main/has_student/sb3_count、删课件
   · 发布（仅课程族）：入队即返、后台单线程、状态轮询、失败留 message
   · 打包下载（全族，D33/D34）：多文件实时 zip、单文件直发、课程族须 shareable=true
+  · viz 可视化族（D35）：建/筛不需 type、重名 6001、lessons/publish 族守卫 404、
+      .html 走 inline + CSP sandbox 响应头；非 viz 的 .html 仍 attachment（老行为不变）
 """
 import io
 import time
@@ -398,6 +400,65 @@ def test_download_missing_404(client, login):
     resp = client.get(f"/api/assets/{data['id']}/files/download",
                       params={"path": "nope.txt"})
     assert resp.status_code == 404 and resp.json()["code"] == 1004
+
+
+# ---------------- viz 可视化族（D35） ----------------
+
+def test_viz_create_without_type(client, login):
+    """viz 非课程族：不填 type 直接建，bucket 落库 viz"""
+    token = login()["token"]
+    data = _mk_asset(client, token, bucket="viz", name="viz_no_type")
+    assert data["bucket"] == "viz"
+
+
+def test_viz_list_filter(client, login):
+    token = login()["token"]
+    _mk_asset(client, token, bucket="viz", name="viz_f1")
+    _mk_asset(client, token, bucket="reference", name="viz_f2")
+    items = client.get("/api/assets", params={"bucket": "viz"}).json()["data"]["items"]
+    assert items and all(i["bucket"] == "viz" for i in items)
+
+
+def test_viz_duplicate_6001(client, login):
+    """重名按 owner 跨 bucket 全局：viz 与资料同名 → 6001"""
+    token = login()["token"]
+    _mk_asset(client, token, bucket="viz", name="viz_dup")
+    resp = client.post("/api/assets", json={"bucket": "reference", "name": "viz_dup"},
+                       headers=_auth(token))
+    assert resp.status_code == 409 and resp.json()["code"] == 6001
+
+
+def test_viz_family_guard_404(client, login):
+    """viz ∉ 课程族：lessons/publish 族守卫自动拦"""
+    token = login()["token"]
+    data = _mk_asset(client, token, bucket="viz", name="viz_guard")
+    resp = client.get(f"/api/assets/{data['id']}/lessons", headers=_auth(token))
+    assert resp.status_code == 404 and resp.json()["code"] == 1004
+    resp = client.post(f"/api/assets/{data['id']}/publish", headers=_auth(token))
+    assert resp.status_code == 404 and resp.json()["code"] == 1004
+
+
+def test_viz_html_inline_with_csp_sandbox(client, login):
+    """viz 的 .html：inline 渲染 + CSP sandbox allow-scripts（演示页可跑脚本但摸不到登录态）"""
+    token = login()["token"]
+    data = _mk_asset(client, token, bucket="viz", name="viz_html")
+    _upload(client, token, data["id"], "index.html", b"<h1>viz</h1>")
+    resp = client.get(f"/api/assets/{data['id']}/files/download",
+                      params={"path": "index.html"})
+    assert resp.status_code == 200
+    assert "inline" in resp.headers.get("content-disposition", "")
+    csp = resp.headers.get("content-security-policy", "")
+    assert "sandbox" in csp and "allow-scripts" in csp
+
+
+def test_non_viz_html_still_attachment(client, login):
+    """资料族 .html 维持 attachment（不因 D35 改变老行为）"""
+    token = login()["token"]
+    data = _mk_asset(client, token, bucket="reference", name="ref_html")
+    _upload(client, token, data["id"], "page.html", b"<h1>x</h1>")
+    resp = client.get(f"/api/assets/{data['id']}/files/download",
+                      params={"path": "page.html"})
+    assert "attachment" in resp.headers.get("content-disposition", "")
 
 
 # ---------------- F4 建文件夹 ----------------

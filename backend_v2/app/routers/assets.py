@@ -1,7 +1,8 @@
 """资产 —— 规范 §3.4/§3.5（D16 合表 · D17 接口合一 · M2 全部动作）
 
 一张 assets 表 + 每资产一个磁盘目录 + file_order 排序账 —— 后端的大一统。
-bucket 四值（courses|books|reference|download）是全域唯一的分类词（原 shelf/category 废除）。
+bucket 五值（courses|books|reference|download|viz）是全域唯一的分类词（原 shelf/category 废除；
+viz=可视化，D35：一行 = 一个演示页 = 根目录一个 .html，其 files/download 走 inline + CSP sandbox）。
 
 权限（逐条对应 tests/test_assets.py）：
   读（列表/详情/文件树/下载）   公开；详情的 publish 字段仅 owner/admin 可见
@@ -40,8 +41,9 @@ from ..security import get_current_account, get_optional_account
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
 
-_BUCKETS = {"courses", "books", "reference", "download"}
+_BUCKETS = {"courses", "books", "reference", "download", "viz"}
 _COURSE_FAMILY = {"courses", "books"}      # 族守卫：lessons/publish 只认这两值（zip 下载已全族开放，D33/D34）
+_VIZ = "viz"                                 # D35 可视化：非课程族（守卫自动拦），.html 走 inline 内嵌
 
 
 # ---------------- 模型 ----------------
@@ -158,7 +160,7 @@ def list_assets(
     viewer=Depends(get_optional_account),
 ):
     if bucket and bucket not in _BUCKETS:
-        raise ApiError(E_PARAM_INVALID, "bucket 只能是 courses/books/reference/download", 400)
+        raise ApiError(E_PARAM_INVALID, "bucket 只能是 courses/books/reference/download/viz", 400)
     stmt = select(Asset)
     if bucket:
         stmt = stmt.where(Asset.bucket == bucket)
@@ -179,7 +181,7 @@ def create_asset(
     if account.role not in ("teacher", "admin"):
         raise ApiError(E_FORBIDDEN, "只有老师可以创建资产", 403)
     if body.bucket not in _BUCKETS:
-        raise ApiError(E_PARAM_INVALID, "bucket 只能是 courses/books/reference/download", 400)
+        raise ApiError(E_PARAM_INVALID, "bucket 只能是 courses/books/reference/download/viz", 400)
 
     name = body.name.strip()
     if not name:
@@ -235,7 +237,7 @@ def patch_asset(
 
     if body.bucket is not None:
         if body.bucket not in _BUCKETS:
-            raise ApiError(E_PARAM_INVALID, "bucket 只能是 courses/books/reference/download", 400)
+            raise ApiError(E_PARAM_INVALID, "bucket 只能是 courses/books/reference/download/viz", 400)
         asset.bucket = body.bucket              # 跨族挪动允许（D17：课→资料归档）
     if body.name is not None:
         name = body.name.strip()
@@ -309,8 +311,12 @@ def list_files(assetId: str, path: str = "", db: DbSession = Depends(get_db)):
 
 @router.get("/{assetId}/files/download")
 def download_file(assetId: str, path: str = "", db: DbSession = Depends(get_db)):
-    _load(db, assetId)
-    return filetree.file_response(filetree.open_target(assetId, path))
+    asset = _load(db, assetId)
+    # D35：viz 族的 .html 走 inline + CSP sandbox（前端 iframe 内嵌演示页）
+    return filetree.file_response(
+        filetree.open_target(assetId, path),
+        inline_html=asset.bucket == _VIZ,
+    )
 
 
 @router.post("/{assetId}/files/upload")

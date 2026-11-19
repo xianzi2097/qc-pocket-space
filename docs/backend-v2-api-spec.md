@@ -32,6 +32,7 @@
 | D20 | 设置 theme 语义勘误（2026-10-10 拍板，**M5 唯二的后端改动之一**，另一个是 P4 如触发） | `settings.theme` 白名单由 `light/dark`（凭空设计的"明暗模式"，前端根本没有暗黑）改为**前端真实四值**：`''`（橙·默认）/ `green` / `blue` / `custom`；`hue` 默认 210→**95**（橙）与 theme 默认配套。判据：**V2 重写时未对照前端代码，spec 想象了不存在的功能**（M5 设置域迁移时发现，231 测试因只测后端自洽未能拦截）。改动面：白名单 1 行 + 默认值 2 处 + 对应测试。 |
 | D25 | 账号生命周期改**停用/启用**直操（2026-10-10 拍板，M5b-2 迁移时发现） | 停用（`DELETE /accounts/{id}`）**不再写回收站**（纯改 status + 踢全部会话），msg「账号已停用，可随时启用」；启用走现成 `PATCH /accounts/{id} {status:'active'}`。判据：账号业务上**不可物理删**，回收站语义只留给班级/资产；实测中"垃圾桶里看不到停用的号"造成困惑（页面未迁是其一，语义割裂是其二）。改动面：`delete_account` 去 Trash 写入 + 3 处测试改写（231 条数不变）。 |
 | D26 | 停用账号登录提示区分（2026-10-10 拍板，用户验收 D25 时提出） | 登录失败分支拆分：**停用号 + 正确密码 → `2004`「账号已被停用」**；密码错 / 账号不存在 → 仍 `2001` 通用文案。判据：用户需要明确提示（"账号密码错误"让人不知所措），但守 test_auth **防枚举原则**（不泄露账号存在性），故密码对了才给专属提示。改动面：`login` 分支拆分 + 断言更新（231 条数不变）。 |
+| D35 | 可视化资产（2026-11-19 拍板） | **bucket 第五值 `viz`**：一个可视化 = 一行资产 = 一个 `.html`（根目录单文件，第一版无文件夹 UI）。**不建新表、不建新 ID 体系**（bucket 是普通字符串列，零迁移；id 沿用 `new_id()`）。判据：可视化与资料族行为同形（一行+一文件+CRUD+可下载+在线打开），差异仅"`.html` 走 inline 内嵌"——按 D17"行为同一份代码才合"继续合在 assets。**族守卫自动生效**（viz∉课程族 → lessons/publish 404）；重名错误码归资料族 6001。**安全（必须项）**：`files/download` 对 viz 的 `.html` 回 `inline` + `Content-Security-Policy: sandbox allow-scripts` 响应头；前端 iframe 嵌入写死 `sandbox="allow-scripts"`（**不给 allow-same-origin**——演示页 JS 跑得动但摸不到登录态）。源文件下载第一版允许（D33 全族开放自动继承），要收紧再加开关 |
 
 ---
 
@@ -165,7 +166,7 @@ class_members(
 
 -- 资产（D16 合表：课程/书架/资料/软件四类共用，bucket 分类）
 assets(
-  id PK, owner_id FK, bucket(courses|books|reference|download), name,
+  id PK, owner_id FK, bucket(courses|books|reference|download|viz), name,
   description, tags JSON, created_at,
   type, format, publish JSON          -- 课程族专用（bucket=courses|books），其余为空
   UNIQUE(owner_id, name)
@@ -266,13 +267,13 @@ trash(
 
 ### 3.4 资产（assets · 课程/书架/资料/软件合一 · D17）
 
-> **落库**：`assets` 一张表（D16）；**接口一族**（D17，2026-10-08 拍板：原 `/api/courses`、`/api/resources` 两前缀合一）。全域分类词只有一个：**`bucket`**（`courses|books|reference|download`——原 shelf/category 词汇废除）。
-> **族守卫**（4 处，违反 → 404）：`lessons`/`publish`/`publish-status` 仅课程族（bucket∈{courses,books}）。**跨族挪动允许**（PATCH bucket：上完的课可转资料归档，课程族专用字段保留、由族守卫挡住误用）。**`download` 已全族开放**（2026-11-15 D33：课程族也允许打包下载；打包仍锁在本资产根目录内，不新增公开面——课程读面本就公开；**课程族须 `shareable=true`，见 D34**）。
+> **落库**：`assets` 一张表（D16）；**接口一族**（D17，2026-10-08 拍板：原 `/api/courses`、`/api/resources` 两前缀合一）。全域分类词只有一个：**`bucket`**（`courses|books|reference|download|viz`——原 shelf/category 词汇废除；`viz`=可视化，D35）。
+> **族守卫**（4 处，违反 → 404）：`lessons`/`publish`/`publish-status` 仅课程族（bucket∈{courses,books}）。**viz 族（D35）**：一行 = 一个可视化 = 根目录一个 `.html`；`files/download` 对 `.html` 回 `inline` + `Content-Security-Policy: sandbox allow-scripts`（前端 iframe 嵌入须 `sandbox="allow-scripts"`，不给 allow-same-origin）。**跨族挪动允许**（PATCH bucket：上完的课可转资料归档，课程族专用字段保留、由族守卫挡住误用）。**`download` 已全族开放**（2026-11-15 D33：课程族也允许打包下载；打包仍锁在本资产根目录内，不新增公开面——课程读面本就公开；**课程族须 `shareable=true`，见 D34**）。
 
 | 方法 | 路径 | 功能 | 权限 |
 |---|---|---|---|
-| GET | `/api/assets` | 列表（`?bucket=courses\|books\|reference\|download`、`?owner=`；不传 bucket = 四类全返；**含 `publish.state`**——渲染状态词 none/queued/building/done/failed，前端据此开电子书 iframe，`message` 不外发；**含 `shareable`**——课程下载开关公开可见，前端据此显隐下载按钮） | 公开 |
-| POST | `/api/assets` | 建资产（body.bucket = D15 四选一值；`type` 课程族必填——前端表单选；`format` 缺省按 type 兜底：scratch→scratch、python/cpp→folder；**库+盘双写**；重名 owner 全局 → 5001 课程族 / 6001 资料族） | teacher / admin |
+| GET | `/api/assets` | 列表（`?bucket=courses\|books\|reference\|download\|viz`、`?owner=`；不传 bucket = 五类全返；**含 `publish.state`**——渲染状态词 none/queued/building/done/failed，前端据此开电子书 iframe，`message` 不外发；**含 `shareable`**——课程下载开关公开可见，前端据此显隐下载按钮） | 公开 |
+| POST | `/api/assets` | 建资产（body.bucket = D15 四选一值 + D35 `viz`；`type` 课程族必填——前端表单选；`format` 缺省按 type 兜底：scratch→scratch、python/cpp→folder；**库+盘双写**；重名 owner 全局 → 5001 课程族 / 6001 资料族） | teacher / admin |
 | GET | `/api/assets/{id}` | 详情（`assets` 行元信息：name/description/tags/type/format/publish.state…；**完整 publish（含失败 message，可能带服务器路径）仅 owner/admin**；文件树另走 F1） | 公开 |
 | PATCH | `/api/assets/{id}` | 改 名称/描述/标签/类型/打开方式 + **`bucket`**（= 挪书架/挪分类，幂等，族内族间均可；原 PUT /shelf 与资料改元信息并入，C5 砍）+ **`shareable`**（课程族下载开关，D34，owner 可改） | owner / admin |
 | DELETE | `/api/assets/{id}` | 删（软删四联动：行→trash 快照(type=asset) · 磁盘移回收站 · 发布产物清理 · file_order 保留；彻底删才清账） | owner / admin |

@@ -42,6 +42,9 @@ _INLINE_EXT = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
     ".mp4", ".webm", ".mp3", ".wav", ".ogg",
 }
+_HTML_EXT = {".html", ".htm"}
+# D35：viz 演示页内嵌响应头 —— 脚本可跑（allow-scripts）但不给同源（摸不到登录态/父页面）
+_HTML_INLINE_CSP = "Content-Security-Policy: sandbox allow-scripts"
 
 
 # ---------------- 目录布局 ----------------
@@ -261,13 +264,19 @@ def open_target(asset_id: str, path: str | None) -> Path:
     return target
 
 
-def file_response(path: Path) -> FileResponse:
-    disposition = "inline" if path.suffix.lower() in _INLINE_EXT else "attachment"
+def file_response(path: Path, inline_html: bool = False) -> FileResponse:
+    """F2 单文件响应。
+    inline_html=True（仅 D35 viz 族调用方传）：.html 也走 inline 并加 CSP sandbox 头，
+    供前端 iframe 内嵌渲染；其余调用方 .html 维持 attachment（老行为不变）。
+    """
+    ext = path.suffix.lower()
+    inline = ext in _INLINE_EXT or (inline_html and ext in _HTML_EXT)
+    disposition = "inline" if inline else "attachment"
     filename = urllib.parse.quote(path.name)
-    return FileResponse(
-        path,
-        headers={"Content-Disposition": f"{disposition}; filename*=UTF-8''{filename}"},
-    )
+    headers = {"Content-Disposition": f"{disposition}; filename*=UTF-8''{filename}"}
+    if inline_html and ext in _HTML_EXT:
+        headers["Content-Security-Policy"] = "sandbox allow-scripts"
+    return FileResponse(path, headers=headers)
 
 
 # ---------------- E6 打包下载 ----------------

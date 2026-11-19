@@ -13,7 +13,7 @@
 | 3  | `login_attempts`  | 账号 | 登录失败计数（防暴力破解）                        | M1 ✅  |
 | 4  | `classes`         | 班级 | 班级本体                                          | M1b ✅ |
 | 5  | `class_members`   | 班级 | 谁在哪个班（关系表）                              | M1b ✅ |
-| 6  | `assets`          | 内容 | 资产合表：课程/书架/资料/软件（bucket 分类，D16） | M2 ✅  |
+| 6  | `assets`          | 内容 | 资产合表：课程/书架/资料/软件/可视化（bucket 分类，D16/D35） | M2 ✅  |
 | 7  | `file_order`      | 内容 | 文件树自定义排序                                  | M2 ✅  |
 | 8  | `message_folders` | 沟通 | 站内信文件夹                                      | M3 ✅  |
 | 9  | `messages`        | 沟通 | 站内信                                            | M3 ✅  |
@@ -115,13 +115,13 @@ trash ──→ 指向被软删的 account / class（payload 存恢复所需快�
 
 ## 6. `assets` — 资产合表（D16）
 
-**四类资产一张表**：课程、书架、资料、软件只是 `bucket` 值不同；`type/format/publish/shareable` 为课程族专用，资料/软件行保持为空。
+**五类资产一张表**：课程、书架、资料、软件、可视化只是 `bucket` 值不同；`type/format/publish/shareable` 为课程族专用，资料/软件/viz 行保持为空。
 
 | 字段            | 类型               | 含义                 | 取值 / 备注                                                                                  |
 | --------------- | ------------------ | -------------------- | -------------------------------------------------------------------------------------------- |
 | `id`          | String(12) · 主键 | 资产 id              | `new_id()`；文件树挂在它下面                                                               |
 | `owner_id`    | String(12) · 索引 | 属于谁               | →`accounts.id`                                                                            |
-| `bucket`      | String(16) · 索引 | **四分类**     | `courses` 课 / `books` 书 / `reference` 参考资料 / `download` 软件（D15 四选一落这） |
+| `bucket`      | String(16) · 索引     | **五分类**     | `courses` 课 / `books` 书 / `reference` 参考资料 / `download` 软件 / `viz` 可视化（D15 四选一 + D35） |
 | `name`        | String(128)        | 资产名               | **同一 owner 下全局唯一**（跨类不重名）→ 业务码 5001/6001                             |
 | `description` | Text               | 说明                 |                                                                                              |
 | `tags`        | JSON（list）       | 标签                 | 筛选用                                                                                       |
