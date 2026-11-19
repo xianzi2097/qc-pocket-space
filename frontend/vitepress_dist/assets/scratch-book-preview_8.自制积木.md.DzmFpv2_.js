@@ -1,0 +1,8 @@
+import{_ as e,c as a,o as r,a2 as o}from"./chunks/framework.BKNXJ1nb.js";const p=JSON.parse('{"title":"自制积木","description":"","frontmatter":{},"headers":[],"relativePath":"scratch-book-preview/8.自制积木.md","filePath":"scratch-book-preview/8.自制积木.md"}'),d={name:"scratch-book-preview/8.自制积木.md"};function h(c,t,n,s,l,_){return r(),a("div",null,[...t[0]||(t[0]=[o(`<h1 id="自制积木" tabindex="-1">自制积木 <a class="header-anchor" href="#自制积木" aria-label="Permalink to &quot;自制积木&quot;">​</a></h1><p>自制积木是粉红色的，一共 2 块：定义和调用。它不是新功能，而是把一串积木打包起个名字，像自己写一个&quot;函数&quot;。起好名字、想清楚要带几个参数，以后喊一声，整串积木就跑一遍——重复的脚本一下子变短。</p><h2 id="_1-定义-我的积木" tabindex="-1">1. 定义 我的积木 <a class="header-anchor" href="#_1-定义-我的积木" aria-label="Permalink to &quot;1. 定义 我的积木&quot;">​</a></h2><pre class="blocks"><code>定义 我的积木
+  移动 (10) 步</code></pre><p>一顶粉帽子，帽子上写着名字；下面挂的积木就是这个名字的全部内容。</p><table tabindex="0"><thead><tr><th>参数</th><th>说明</th><th>单位</th></tr></thead><tbody><tr><td>名字</td><td>起个好记的名字，调用时喊它</td><td>无</td></tr></tbody></table><h2 id="_2-我的积木" tabindex="-1">2. 我的积木 <a class="header-anchor" href="#_2-我的积木" aria-label="Permalink to &quot;2. 我的积木&quot;">​</a></h2><pre class="blocks"><code>定义 我的积木
+  移动 (10) 步
+
+我的积木</code></pre><p>定义好之后，名字本身就是一块积木：放一块进脚本，等于把定义下面那串积木跑一遍。</p><p>没有参数。</p><h2 id="_3-定义-直走-步数" tabindex="-1">3. 定义 直走 (步数) <a class="header-anchor" href="#_3-定义-直走-步数" aria-label="Permalink to &quot;3. 定义 直走 (步数)&quot;">​</a></h2><pre class="blocks"><code>定义 直走 (步数)
+  移动 (步数) 步
+
+直走 (50)</code></pre><p>括号里写上参数名，每次调用传不同的值——同一段积木，这次走 50 步，下次可以走 100 步。</p><table tabindex="0"><thead><tr><th>参数</th><th>说明</th><th>单位</th></tr></thead><tbody><tr><td>参数</td><td>每次调用可以换的值，名字在定义时起</td><td>无</td></tr></tbody></table>`,14)])])}const b=e(d,[["render",h]]);export{p as __pageData,b as default};
