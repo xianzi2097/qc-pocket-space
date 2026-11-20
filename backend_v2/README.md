@@ -25,7 +25,7 @@
 | **M4 收口** | 回收站合并、backup/build 平移、横切能力逐项核对 | ✅ 完成 | 2026-10-09 |
 | M5 切流 | 前端按新规范改造、手测、停 V1 起 V2 | ⏸ 未开始 | |
 
-测试用例：**242 个**（最近自动同步：2026-11-19）
+测试用例：**242 个**（最近自动同步：2026-11-20）
 
 ## 文件地图
 
@@ -102,10 +102,10 @@ POST /api/auth/login
 ```powershell
 # 启动服务（8001；V1 的 8000 不受影响）
 cd qc-pocket-space\backend_v2
-& "..\tests\venv\Scripts\python.exe" -m uvicorn main:app --port 8001
+& ".\.venv\Scripts\python.exe" -m uvicorn main:app --port 8001
 
 # 跑测试（约 3 秒，用独立临时库，不碰真实数据）
-& "..\tests\venv\Scripts\python.exe" -m pytest tests -q
+& ".\.venv\Scripts\python.exe" -m pytest tests -q
 ```
 
 接口文档（启动后）：`http://127.0.0.1:8001/docs`

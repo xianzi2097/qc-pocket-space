@@ -504,7 +504,7 @@ def test_create_class(client, login, db):
 
 ```powershell
 cd qc-pocket-space\backend_v2
-& "..\tests\venv\Scripts\python.exe" -m pytest tests -q
+& ".\.venv\Scripts\python.exe" -m pytest tests -q
 ```
 
 测试基础设施（`tests/conftest.py`）：
