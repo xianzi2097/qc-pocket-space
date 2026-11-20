@@ -767,67 +767,150 @@ html.dark[data-vp-theme='blue'] {
   --alert-tip-bg: #17293f;
 }
 
-/* ---------- 橙红（Scratch）· 浅色 ---------- */
+/* ---------- 橙红（Scratch）· 浅色（D40：去猪肝红，提亮偏橙） ---------- */
 [data-vp-theme='orange'] {
-  --spring-green-dark: #cf4d1f;
-  --spring-green: #e06735;
-  --spring-green-light: #fdeee6;
-  --spring-green-lighter: #fcf3ee;
-  --spring-green-pale: rgba(252, 224, 208, 0.55);
-  --spring-strong: #9c2f0a;
-  --spring-link: #c7451a;
-  --spring-link-hover: #8a2c08;
-  --spring-selection: #fbdccf;
+  --spring-green-dark: #e8590c;
+  --spring-green: #f57316;
+  --spring-green-light: #fff1e6;
+  --spring-green-lighter: #fff9f4;
+  --spring-green-pale: rgba(255, 232, 214, 0.55);
+  --spring-strong: #c24a00;
+  --spring-link: #e8590c;
+  --spring-link-hover: #b34400;
+  --spring-selection: #ffe4cc;
 
-  --spring-h1-fade: rgba(255, 180, 140, 0);
-  --spring-h2-underline: #e07a4a;
-  --spring-h2-fade: rgba(240, 150, 100, 0);
-  --spring-p-hover: rgba(235, 160, 120, 0.08);
-  --spring-em-hover: #b03000;
-  --spring-code-text: #d4500f;
-  --spring-code-hover-bg: rgba(252, 224, 208, 0.85);
-  --spring-code-block-text: #5f4030;
-  --spring-td-hover: rgba(253, 240, 233, 0.7);
-  --spring-hr-edge: #dd8a60;
-  --spring-tagline: #a57a63;
-  --spring-btn-hover-bg: #f8d9c8;
-  --spring-feature-hover-shadow: rgba(207, 77, 31, 0.12);
-  --spring-dot-1: #8f2f0a;
-  --spring-dot-2: #d1451a;
-  --spring-dot-3: rgb(255, 160, 90);
-  --spring-syntax-kw: #c04a12;
-  --spring-syntax-fn: #e06a2e;
+  --spring-h1-fade: rgba(255, 195, 150, 0);
+  --spring-h2-underline: #f5893f;
+  --spring-h2-fade: rgba(255, 175, 110, 0);
+  --spring-p-hover: rgba(255, 175, 115, 0.1);
+  --spring-em-hover: #d14e00;
+  --spring-code-text: #e8590c;
+  --spring-code-hover-bg: rgba(255, 235, 215, 0.85);
+  --spring-code-block-text: #6b4a38;
+  --spring-td-hover: rgba(255, 243, 232, 0.7);
+  --spring-hr-edge: #f09a68;
+  --spring-tagline: #b08a66;
+  --spring-btn-hover-bg: #ffe6d2;
+  --spring-feature-hover-shadow: rgba(232, 89, 12, 0.12);
+  --spring-dot-1: #c24a00;
+  --spring-dot-2: #f06414;
+  --spring-dot-3: rgb(255, 175, 105);
+  --spring-syntax-kw: #e8590c;
+  --spring-syntax-fn: #f5731f;
 
-  --alert-tip-border: #c2410c;
-  --alert-tip-bg: #fdeee6;
+  --alert-tip-border: #e8590c;
+  --alert-tip-bg: #fff1e6;
 }
 
-/* ---------- 橙红（Scratch）· 暗色 ---------- */
+/* ---------- 橙红（Scratch）· 暗色（D40 同步偏橙） ---------- */
 html.dark[data-vp-theme='orange'] {
-  --spring-green-dark: #f09060;
+  --spring-green-dark: #ff9a4d;
   --spring-green-light: #3a2116;
   --spring-green-lighter: #42281c;
-  --spring-strong: #f5a982;
-  --spring-link: #f0a578;
-  --spring-link-hover: #f8c4a4;
+  --spring-strong: #ffb684;
+  --spring-link: #ffa666;
+  --spring-link-hover: #ffcaa0;
   --spring-selection: #4a2a18;
 
-  --spring-h1-fade: rgba(240, 144, 96, 0);
-  --spring-h2-underline: #f09060;
-  --spring-h2-fade: rgba(240, 144, 96, 0);
-  --spring-p-hover: rgba(240, 144, 96, 0.12);
-  --spring-em-hover: #f8c4a4;
-  --spring-code-text: #f0a578;
-  --spring-code-hover-bg: rgba(252, 224, 208, 0.14);
+  --spring-h1-fade: rgba(255, 154, 77, 0);
+  --spring-h2-underline: #ff9a4d;
+  --spring-h2-fade: rgba(255, 154, 77, 0);
+  --spring-p-hover: rgba(255, 154, 77, 0.14);
+  --spring-em-hover: #ffcaa0;
+  --spring-code-text: #ffa666;
+  --spring-code-hover-bg: rgba(255, 224, 190, 0.14);
   --spring-code-block-text: #e8d5c8;
-  --spring-td-hover: rgba(240, 144, 96, 0.12);
-  --spring-hr-edge: #94522f;
-  --spring-tagline: #c49a82;
+  --spring-td-hover: rgba(255, 154, 77, 0.14);
+  --spring-hr-edge: #9d5d2e;
+  --spring-tagline: #cca07a;
   --spring-btn-hover-bg: #4a2a18;
-  --spring-feature-hover-shadow: rgba(240, 144, 96, 0.2);
-  --spring-syntax-kw: #f09060;
-  --spring-syntax-fn: #f5b189;
+  --spring-feature-hover-shadow: rgba(255, 154, 77, 0.2);
+  --spring-syntax-kw: #ff9a4d;
+  --spring-syntax-fn: #ffc096;
 
-  --alert-tip-border: #d1622f;
+  --alert-tip-border: #e8703a;
   --alert-tip-bg: #3a2116;
+}
+
+/* ===== Scratch 积木块样式（D39 移植自本地维基，2026-11-20） ===== */
+
+/* 积木校验失败的错误横幅（构建期在 Node 里检出，随页面一起输出） */
+.vp-doc .scratch-error {
+  border: 1px solid var(--vp-c-danger-2, #f66);
+  background: var(--vp-c-danger-soft, rgba(255, 80, 80, 0.14));
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.vp-doc .scratch-error strong {
+  color: var(--vp-c-danger-1, #e04040);
+  display: block;
+  margin-bottom: 4px;
+}
+.vp-doc .scratch-error code {
+  background: transparent;
+  padding: 0;
+  color: var(--vp-c-danger-1, #e04040);
+  font-weight: 600;
+}
+.vp-doc .scratch-error ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+.vp-doc .scratch-error p {
+  margin: 6px 0 0;
+  opacity: 0.85;
+}
+
+/* 写法提醒横幅（黄色，非致命警告） */
+.vp-doc .scratch-warn {
+  border: 1px solid var(--vp-c-warning-2, #e0a800);
+  background: var(--vp-c-warning-soft, rgba(255, 190, 60, 0.16));
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.vp-doc .scratch-warn strong {
+  color: var(--vp-c-warning-1, #9a6700);
+  display: block;
+  margin-bottom: 4px;
+}
+.vp-doc .scratch-warn code {
+  background: transparent;
+  padding: 0;
+  color: var(--vp-c-warning-1, #9a6700);
+  font-weight: 600;
+}
+.vp-doc .scratch-warn ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+/* 水合前的原始文本占位符：保持代码块外观，横向可滚动 */
+.vp-doc pre.blocks {
+  background: var(--vp-c-bg-alt);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+/* 渲染后的积木容器：过宽时横向滚动，不撑破布局 */
+.vp-doc pre.blocks .scratchblocks,
+.vp-doc .scratchblocks {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.vp-doc .scratchblocks svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 行内积木与文字对齐 */
+.vp-doc code.b svg {
+  vertical-align: middle;
 }

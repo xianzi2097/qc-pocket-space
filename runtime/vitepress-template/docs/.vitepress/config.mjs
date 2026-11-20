@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitepress'
 import { withMermaid } from 'vitepress-plugin-mermaid'
 import { sidebar } from './gen/sidebar.mjs'
+import { checkScratchCode } from './scratch-check.mjs'
 
 // 课程模板 config（静态引擎部分，Python 不修改此文件）
 // - base：由环境变量 VP_BASE 注入（Python 每次构建时按课程设置）
@@ -23,6 +24,52 @@ export default withMermaid({
   markdown: {
     lineNumbers: true,
     math: true,
+    // 注册 ```scratch 围栏：校验 → 占位符（浏览器端 scratchblocks 转 SVG）
+    // 与本地维基 vitepress-dev 同款（D39 移植，2026-11-20）
+    config(md) {
+      const fence = md.renderer.rules.fence
+      md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+        const token = tokens[idx]
+        if (token.info.trim() === 'scratch') {
+          const raw = token.content.replace(/\n$/, '')
+          if (!raw.trim()) return ''
+
+          const file = env?.relativePath || '未知文件'
+          const line = token.map ? token.map[0] + 1 : 0
+          const { ok, errors, warnings, converted } = checkScratchCode(raw)
+
+          const pre = `<pre class="blocks"><code>${md.utils.escapeHtml(converted)}</code></pre>\n`
+
+          if (!ok) {
+            const list = errors.map((e) => `<li>${md.utils.escapeHtml(e)}</li>`).join('')
+            console.warn(`[scratch] ${file}:${line}  → ${errors.join('；')}`)
+            const banner =
+              `<div class="scratch-error" role="alert">` +
+              `<strong>⚠️ Scratch 积木无法识别</strong>` +
+              `<code>${md.utils.escapeHtml(file)}:${line}</code>` +
+              `<ul>${list}</ul>` +
+              `<p>红色积木 = 文本没匹配上官方词条（错别字、多空格、漏字都算）。</p>` +
+              `</div>\n`
+            return banner + pre
+          }
+
+          if (warnings.length) {
+            const list = warnings.map((w) => `<li>${md.utils.escapeHtml(w)}</li>`).join('')
+            console.warn(`[scratch] ${file}:${line} (警告)  → ${warnings.join('；')}`)
+            const banner =
+              `<div class="scratch-warn" role="status">` +
+              `<strong>⚠️ 写法提醒</strong>` +
+              `<code>${md.utils.escapeHtml(file)}:${line}</code>` +
+              `<ul>${list}</ul>` +
+              `</div>\n`
+            return banner + pre
+          }
+
+          return pre
+        }
+        return fence(tokens, idx, options, env, self)
+      }
+    },
   },
 
   title: process.env.VP_TITLE || 'CodeNova',
