@@ -5,7 +5,8 @@
   class   → 行删了、快照在 payload；恢复 = 插回行（成员/课堂记录一直没动 → 自动复原）
             彻底删 = 级联清成员 + 课堂记录（铁律：删对象必清引用）
   asset   → 行删了 + 磁盘搬进 trash/{id}；恢复 = 插回行 + 磁盘搬回 + 排序账原样活着
-            彻底删 = 清 file_order + 磁盘物理删（彻底删才清账）
+            彻底删 = 清 file_order + 磁盘物理删 + 发布产物清理（彻底删才清账）
+            恢复时校准 publish 状态：产物已清 → done 复位 none（状态诚实，防预览 404）
 
 列表：admin 全部，其余只见 owner_id=自己（owner_id = 对象主人）。
 越权按 404 不泄露；恢复冲突沿用原域错误码（班 4001 / 资产 5001）。
@@ -40,6 +41,7 @@ from ..models import (
     FileOrder,
     Trash,
 )
+from ..publish import remove_site, site_exists
 from ..security import get_current_account
 
 router = APIRouter(prefix="/api/trash", tags=["trash"])
@@ -101,6 +103,12 @@ def _restore(db: DbSession, item: Trash, account) -> None:
             code = E_COURSE_NAME_TAKEN if bucket in ("courses", "books") else E_RESOURCE_NAME_TAKEN
             raise ApiError(code, "名称已存在", 409)
 
+        # publish 状态诚实性：产物已随软删清掉（或历史条目本就没有）→
+        # 恢复后不得仍报 done（UI 显示"已发布"但预览 404）
+        publish_state = payload.get("publish") or {}
+        if publish_state.get("state") == "done" and not site_exists(payload["id"]):
+            publish_state = {"state": "none"}
+
         # 先搬磁盘，再落行；任一步失败都回滚另一半
         src = config.DATA_ROOT / (item.disk_path or f"trash/{payload['id']}")
         dst = config.DATA_ROOT / "assets" / payload["id"]
@@ -114,7 +122,7 @@ def _restore(db: DbSession, item: Trash, account) -> None:
                 id=payload["id"], owner_id=payload["owner_id"], bucket=bucket,
                 name=payload["name"], description=payload.get("description", ""),
                 tags=payload.get("tags") or [], type=payload.get("type", ""),
-                format=payload.get("format", ""), publish=payload.get("publish") or {},
+                format=payload.get("format", ""), publish=publish_state,
                 created_at=payload["created_at"],
             ))
             db.delete(item)
@@ -140,6 +148,7 @@ def _purge(db: DbSession, item: Trash) -> None:
         db.query(FileOrder).filter_by(asset_id=aid).delete(synchronize_session=False)     # 彻底删才清账
         disk = config.DATA_ROOT / (item.disk_path or f"trash/{aid}")
         shutil.rmtree(disk, ignore_errors=True)
+        remove_site(aid)                        # 发布产物同灭（软删漏清的历史条目靠这里兜底）
     db.delete(item)
 
 

@@ -23,7 +23,7 @@ import time
 import zipfile
 
 from app.db import SessionLocal
-from app.models import FileOrder, Trash
+from app.models import Asset, FileOrder, Trash
 
 PWD = "abcd1234"
 
@@ -276,6 +276,59 @@ def test_delete_twice_404(client, login):
     assert client.delete(f"/api/assets/{data['id']}", headers=_auth(token)).json()["code"] == 0
     resp = client.delete(f"/api/assets/{data['id']}", headers=_auth(token))
     assert resp.status_code == 404 and resp.json()["code"] == 1004
+
+
+def test_delete_soft_cleans_publish_artifact(client, login, monkeypatch, tmp_path):
+    """软删四联动第⑤项：发布产物清理（§3.4）——已删资产的产物必须同灭，
+    否则删除的电子书在 /course/{id}/ 公网仍可访问（数据安全事故）"""
+    import app.publish as publish
+    monkeypatch.setattr(publish, "SITES_DIR", tmp_path / "sites")
+
+    token = login()["token"]
+    data = _mk_asset(client, token, name="ast_del_pub", type_="scratch")
+    art = tmp_path / "sites" / data["id"]
+    art.mkdir(parents=True)
+    (art / "index.html").write_text("<html>published</html>", encoding="utf-8")
+
+    resp = client.delete(f"/api/assets/{data['id']}", headers=_auth(token))
+    assert resp.json()["code"] == 0
+    assert not art.exists(), "软删必须清理发布产物（规范 §3.4 四联动）"
+
+
+def test_build_aborts_if_asset_deleted_midway(client, login, monkeypatch, tmp_path):
+    """竞态守卫：构建期间（最长 910s）资产被删 → 写回产物前必须复核资产还在，
+    否则删除的电子书在构建完成后又"复活"成公网孤儿"""
+    from types import SimpleNamespace
+
+    import app.publish as publish
+
+    tpl = tmp_path / "tpl"
+    (tpl / "docs" / ".vitepress").mkdir(parents=True)
+    monkeypatch.setattr(publish, "TEMPLATE_DIR", tpl)
+    monkeypatch.setattr(publish, "SITES_DIR", tmp_path / "sites")
+
+    token = login()["token"]
+    data = _mk_asset(client, token, name="ast_race", type_="scratch")
+    _upload(client, token, data["id"], "index.md", b"# race")
+
+    def _fake_run(cmd, **kwargs):
+        # 模拟 vitepress build 期间用户删除了资产
+        db = SessionLocal()
+        try:
+            db.delete(db.get(Asset, data["id"]))
+            db.commit()
+        finally:
+            db.close()
+        out = tpl / "docs" / "out"
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "index.html").write_text("<html>built</html>", encoding="utf-8")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(publish, "subprocess", SimpleNamespace(run=_fake_run))
+    publish._run_build(data["id"])          # 不抛异常，但绝不能写出产物
+
+    assert not (tmp_path / "sites" / data["id"]).exists(), \
+        "构建期间被删的资产不得写出产物（孤儿 = 公网可访问已删内容）"
 
 
 # ---------------- F3 上传 ----------------

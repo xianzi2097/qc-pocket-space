@@ -213,6 +213,69 @@ def test_purge_asset_destroys_everything(client, login):
     assert not any(i["id"] == item["id"] for i in _trash_items(client, admin))
 
 
+def test_purge_cleans_publish_artifact(client, login, monkeypatch, tmp_path):
+    """彻底删补刀：发布产物同灭（软删漏清的历史条目靠这里兜底，
+    否则 /course/{id}/ 公网永远可访问已火化内容）"""
+    import app.publish as publish
+    monkeypatch.setattr(publish, "SITES_DIR", tmp_path / "sites")
+
+    admin, t1, _ = _setup(client, login)
+    asset = client.post("/api/assets",
+                        json={"bucket": "reference", "name": "火化带产物"},
+                        headers=_auth(t1)).json()["data"]
+    client.delete(f"/api/assets/{asset['id']}", headers=_auth(t1))
+
+    # 模拟"软删漏清"的历史条目：产物仍在
+    art = tmp_path / "sites" / asset["id"]
+    art.mkdir(parents=True)
+    (art / "index.html").write_text("<html>ghost</html>", encoding="utf-8")
+
+    item = next(i for i in _trash_items(client, admin) if i["name"] == "火化带产物")
+    resp = client.delete(f"/api/trash/{item['id']}", headers=_auth(admin))
+    assert resp.json()["code"] == 0
+    assert not art.exists(), "彻底删必须清理发布产物"
+
+
+def test_restore_asset_resets_publish_state(client, login, monkeypatch, tmp_path):
+    """恢复后 publish 状态诚实性：产物已随软删清掉 → 恢复必须把 done 复位，
+    否则 UI 显示"已发布"但预览 404（状态失真）"""
+    import app.publish as publish
+    monkeypatch.setattr(publish, "SITES_DIR", tmp_path / "sites")
+
+    admin, t1, _ = _setup(client, login)
+    asset = client.post("/api/assets",
+                        json={"bucket": "courses", "name": "恢复渲染课",
+                              "type": "scratch"},
+                        headers=_auth(t1)).json()["data"]
+    # 造一条"已渲染"状态 + 产物
+    db = SessionLocal()
+    try:
+        row = db.get(Asset, asset["id"])
+        row.publish = {"state": "done", "finished_at": "2026-11-20 10:00:00"}
+        db.commit()
+    finally:
+        db.close()
+    art = tmp_path / "sites" / asset["id"]
+    art.mkdir(parents=True)
+    (art / "index.html").write_text("<html>published</html>", encoding="utf-8")
+
+    client.delete(f"/api/assets/{asset['id']}", headers=_auth(t1))
+    assert not art.exists(), "前置：软删已清产物（由软删用例保证）"
+
+    item = next(i for i in _trash_items(client, t1) if i["name"] == "恢复渲染课")
+    assert client.post(f"/api/trash/{item['id']}/restore",
+                       headers=_auth(t1)).json()["code"] == 0
+
+    db = SessionLocal()
+    try:
+        row = db.get(Asset, asset["id"])
+        assert row is not None
+        assert (row.publish or {}).get("state") != "done", \
+            "产物已清，恢复后不得仍报 done（状态失真 → 预览 404）"
+    finally:
+        db.close()
+
+
 def test_purge_requires_admin_and_content_only(client, login):
     admin, t1, _ = _setup(client, login)
     # 老师不能彻底删

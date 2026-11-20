@@ -36,7 +36,7 @@ from ..envelope import (
     ok,
 )
 from ..models import Account, Asset, Trash, new_id, now_str
-from ..publish import enqueue, is_active
+from ..publish import enqueue, is_active, remove_site
 from ..security import get_current_account, get_optional_account
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
@@ -268,10 +268,11 @@ def delete_asset(
 ):
     asset = _load(db, assetId)
     _require_owner(asset, account)
+    asset_id = asset.id                          # commit 后对象过期，先捕获
 
     # ③ 磁盘整棵移进回收站（软删；恢复 M4 做，移回即复原）
-    src = filetree.asset_root(asset.id)
-    dst = filetree.asset_trash_dir(asset.id)
+    src = filetree.asset_root(asset_id)
+    dst = filetree.asset_trash_dir(asset_id)
     if src.exists():
         shutil.rmtree(dst, ignore_errors=True)
         shutil.move(str(src), str(dst))
@@ -298,6 +299,9 @@ def delete_asset(
         if dst.exists() and not src.exists():     # 磁盘搬回来，保持一致
             shutil.move(str(dst), str(src))
         raise
+    # ⑤ 发布产物清理（§3.4 四联动）：已删内容不得在 /course/{id}/ 公网残留。
+    #    放 commit 成功后——回滚路径资产还活着，产物必须保留（状态诚实）
+    remove_site(asset_id)
     return ok(None, "已移入回收站")
 
 

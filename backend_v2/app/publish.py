@@ -59,6 +59,18 @@ def is_active(state: str | None) -> bool:
     return state in ("queued", "building")
 
 
+def remove_site(asset_id: str) -> None:
+    """删发布产物目录（软删四联动之⑤ / 彻底删兜底；幂等，含 .bak 残留）。
+    SITES_DIR 在调用期查模块全局 → 测试 monkeypatch 可替换。"""
+    shutil.rmtree(SITES_DIR / asset_id, ignore_errors=True)
+    shutil.rmtree(Path(str(SITES_DIR / asset_id) + ".bak"), ignore_errors=True)
+
+
+def site_exists(asset_id: str) -> bool:
+    """发布产物是否仍在（恢复时校准 publish 状态诚实性用）"""
+    return (SITES_DIR / asset_id).exists()
+
+
 def enqueue(asset_id: str) -> None:
     global _worker_started
     with _start_lock:
@@ -170,6 +182,16 @@ def _run_build(asset_id: str) -> None:
                 raise RuntimeError("渲染产物缺失 index.html")
 
             # 5. 原子替换正式产物（失败旧产物原样保留）
+            # 竞态守卫：构建期（实测可达 910s）资产可能被软删 → 写回前复核资产还在，
+            # 否则已删电子书在构建完成后"复活"成公网孤儿（绕过 §3.4 发布产物清理）
+            guard_db = SessionLocal()
+            try:
+                alive = guard_db.get(Asset, asset_id) is not None
+            finally:
+                guard_db.close()
+            if not alive:
+                log("=== 资产已被删除，放弃写入产物 ===")
+                return
             final_dir = SITES_DIR / asset_id
             final_dir.parent.mkdir(parents=True, exist_ok=True)
             bak = Path(str(final_dir) + ".bak")
