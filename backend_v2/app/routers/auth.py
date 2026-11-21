@@ -1,8 +1,8 @@
 """认证与会话 —— 规范 §3.1（V2 第一批接口，也是后续所有接口的写法模板）
 
 提供 4 个接口：
-  POST /api/auth/login      登录：限流检查 → 验密码 → 发 7 天 token
-                            （失败记一笔，错 5 次锁 30 秒）
+  POST /api/auth/login      登录：限流检查 → 验密码 → 删同账号旧会话 → 发 7 天 token
+                            （D41 单端登录：后登顶掉先登；失败记一笔，错 5 次锁 30 秒）
   POST /api/auth/logout     登出：把这行 token 从库里删掉
   GET  /api/auth/me         我是谁：返回当前账号完整资料（前端拿它判断登录态）
   PATCH /api/auth/password  改密：验原密码 → 改哈希 → 其他设备全部踢下线
@@ -63,6 +63,8 @@ def login(body: LoginIn, request: Request, db: DbSession = Depends(get_db)):
         raise ApiError(E_ACCOUNT_DISABLED, "账号已被停用", 401)
 
     clear_login_failures(db, ip)
+    # D41（2026-11-21）单端登录：同账号只留最新一处，先登的那台下次请求即 401
+    db.query(AuthSession).filter(AuthSession.account_id == account.id).delete()
     token = create_session(db, account, ip=ip, user_agent=request.headers.get("user-agent", ""))
     return ok(
         {

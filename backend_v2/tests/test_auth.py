@@ -7,11 +7,13 @@
     停用号 + 错误密码 → 仍 2001（防枚举原则不变）
   · me：带 token 正常返回、乱 token 拒、过期 token → 2003
   · 登出后原 token 立即失效
+  · D41 单端登录：同账号再次登录，先登那处立即失效（后登顶先登）
   · 改密：新密码太短拒、原密码错拒、成功后其他设备被踢、旧密码作废
   · 梯度限流：错 5 次第 6 次被锁 429；登录成功则计数清零
 """
 from app.db import SessionLocal
-from app.models import AuthSession
+from app.models import Account, AuthSession
+from app.security import create_session
 
 
 def test_login_success(client):
@@ -90,22 +92,42 @@ def test_logout_invalidates_token(client, login):
     assert after.json()["code"] == 2002
 
 
-def test_change_password_kills_other_sessions(client, login):
+def test_login_kicks_previous_session(client, login):
+    """D41 单端登录：同账号后登的顶掉先登的（用户实测场景：老师用学生号先登着，学生再登）"""
     first = login()
     second = login()
     h_first = {"Authorization": f"Bearer {first['token']}"}
     h_second = {"Authorization": f"Bearer {second['token']}"}
 
+    assert client.get("/api/auth/me", headers=h_second).status_code == 200
+    kicked = client.get("/api/auth/me", headers=h_first)
+    assert kicked.status_code == 401
+    assert kicked.json()["code"] == 2002  # 会话行已被删，按未登录处理
+
+
+def test_change_password_kills_other_sessions(client, login):
+    """D41 后登录互踢，正常登录拿不到并存会话 → 手工造一行"另一台设备"再验改密踢它"""
+    current = login()
+    db = SessionLocal()
+    try:
+        other_token = create_session(
+            db, db.query(Account).filter(Account.username == "admin").one()
+        )
+    finally:
+        db.close()
+    h_current = {"Authorization": f"Bearer {current['token']}"}
+    h_other = {"Authorization": f"Bearer {other_token}"}
+
     resp = client.patch(
         "/api/auth/password",
-        headers=h_first,
+        headers=h_current,
         json={"old_password": "111111", "new_password": "abcd1234"},
     )
     assert resp.status_code == 200 and resp.json()["code"] == 0
 
-    # 其他会话被踢下线，当前会话保留
-    assert client.get("/api/auth/me", headers=h_second).status_code == 401
-    assert client.get("/api/auth/me", headers=h_first).status_code == 200
+    # 另一台设备被踢下线，当前会话保留
+    assert client.get("/api/auth/me", headers=h_other).status_code == 401
+    assert client.get("/api/auth/me", headers=h_current).status_code == 200
 
     # 旧密码失效、新密码可登录
     assert client.post("/api/auth/login", json={"username": "admin", "password": "111111"}).status_code == 401
