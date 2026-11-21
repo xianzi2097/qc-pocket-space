@@ -767,68 +767,68 @@ html.dark[data-vp-theme='blue'] {
   --alert-tip-bg: #17293f;
 }
 
-/* ---------- 橙红（Scratch）· 浅色（D40：去猪肝红，提亮偏橙） ---------- */
+/* ---------- 橙红（Scratch）· 浅色（D40 去猪肝红；D41 再提亮偏黄更活泼） ---------- */
 [data-vp-theme='orange'] {
-  --spring-green-dark: #e8590c;
-  --spring-green: #f57316;
+  --spring-green-dark: #ff6b1a;
+  --spring-green: #ff8538;
   --spring-green-light: #fff1e6;
   --spring-green-lighter: #fff9f4;
   --spring-green-pale: rgba(255, 232, 214, 0.55);
-  --spring-strong: #c24a00;
-  --spring-link: #e8590c;
-  --spring-link-hover: #b34400;
+  --spring-strong: #d95a00;
+  --spring-link: #ff6b1a;
+  --spring-link-hover: #d05a00;
   --spring-selection: #ffe4cc;
 
   --spring-h1-fade: rgba(255, 195, 150, 0);
-  --spring-h2-underline: #f5893f;
+  --spring-h2-underline: #ff9d5f;
   --spring-h2-fade: rgba(255, 175, 110, 0);
   --spring-p-hover: rgba(255, 175, 115, 0.1);
-  --spring-em-hover: #d14e00;
-  --spring-code-text: #e8590c;
+  --spring-em-hover: #e85e00;
+  --spring-code-text: #ff6b1a;
   --spring-code-hover-bg: rgba(255, 235, 215, 0.85);
   --spring-code-block-text: #6b4a38;
   --spring-td-hover: rgba(255, 243, 232, 0.7);
-  --spring-hr-edge: #f09a68;
-  --spring-tagline: #b08a66;
+  --spring-hr-edge: #ffab7d;
+  --spring-tagline: #c09472;
   --spring-btn-hover-bg: #ffe6d2;
-  --spring-feature-hover-shadow: rgba(232, 89, 12, 0.12);
-  --spring-dot-1: #c24a00;
-  --spring-dot-2: #f06414;
-  --spring-dot-3: rgb(255, 175, 105);
-  --spring-syntax-kw: #e8590c;
-  --spring-syntax-fn: #f5731f;
+  --spring-feature-hover-shadow: rgba(255, 107, 26, 0.14);
+  --spring-dot-1: #d95a00;
+  --spring-dot-2: #ff7f30;
+  --spring-dot-3: rgb(255, 187, 125);
+  --spring-syntax-kw: #ff6b1a;
+  --spring-syntax-fn: #ff8538;
 
-  --alert-tip-border: #e8590c;
+  --alert-tip-border: #ff6b1a;
   --alert-tip-bg: #fff1e6;
 }
 
-/* ---------- 橙红（Scratch）· 暗色（D40 同步偏橙） ---------- */
+/* ---------- 橙红（Scratch）· 暗色（D41 同步小幅提亮） ---------- */
 html.dark[data-vp-theme='orange'] {
-  --spring-green-dark: #ff9a4d;
+  --spring-green-dark: #ffa65c;
   --spring-green-light: #3a2116;
   --spring-green-lighter: #42281c;
-  --spring-strong: #ffb684;
-  --spring-link: #ffa666;
-  --spring-link-hover: #ffcaa0;
+  --spring-strong: #ffc496;
+  --spring-link: #ffb47a;
+  --spring-link-hover: #ffd4b0;
   --spring-selection: #4a2a18;
 
   --spring-h1-fade: rgba(255, 154, 77, 0);
-  --spring-h2-underline: #ff9a4d;
+  --spring-h2-underline: #ffa65c;
   --spring-h2-fade: rgba(255, 154, 77, 0);
-  --spring-p-hover: rgba(255, 154, 77, 0.14);
-  --spring-em-hover: #ffcaa0;
-  --spring-code-text: #ffa666;
+  --spring-p-hover: rgba(255, 166, 92, 0.14);
+  --spring-em-hover: #ffd4b0;
+  --spring-code-text: #ffb47a;
   --spring-code-hover-bg: rgba(255, 224, 190, 0.14);
   --spring-code-block-text: #e8d5c8;
-  --spring-td-hover: rgba(255, 154, 77, 0.14);
-  --spring-hr-edge: #9d5d2e;
-  --spring-tagline: #cca07a;
+  --spring-td-hover: rgba(255, 166, 92, 0.14);
+  --spring-hr-edge: #a86735;
+  --spring-tagline: #d6ab88;
   --spring-btn-hover-bg: #4a2a18;
-  --spring-feature-hover-shadow: rgba(255, 154, 77, 0.2);
-  --spring-syntax-kw: #ff9a4d;
-  --spring-syntax-fn: #ffc096;
+  --spring-feature-hover-shadow: rgba(255, 166, 92, 0.2);
+  --spring-syntax-kw: #ffa65c;
+  --spring-syntax-fn: #ffcca8;
 
-  --alert-tip-border: #e8703a;
+  --alert-tip-border: #f08248;
   --alert-tip-bg: #3a2116;
 }
 
