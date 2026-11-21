@@ -767,7 +767,7 @@ html.dark[data-vp-theme='blue'] {
   --alert-tip-bg: #17293f;
 }
 
-/* ---------- 橙红（Scratch）· 浅色（D40 去猪肝红；D41 再提亮偏黄更活泼） ---------- */
+/* ---------- 橙红（Scratch）· 浅色（D40 去猪肝红；D42 再提亮偏黄更活泼） ---------- */
 [data-vp-theme='orange'] {
   --spring-green-dark: #ff6b1a;
   --spring-green: #ff8538;
@@ -802,7 +802,7 @@ html.dark[data-vp-theme='blue'] {
   --alert-tip-bg: #fff1e6;
 }
 
-/* ---------- 橙红（Scratch）· 暗色（D41 同步小幅提亮） ---------- */
+/* ---------- 橙红（Scratch）· 暗色（D42 同步小幅提亮） ---------- */
 html.dark[data-vp-theme='orange'] {
   --spring-green-dark: #ffa65c;
   --spring-green-light: #3a2116;
