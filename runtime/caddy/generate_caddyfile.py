@@ -2,7 +2,7 @@
 青橙 Studio - Caddyfile 生成器
 自动检测项目路径，注入绝对路径到 Caddyfile。
 零依赖，可直接用系统 Python 运行。
-用法: python generate_caddyfile.py local|server [域名] [fastapi端口] [caddy端口] [judge0上游] [agent域名]
+用法: python generate_caddyfile.py local|server [域名] [fastapi端口] [caddy端口] [judge0上游] [agent域名] [comfyui域名]
 """
 import os
 import sys
@@ -30,6 +30,9 @@ def main():
 
     # Agent 站点（如：qwen.codenova.cn）留空不生成，仅 server 模式；裸域名自动领证，http:// 前缀=不用 TLS
     agent_site = sys.argv[6].strip() if len(sys.argv) > 6 and sys.argv[6].strip() else ""
+
+    # 生图模型站点（如：comfyui.codenova.cn）留空不生成，仅 server 模式
+    comfy_site = sys.argv[7].strip() if len(sys.argv) > 7 and sys.argv[7].strip() else ""
 
     # Caddy 地址：本地模式用 `:端口`（纯HTTP），域名模式用 `域名:端口`
     if mode == "local":
@@ -64,6 +67,26 @@ def main():
 # ================= Agent 站点 =================
 {agent_site} {{
     reverse_proxy localhost:25553
+}}"""
+
+    # 生图模型站点（ComfyUI）：反代到 SSH 隧道 localhost:25554（朋友那台 Windows 机本机地址）
+    comfy_block = ""
+    if comfy_site and mode == "server":
+        comfy_block = f"""
+# ================= 生图模型站点（ComfyUI） =================
+{comfy_site} {{
+    # 网站前端跨域调用（ComfyUI 自身默认不带 CORS 头）
+    header {{
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization"
+    }}
+    @options {{
+        method OPTIONS
+    }}
+    respond @options 204
+
+    reverse_proxy localhost:25554
 }}"""
 
     # 构建 Caddyfile 内容（f-string 直接生成，无需模板文件）
@@ -127,7 +150,7 @@ def main():
         file_server
     }}
 
-}}{agent_block}"""
+}}{agent_block}{comfy_block}"""
 
     # 写出最终的 Caddyfile（覆盖旧的）
     caddyfile_path = os.path.join(script_dir, "Caddyfile")
@@ -139,6 +162,8 @@ def main():
     print(f"     域名   = {site_domain}")
     if agent_block:
         print(f"     Agent  = {agent_site} → localhost:25553")
+    if comfy_block:
+        print(f"     ComfyUI = {comfy_site} → localhost:25554")
     print(f"     文件   = {caddyfile_path}")
 
 
